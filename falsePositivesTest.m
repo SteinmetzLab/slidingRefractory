@@ -354,7 +354,7 @@ b = 1e-6:binSize:0.0055;
 
 baseRates = logspace(-0.3,1.3,8); 
 recDur = 3600; 
-rp = 0.004;
+rp = 0.002;
 contPct = 0:0.02:0.2;
 thresh = 0.2;
 
@@ -399,4 +399,229 @@ set(gcf, 'Color', 'w');
 box off; 
 xlabel('True contamination proportion'); 
 ylabel('Percentage of simulations that pass'); 
+
+
+% todo: 
+% - determine threshold firing rate where neurons start getting accepted
+% - see how this plot varies for different true refractory periods
+% - compare directly to a 'classic' test with fixed refractory period
 	
+
+%% determine threshold rate
+
+
+clear all; 
+
+nSim = 1000; 
+
+binSize = 0.0005;
+b = 1e-6:binSize:0.0055;
+
+baseRates = [0.1 0.5:0.05:1.5 3 10 20]; 
+recDur = 3600; 
+allrp = [0.0015 0.002 0.003 0.004 0.005];
+contPct = [0 0.1 0.2];
+thresh = 0.2;
+
+figure;  set(gcf, 'Color', 'w');
+for ridx = 1:numel(allrp)
+    rp = allrp(ridx);
+    subplot(1, numel(allrp), ridx);
+    passPct = zeros(numel(baseRates), numel(contPct));
+    colors = hsv(numel(contPct));
+    for c = 1:numel(contPct)
+        
+        for bidx = 1:numel(baseRates)
+            baseRate = baseRates(bidx);
+            
+            contRate = baseRate*contPct(c);
+            
+            m = arrayfun(@(xx)maxAcceptableISIviol2(baseRate, xx, recDur, baseRate/10, thresh), b(2:end-1));
+            
+            simRes = zeros(nSim, numel(b)-1);
+            for n = 1:nSim
+                
+                st = genST(baseRate,recDur);
+                isi = diff([0; st]); isi(isi<rp) = [];
+                st = cumsum(isi);
+                
+                contST = genST(contRate,recDur);
+                
+                combST = sort([st; contST]);
+                
+                [nComb,xACG] = histdiff(combST, combST, b);
+                
+                simRes(n,:) = cumsum(nComb);
+            end
+            
+            passPct(bidx,c) = sum(any(simRes(:,1:end-1)<=repmat(m,nSim,1),2))/nSim*100;
+            
+            
+        end
+        legH(c) = semilogx(baseRates, passPct(:,c), 'o-', 'Color', colors(c,:), 'MarkerFaceColor', colors(c,:));
+        
+        hold on; drawnow;
+    end
+    xlim([min(baseRates) max(baseRates)])
+    box off;
+    xlabel('Firing rate (sp/s)');
+    ylabel('Percentage of simulations that pass');
+    title(sprintf('true refractory = %.2f', rp*1000));
+    legend(legH, array2stringCell(contPct));
+
+end
+
+%% determine threshold rate, take 2
+
+clear all; 
+
+nSim = 1000; 
+
+binSize = 0.0005;
+b = 1e-6:binSize:0.0055;
+
+baseRates = 0.5*1.03.^(1:50);
+recDur = 3600; 
+allrp = [0.001:0.00025:0.005];
+contPct = 0; contRate = 0;
+thresh = 0.2;
+
+threshFR = zeros(size(allrp));
+for ridx = 1:numel(allrp)
+    rp = allrp(ridx);
+    bidx = 0; passPct = 0;
+    while passPct<100 && bidx<numel(baseRates)
+        bidx = bidx+1;
+        baseRate = baseRates(bidx);
+        m = arrayfun(@(xx)maxAcceptableISIviol2(baseRate, xx, recDur, baseRate/10, thresh), b(2:end-1));
+        
+        simRes = zeros(nSim, numel(b)-1);
+        for n = 1:nSim
+            
+            st = genST(baseRate,recDur);
+            isi = diff([0; st]); isi(isi<rp) = [];
+            st = cumsum(isi);
+            
+            contST = genST(contRate,recDur);
+            
+            combST = sort([st; contST]);
+            
+            [nComb,xACG] = histdiff(combST, combST, b);
+            
+            simRes(n,:) = cumsum(nComb);
+        end
+        passPct = sum(any(simRes(:,1:end-1)<=repmat(m,nSim,1),2))/nSim*100;
+    end
+    threshFR(ridx) = baseRates(bidx);
+end
+
+
+f = figure; f.Color = 'w';
+plot(allrp, threshFR, 'o-', 'LineWidth', 2.0);
+xlabel('refractory period (s)'); 
+ylabel('threshold firing rate (sp/s)');
+box off; 
+
+print(f, 'threshFR', '-dpdf')
+
+%% repeat plot for different RPs and compare to classic test
+
+
+clear all; 
+
+nSim = 500; 
+
+binSize = 0.0005;
+b = 1e-6:binSize:0.0055;
+classicIdx = find(b>0.002,1);
+
+baseRates = logspace(-0.3,1.3,8); 
+recDur = 3600; 
+allrp = [0.001:0.0005:0.005]; nrp = numel(allrp);
+contPct = 0:0.025:0.2;
+thresh = 0.2;
+
+f = figure; f.Color = 'w';
+
+
+colors = hsv(numel(baseRates));
+
+for ridx = 1:nrp
+    rp = allrp(ridx);
+    passPct = zeros(numel(baseRates), numel(contPct));
+    passPctClassic = zeros(numel(baseRates), numel(contPct));
+    for bidx = 1:numel(baseRates)
+        baseRate = baseRates(bidx);
+        for c = 1:numel(contPct)
+            
+            contRate = baseRate*contPct(c);
+            
+            m = arrayfun(@(xx)maxAcceptableISIviol2(baseRate, xx, recDur, baseRate/10, thresh), b(2:end-1));
+            
+            simRes = zeros(nSim, numel(b)-1);
+            for n = 1:nSim
+                
+                st = genST(baseRate,recDur);
+                isi = diff([0; st]); isi(isi<rp) = [];
+                st = cumsum(isi);
+                
+                contST = genST(contRate,recDur);
+                
+                combST = sort([st; contST]);
+                
+                [nComb,xACG] = histdiff(combST, combST, b);
+                
+                simRes(n,:) = cumsum(nComb);
+            end
+            
+            passPct(bidx,c) = sum(any(simRes(:,1:end-1)<=repmat(m,nSim,1),2))/nSim*100;
+            passPctClassic(bidx,c) = sum(simRes(:,classicIdx-1)<=m(classicIdx-1))/nSim*100;
+            
+        end
+        subplot(2,nrp,ridx);hold on;
+        legH(bidx) = plot(contPct, passPct(bidx,:), 'o-', 'Color', colors(bidx,:), 'MarkerFaceColor', colors(bidx,:));
+        subplot(2,nrp,ridx+nrp);hold on;
+        legHc(bidx) = plot(contPct, passPctClassic(bidx,:), 'o-', 'Color', colors(bidx,:), 'MarkerFaceColor', colors(bidx,:));
+        
+        drawnow;
+    end
+    subplot(2,nrp,ridx); title(sprintf('New test. True RP = %.1f', 1000*rp));
+    subplot(2,nrp,ridx+nrp); title(sprintf('Classic test. True RP = %.1f', 1000*rp));
+    for pidx = 0:1
+        subplot(2,nrp,ridx+nrp*pidx)
+        ylim([0 100]);
+        addX(0.1);        
+        box off; 
+        xlabel('True contamination proportion');
+        ylabel('Percentage of simulations that pass');
+        
+    end
+end
+legend(legH, array2stringCell(baseRates));
+
+print(f, 'rpCompare', '-dpdf')
+print(f, 'rpCompare', '-dpng')
+
+
+%% now to run the metric on real neurons and save the output
+
+thresh = 0.2; 
+recDur = st(end)-st(1); 
+binSize = 0.0005;
+b = 1e-6:binSize:0.0055;
+classicIdx = find(b>0.002,1);
+
+
+
+for c = 1:numel(cid)
+    thisST = st(clu==cid(c)); 
+    thisRate = numel(thisST)/recDur; 
+    m = arrayfun(@(xx)maxAcceptableISIviol2(thisRate, xx, recDur, thisRate/10, thresh), b(2:end-1));
+
+    [n,xACG] = histdiff(thisST, thisST, b);
+    
+    res = cumsum(n); 
+    
+    pass(c) = any(res(1:end-1)<=m);
+    passClassic(c) = res(classicIdx-1)<=m(classicIdx-1);
+end
