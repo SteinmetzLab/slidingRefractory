@@ -26,7 +26,8 @@ figure; imagesc(rp, cont, confMatrix)
 
 %% test plotting
 
-cidx =26;
+% cidx =1;
+cidx = find(cids==22);
 st = allst(clu==cids(cidx));
 params = struct();
 params.cidx = cids(cidx);

@@ -37,7 +37,7 @@ for cidx = 1:numel(cids)
         rpMetrics(cidx).confMatrix = confMatrix;
     end
     if verbose
-        if maxConfidenceAt10Cont>=90; pfstring = 'PASS'; else pfstring = 'FAIL'; end;
+        if minContWith90Confidence<=10; pfstring = 'PASS'; else pfstring = 'FAIL'; end;
         fprintf(1, '  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n', ...
             cids(cidx), pfstring, maxConfidenceAt10Cont, ...
             minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2);

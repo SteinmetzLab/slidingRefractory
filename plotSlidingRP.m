@@ -17,7 +17,7 @@ xlabel('Time from spike (ms)');
 ylabel('ACG count (spks)'); 
 t1 = title(sprintf('Cluster #%d: FR=%.2f', params.cidx, firingRate)); 
 hold on; 
-fill([0 1 1 0]*0.5, [0 0 1 1]*max(ylim()), 'k', 'FaceAlpha', 0.2); 
+fill([0 1 1 0]*0.5, [0 0 1 1]*max(ylim()), 'k', 'FaceAlpha', 0.2, 'EdgeAlpha', 0); 
 box off; 
 
 
@@ -35,7 +35,7 @@ if ~isnan(timeOfLowestCont)
     plot(rp*1000, contContour, 'r', 'LineWidth', 2.0); 
 end
 
-fill([0 1 1 0]*0.5, [0 0 1 1]*max(ylim()), 'k', 'FaceAlpha', 0.5); 
+fill([0 1 1 0]*0.5, [0 0 1 1]*max(ylim()), 'k', 'FaceAlpha', 0.5, 'EdgeAlpha', 0); 
 
 h = colorbar;
 h.Label.String = 'Confidence (%)'; 
@@ -66,6 +66,6 @@ xlabel('Time from spike (ms)');
 ylabel('Confidence of \leq10% contamination (%)'); 
 box off; hold on; 
 plot([0 5], [90 90], 'r'); 
-fill([0 1 1 0]*0.5, [0 0 1 1]*100, 'k', 'FaceAlpha', 0.2); 
+fill([0 1 1 0]*0.5, [0 0 1 1]*100, 'k', 'FaceAlpha', 0.2, 'EdgeAlpha', 0); 
 xlim([0 5]); 
 ylim([0 100]); 
