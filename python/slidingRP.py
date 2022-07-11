@@ -12,11 +12,96 @@ from phylib.stats import correlograms
 from types import SimpleNamespace
 
 
+def slidingRP_all(spikeTimes, spikeClusters, params = None):
+    '''
+    
+    Compute the metric for each cluster in a recording
+    
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (ms)
+    spikeClusters : TYPE
+        DESCRIPTION.
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
+        params.sampleRate : sample rate of the recording (Hz)
+
+    Returns
+    -------
+    rpMetrics: dict
+        keys:
+            maxConfidenceAt10Cont
+            minContWith90Confidence
+            timeOfLowestCont
+            nSpikesBelow2
+            confMatrix (optional, if returnMatrix ==1)
+    cont: nd.array
+        Vector of contamination values tested      
+    rp: nd.array
+        Vector of refractory period durations tested  
+
+    '''
+
+if params and 'returnMatrix' in params:
+    returnMatrix = params['returnMatrix'] 
+else:
+    returnMatrix = False
+
+
+if params and 'verbose' in params:
+    verbose = params['verbose']; 
+else:
+    verbose = False
+
+
+cids = np.unique(spikeClusters)
+
+#initialize rpMetrics as dict
+rpMetrics = {}
+rpMetrics['cid'] = []
+rpMetrics ['maxConfidenceAt10Cont'] = []
+rpMetrics['minContWith90Confidence'] = []
+rpMetrics['timeOfLowestCont'] = []
+rpMetrics['nSpikesBelow2'] = []
+
+if verbose:
+    print("Computing metrics for %d clusters \n" % len(cids))
+    
+for cidx in range(len(cids)):
+    st = spikeTimes[spikeClusters==cids[cidx]] 
+    
+    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+        nSpikesBelow2, confMatrix, cont, rp, nACG,
+        firingRate] = slidingRP(st, params)
+
+    rpMetrics['cid'].append(cids[cidx]) 
+    rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
+    rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
+    rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
+    rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+    
+    if returnMatrix:
+        if 'confMatrix' not in rpMetrics:
+            rpMetrics['confMatrix'] = []
+        rpMetrics['confMatrix'].append(confMatrix)
+        
+    if verbose:
+        if minContWith90Confidence<=10:
+            pfstring = 'PASS'
+        else: 
+            pfstring = 'FAIL'
+        print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+
+    return rpMetrics, cont, rp
+
+
 def slidingRP(spikeTimes, params):
 
     '''     
+    Compute the metric for one cluster
     
-        Parameters
+    Parameters
     ----------
     spikeTimes : TYPE
         DESCRIPTION.
@@ -91,7 +176,6 @@ def computeMatrix(spikeTimes, params):
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
         params.sampleRate : sample rate of the recording (Hz)
-    DESCRIPTION.
 
     Returns
     -------
