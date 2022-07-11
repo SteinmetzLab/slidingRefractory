@@ -43,55 +43,55 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
 
     '''
 
-if params and 'returnMatrix' in params:
-    returnMatrix = params['returnMatrix'] 
-else:
-    returnMatrix = False
-
-
-if params and 'verbose' in params:
-    verbose = params['verbose']; 
-else:
-    verbose = False
-
-
-cids = np.unique(spikeClusters)
-
-#initialize rpMetrics as dict
-rpMetrics = {}
-rpMetrics['cid'] = []
-rpMetrics ['maxConfidenceAt10Cont'] = []
-rpMetrics['minContWith90Confidence'] = []
-rpMetrics['timeOfLowestCont'] = []
-rpMetrics['nSpikesBelow2'] = []
-
-if verbose:
-    print("Computing metrics for %d clusters \n" % len(cids))
+    if params and 'returnMatrix' in params:
+        returnMatrix = params['returnMatrix'] 
+    else:
+        returnMatrix = False
     
-for cidx in range(len(cids)):
-    st = spikeTimes[spikeClusters==cids[cidx]] 
     
-    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-        nSpikesBelow2, confMatrix, cont, rp, nACG,
-        firingRate] = slidingRP(st, params)
-
-    rpMetrics['cid'].append(cids[cidx]) 
-    rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
-    rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
-    rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
-    rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+    if params and 'verbose' in params:
+        verbose = params['verbose']; 
+    else:
+        verbose = False
     
-    if returnMatrix:
-        if 'confMatrix' not in rpMetrics:
-            rpMetrics['confMatrix'] = []
-        rpMetrics['confMatrix'].append(confMatrix)
-        
+    
+    cids = np.unique(spikeClusters)
+    
+    #initialize rpMetrics as dict
+    rpMetrics = {}
+    rpMetrics['cid'] = []
+    rpMetrics ['maxConfidenceAt10Cont'] = []
+    rpMetrics['minContWith90Confidence'] = []
+    rpMetrics['timeOfLowestCont'] = []
+    rpMetrics['nSpikesBelow2'] = []
+    
     if verbose:
-        if minContWith90Confidence<=10:
-            pfstring = 'PASS'
-        else: 
-            pfstring = 'FAIL'
-        print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+        print("Computing metrics for %d clusters \n" % len(cids))
+     
+    for cidx in range(len(cids)):
+        st = spikeTimes[spikeClusters==cids[cidx]] 
+        
+        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+            nSpikesBelow2, confMatrix, cont, rp, nACG,
+            firingRate] = slidingRP(st, params)
+    
+        rpMetrics['cid'].append(cids[cidx]) 
+        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
+        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
+        rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
+        rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+        
+        if returnMatrix:
+            if 'confMatrix' not in rpMetrics:
+                rpMetrics['confMatrix'] = []
+            rpMetrics['confMatrix'].append(confMatrix)
+            
+        if verbose:
+            if minContWith90Confidence<=10:
+                pfstring = 'PASS'
+            else: 
+                pfstring = 'FAIL'
+            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
 
     return rpMetrics, cont, rp
 
@@ -140,17 +140,20 @@ def slidingRP(spikeTimes, params):
     
     
     indsConf90 = np.row_stack(np.where(confMatrix[:,testTimes]>90))
-    [ii,jj] = np.where(confMatrix[:,testTimes]>90) 
+    ii = indsConf90[0] #row inds
+    jj = indsConf90[1] #col inds
+    
+
     try:
-        ii = indsConf90[0] #row inds
-        jj = indsConf90[1] #col inds
         minI = np.min(ii)
         idx = np.argmin(ii)
-        minContWith90Confidence = cont[minI]  
+        minContWith90Confidence = cont[minI]
+        minRP = np.argmax(confMatrix[minI,testTimes])
+
     except:     #TODO check that this doesn't have any other kind of error
         minContWith90Confidence = np.nan
     
-    minRP = np.argmax(confMatrix[minI,testTimes])
+        minRP = np.nan# np.argmax(confMatrix[minI,testTimes])
     try:
        timeOfLowestCont = rp[minRP+np.where(testTimes)[0][0]]
     except: 
@@ -160,8 +163,7 @@ def slidingRP(spikeTimes, params):
     nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]])
 
 
-    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-           nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
+    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
     
     
     
@@ -193,13 +195,13 @@ def computeMatrix(spikeTimes, params):
     spikeCount = len(spikeTimes)
     #setup for acg
     clustersIds = [0] # call the cluster id 0 (not used, but required input for correlograms)
-    spikeClusters = np.zeros(len(ts), dtype = 'int8') # each spike time gets cluster id 0 
-    
-    # compute an acg in 1s bins to compute the firing rate 
-    nACG = correlograms(spikeTimes, spikeClusters, cluster_ids = clustersIds, bin_size = 1, sample_rate = params.sampleRate, window_size=2,symmetrize=False)[0][0] #compute acg
+    spikeClustersACG = np.zeros(len(spikeTimes), dtype = 'int8') # each spike time gets cluster id 0 
+
+    # compute an acg in 1s bins to compute the firing rate  
+    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = 1, sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
     firingRate = nACG[1] / spikeCount
         
-    nACG = correlograms(spikeTimes, spikeClusters, cluster_ids = clustersIds, bin_size = params.binSizeCorr, sample_rate = params.sampleRate, window_size=2,symmetrize=False)[0][0] #compute acg
+    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = params['binSizeCorr'], sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
 
     confMatrix = np.empty((len(cont), len(rp)))
     confMatrix[:] = np.nan
@@ -258,6 +260,20 @@ params = {}
 params['sampleRate'] = []
 params['sampleRate'] = 30000
 params['binSizeCorr'] = 1 / params['sampleRate']
-params = SimpleNamespace(**params) #convert to dot notation
+# params = SimpleNamespace(**params) #convert to dot notation
+params['returnMatrix'] = True
+params['verbose'] = True
 
-mat = computeMatrix(spikeTimes, params)
+# mat = computeMatrix(spikeTimes, params)
+#load sample data
+nickname = 'Hopkins'
+spikeTimes = np.load(datapath + '\\spike_times.npy').flatten() 
+if nickname == 'Hopkins':
+    #convert from samples to seconds
+    spikeTimes = spikeTimes/params['sampleRate']
+
+spikeClusters = np.load(datapath + '\\spike_clusters.npy')
+
+#%%
+#run slidingRP for the loaded recording
+slidingRP_all(spikeTimes, spikeClusters, params = params)
