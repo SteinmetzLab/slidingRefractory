@@ -6,6 +6,7 @@ function plotSlidingRP(spikeTimes, params)
     nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
     = slidingRP(spikeTimes, params);
 
+nSpikesBelow2
 f = figure; f.Color = 'w';
 fp = f.Position;
 f.Position = [fp(1) fp(2) 1300 369];

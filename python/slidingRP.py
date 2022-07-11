@@ -51,22 +51,32 @@ def slidingRP(spikeTimes, params):
     testTimes = rp>0.0005 # (in seconds) 
     #only test for refractory period durations greater than 0.5 ms
     
-    # maxConfidenceAt10Cont = max(confMatrix(cont==10, testTimes)); 
+    maxConfidenceAt10Cont = max(confMatrix[cont==10,testTimes]) #TODO check behavior if no max
     
-    # [ii,jj] = find(confMatrix(:,testTimes)>90); 
-    # [minI, idx] = min(ii); 
-    # minContWith90Confidence = cont(minI);  
-    # if isempty(minContWith90Confidence); minContWith90Confidence = NaN; end
     
-    # [~,minRP] = max(confMatrix(minI,testTimes)); 
-    # timeOfLowestCont = rp(minRP+find(testTimes,1));
-    # if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
+    indsConf90 = np.row_stack(np.where(confMatrix[:,testTimes]>90))
+    [ii,jj] = np.where(confMatrix[:,testTimes]>90) 
+    try:
+        ii = indsConf90[0] #row inds
+        jj = indsConf90[1] #col inds
+        minI = np.min(ii)
+        idx = np.argmin(ii)
+        minContWith90Confidence = cont[minI]  
+    except:     #TODO check that this doesn't have any other kind of error
+        minContWith90Confidence = np.nan
     
-    # nSpikesBelow2 = sum(nACG(1:find(rp>0.002,1)));
+    minRP = np.argmax(confMatrix[minI,testTimes])
+    try:
+       timeOfLowestCont = rp[minRP+np.where(testTimes)[0][0]]
+    except: 
+        timeOfLowestCont = np.nan
+        
+    
+    nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]])
 
 
-    # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
-    # nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
+    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+           nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
     
     
     
