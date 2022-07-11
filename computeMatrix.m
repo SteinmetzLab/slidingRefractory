@@ -3,7 +3,7 @@ function [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, pa
 
 cont = 0.5:0.5:35; 
 % rpEdges = (0:10*30)/30000; % 10 ms at 30kHz
-rpBinSize = 0.1/1000; 
+rpBinSize = 1/30000;
 rpEdges = 0:rpBinSize:10/1000;
 
 % compute firing rate and spike count
