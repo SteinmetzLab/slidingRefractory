@@ -10,6 +10,9 @@ compute the metric for a single cluster (neuron) in a recording
 
 from phylib.stats import correlograms
 from types import SimpleNamespace
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
 
 
 def slidingRP_all(spikeTimes, spikeClusters, params = None):
@@ -75,7 +78,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
             nSpikesBelow2, confMatrix, cont, rp, nACG,
             firingRate] = slidingRP(st, params)
     
-        rpMetrics['cid'].append(cids[cidx]) 
+        rpMetrics['cidx'].append(cids[cidx]) 
         rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
         rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
@@ -254,6 +257,103 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     return confidenceScore
 
 
+def plotSlidingRP(spikeTimes, params):
+    '''
+    
+
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (ms)
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
+        params.sampleRate : sample rate of the recording (Hz)
+
+    Returns
+    -------
+    None.
+
+    '''
+
+    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+        nSpikesBelow2, confMatrix, cont, rp, nACG, 
+        firingRate]  = slidingRP(spikeTimes, params)
+    
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (12,4))
+    
+    ax = axs[0]
+    ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0)) #TODO width??
+    ax.set_xlim([0, 5]) 
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_ylabel('ACG count (spks)')
+    t1 = ('Cluster #%d: FR=%.2f' %(params['cidx'][0], firingRate))
+    ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    
+    ax = axs[1]
+    c = ax.imshow(confMatrix, extent = [rp[0]*1000, rp[-1]*1000, cont[0], cont[-1]], aspect = 'auto', vmin = 0, vmax = 100, origin = 'lower')
+    ax.set_xlim((0,5))
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    cbar = fig.colorbar(c, ax = ax, location = 'right')
+    cbar.set_label('Confidence (%)')
+    ax.invert_yaxis()
+    ax.plot([rp[0]*1000, rp[-1]*1000], [10, 10], 'r', linewidth = 1)
+    
+    if ~np.isnan(timeOfLowestCont):
+        ax.plot(timeOfLowestCont*1000*np.array([1, 1]), [cont[0], cont[-1]],'r', linewidth = 1)
+    
+        # compute the conf=90 contour
+        #zeropad confMatrix 
+        z = np.zeros((np.shape(confMatrix)[0]+1,np.shape(confMatrix)[1]))
+        z[1:,:] = confMatrix
+        
+        ii = np.argmax(z>90, 0).astype(float)  
+        ii[ii==0] = np.nan
+        contContour = np.empty(np.shape(ii)); contContour[:] = np.nan
+        contContour[~np.isnan(ii)] = cont[(ii[~np.isnan(ii)]-1).astype(int)]
+        ax.plot(rp*1000, contContour, 'r', linewidth = 2)
+    val = ax.get_ylim()[1]
+    # ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 1) 
+    ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
+    # ax.add_patch(patches.Rectangle((0,0), 0.5, val, fc = 'k') )
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_xlim([0, 5]) 
+    ax.set_ylabel('Contamination (%)')
+    # ax.set_ylim([max(cont),0]) #seems unnecessary?
+    t2 = ('max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms'% (maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000))
+    
+    
+    if minContWith90Confidence >= 10:
+        axs[0].set_title(t1, color='g')                   
+        axs[1].set_title(t2,color = 'g')
+    elif nSpikesBelow2 == 0:
+        axs[0].set_title(t1, color='g')                   
+        axs[1].set_title(t2,color = 'g')
+    else:
+        axs[0].set_title(t1, color='r')                   
+        axs[1].set_title(t2,color = 'r')
+        
+        
+    
+    ax = axs[2]
+    ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'k', linewidth = 2.0)
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_ylabel('Confidence of \leq10% contamination (%)')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    ax.plot([0, 5], [90, 90], 'r'); 
+    ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
+    ax.set_xlim([0, 5]); 
+    ax.set_ylim([0, 100]); 
+    
+    fig.tight_layout()
+
 #%% script testing
 
 params = {}
@@ -277,3 +377,12 @@ spikeClusters = np.load(datapath + '\\spike_clusters.npy')
 #%%
 #run slidingRP for the loaded recording
 slidingRP_all(spikeTimes, spikeClusters, params = params)
+
+
+
+#%%
+#run plotting code for one cluster
+
+params['cidx'] = [0]
+st = spikeTimes[spikeClusters == params['cidx'][0]]
+plotSlidingRP(st, params)
