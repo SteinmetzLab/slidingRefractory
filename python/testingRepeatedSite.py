@@ -104,7 +104,7 @@ passpass = 0
 failpass = 0
 failfail = 0
 passfail = 0
-nClusters = len(oldMetricValue)
+nClusters = len(rpMetrics['oldMetricValue'])
 for c in range(nClusters):
     if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
         passpass +=1
@@ -221,16 +221,56 @@ for s in range(nSess)[0:1]:
     spikeClusters = spikes.clusters[cluInds]
     
     #%%
+    
+from brainbox.singlecell import firing_rate, acorr
+from phylib.stats import correlograms
+
 subject = insertions[s]['session']['subject']
 #load saved rpMetrics
 file = open(savefile + subject + '.pickle','rb')
 rpMetrics = pickle.load(file)
 file.close()    
+ 
+timeBins = np.arange(1/sampleRate, 1, 1/sampleRate)
+nClusters = len(rpMetrics['oldMetricValue'])
+for cluster_id in range(nClusters)[0:10]:   
+    c = rpMetrics['cidx'][cluster_id]
+    st = spikeTimes[spikeClusters==c] 
+    spikeCount = len(st)
+    sampleRate = 30000
     
-cluster_id = 0    
-c = rpMetrics['cidx'][cluster_id]
-st = spikeTimes[spikeClusters==c] 
+    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+    nSpikesBelow2, confMatrix, cont, rp, nACG,
+    firingRate,xx] = slidingRP(st, params)
+    
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize = (12,4))
+    
+    ax = axs[0]
+    histWin = 0.5 #seconds
+    binnedFR = firing_rate(st,hist_win = histWin, fr_win =  10)
+    ax.plot(np.arange(0,recDur,histWin),binnedFR, 'k')
+    recDur = st[-1]-st[0]
+    firingRateSC = spikeCount / recDur
+    rpOld = bool(rpMetrics['oldMetricValue'][cluster_id])
+    rpNew = bool(rpMetrics['value'][cluster_id])
+    
+    if rpOld:
+        rpOld = 'PASS'
+    else:
+        rpOld = 'FAIL'
+    if rpNew:
+        rpNew= 'PASS'
+    else:
+        rpNew = 'FAIL' 
+        
+    ax.set_title('FR from ACG = %.2f   FR from SC = %.2f'%(firingRate, firingRateSC))
+    ax.set_ylabel('FR (spks/s)')
 
+    ax = axs[1]
+    ax.plot(timeBins,nACG[1:-1],'k')
+    ax.set_title('old:%s, new:%s'%(rpOld, rpNew))
+    ax.set_ylabel('ACG count (spks)')
+    ax.set_xlabel('Time (s)')
 
 
 
