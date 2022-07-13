@@ -39,6 +39,8 @@ nSpikesBelow2, confMatrix, cont, rp, nACG,
 firingRate,xx] = slidingRP(st, params)
 
 
+
+
  #%%
 #run plotting code for one cluster
 
@@ -50,8 +52,13 @@ plotSlidingRP(st, params)
 #%%
 #run slidingRP for the loaded recording
 
-slidingRP_all(spikeTimes, spikeClusters, params = params)
-
-
+[rpMetrics, cont, rp, sc, frrd] = slidingRP_all(spikeTimes, spikeClusters, params = params)
+#%%
+fig,ax = plt.subplots(1,1)
+ax.scatter(sc[0:10],frrd[0:10])
+ax.set_xlabel('spikecount')
+ax.set_ylabel('firingrate * recDur')
+xlims = ax.get_xlim()
+ax.plot( [0,xlims[1]],[0,xlims[1]] )
 
 

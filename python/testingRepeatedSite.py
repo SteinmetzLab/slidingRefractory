@@ -289,7 +289,7 @@ for s in range(nSess):
     subject = insertions[s]['session']['subject']
     #load saved rpMetrics
     file = open(savefile + subject + '.pickle','rb')
-    rpMetrics = pickle.load(file)
+    rpMetricsUpdated = pickle.load(file)
     file.close()
     
     print('Comparing old and  new RP values for session %d / %d'%(s, nSess))

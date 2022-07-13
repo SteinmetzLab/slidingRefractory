@@ -74,6 +74,10 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
     if verbose:
         print("Computing metrics for %d clusters \n" % len(cids))
      
+    frrd = np.empty(len(cids))
+    frrd[:] = np.nan    
+    sc = np.empty(len(cids))
+    sc[:] = np.nan
     for cidx in range(len(cids)):
         st = spikeTimes[spikeClusters==cids[cidx]] 
         
@@ -86,6 +90,12 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
         rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+        
+        spikeCount = len(st)
+        recDur = st[-1]-st[0]
+        frrd[cidx] = firingRate * recDur
+        sc[cidx] = spikeCount
+        
         
         if returnMatrix:
             if 'confMatrix' not in rpMetrics:
@@ -107,7 +117,10 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
                 pfstring = 'FAIL'
             print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
             # print('Seconds elapsed: %.2f%%'%secondsElapsed)
-    return rpMetrics, cont, rp
+    
+    # fig,ax = plt.subplots(1,1)
+    # ax.scatter(scfr,fr,'k.')
+    return rpMetrics, cont, rp, sc, frrd
 
 
 def slidingRP(spikeTimes, params):
