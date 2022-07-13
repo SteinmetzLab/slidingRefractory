@@ -180,6 +180,62 @@ for s in range(nSess):
     ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
            rotation=20)
         
+    
 #%%
-print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+
+#Look into why neurons go from pass to fail and why some neurons go from fail to pass
+nSess = len(insertions)
+
+for s in range(nSess)[0:1]:
+    subject = insertions[s]['session']['subject']
+    #load saved rpMetrics
+    file = open(savefile + subject + '.pickle','rb')
+    rpMetrics = pickle.load(file)
+    file.close()
+    
+    print(f'processing {s + 1}/{len(insertions)}')
+    eid = insertions[s]['session']['id']
+    probe = insertions[s]['probe_name']
+    pid = insertions[s]['probe_insertion']
+
+
+    # Load in spikesorting
+    sl = SpikeSortingLoader(eid=eid, pname=probe, one=one, atlas=ba)
+    spikes, clusters, channels = sl.load_spike_sorting()
+    clusters = sl.merge_clusters(spikes, clusters, channels)
+
+
+  
+
+    clusters['rep_site_acronym'] = combine_regions(clusters['acronym'])
+    # Find clusters that are in the repeated site brain regions
+    cluster_idx = np.sort(np.where(np.isin(clusters['rep_site_acronym'], BRAIN_REGIONS))[0])
+    
+    #save the 'old' (computed in pipeline) slidingRP metric value
+    oldMetricValue = [clusters['slidingRP_viol'][x] for x in cluster_idx]
+    
+    #now rerun code in steinmetzlabrepo
+    print('Loading spike times and clusters...')
+    cluInds = np.array(list(x for x in range(len(spikes.clusters)) if spikes.clusters[x] in cluster_idx)) #this takes forever??
+    spikeTimes = spikes.times[cluInds]
+    spikeClusters = spikes.clusters[cluInds]
+    
+    #%%
+subject = insertions[s]['session']['subject']
+#load saved rpMetrics
+file = open(savefile + subject + '.pickle','rb')
+rpMetrics = pickle.load(file)
+file.close()    
+    
+cluster_id = 0    
+c = rpMetrics['cidx'][cluster_id]
+st = spikeTimes[spikeClusters==c] 
+
+
+
+
+
+
+
+
 
