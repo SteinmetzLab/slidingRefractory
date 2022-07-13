@@ -3,3 +3,4 @@
 *.DS_Store
 *.m~
 plotSlidingRP.m
+*.pickle
