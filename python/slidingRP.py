@@ -12,6 +12,9 @@ from phylib.stats import correlograms
 from types import SimpleNamespace
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import numpy as np
+from scipy import stats
+
 
 
 
@@ -62,7 +65,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
     
     #initialize rpMetrics as dict
     rpMetrics = {}
-    rpMetrics['cid'] = []
+    rpMetrics['cidx'] = []
     rpMetrics ['maxConfidenceAt10Cont'] = []
     rpMetrics['minContWith90Confidence'] = []
     rpMetrics['timeOfLowestCont'] = []
@@ -94,7 +97,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
                 pfstring = 'PASS'
             else: 
                 pfstring = 'FAIL'
-            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
 
     return rpMetrics, cont, rp
 
@@ -153,17 +156,19 @@ def slidingRP(spikeTimes, params):
         minContWith90Confidence = cont[minI]
         minRP = np.argmax(confMatrix[minI,testTimes])
 
+
     except:     #TODO check that this doesn't have any other kind of error
         minContWith90Confidence = np.nan
     
         minRP = np.nan# np.argmax(confMatrix[minI,testTimes])
+
     try:
-       timeOfLowestCont = rp[minRP+np.where(testTimes)[0][0]]
+        timeOfLowestCont = rp[minRP+np.where(testTimes)[0][0]+1]
     except: 
         timeOfLowestCont = np.nan
         
     
-    nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]])
+    nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]+1])
 
 
     return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
@@ -366,6 +371,7 @@ params['verbose'] = True
 
 # mat = computeMatrix(spikeTimes, params)
 #load sample data
+datapath = r'E:\Hopkins_CortexLab'
 nickname = 'Hopkins'
 spikeTimes = np.load(datapath + '\\spike_times.npy').flatten() 
 if nickname == 'Hopkins':
@@ -375,7 +381,17 @@ if nickname == 'Hopkins':
 spikeClusters = np.load(datapath + '\\spike_clusters.npy')
 
 #%%
+#run slidingRP for ONE CLUSTER (DEBUGGING)
+params['cidx'] = [0]
+st = spikeTimes[spikeClusters == params['cidx'][0]]
+
+[maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+nSpikesBelow2, confMatrix, cont, rp, nACG,
+firingRate] = slidingRP(st, params)
+
+#%%
 #run slidingRP for the loaded recording
+
 slidingRP_all(spikeTimes, spikeClusters, params = params)
 
 
