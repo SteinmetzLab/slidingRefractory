@@ -274,8 +274,65 @@ for cluster_id in range(nClusters)[0:10]:
 
 
 
+#%%
+#TODO: also check what about passing/failing in general!! i.e. including other 2 single unit quality metrics!
 
-
+# compare old metric value to new one for all sessions 
+nSess = len(insertions)
+plotEach = False
+passpassAll = 0
+failfailAll = 0
+failpassAll = 0
+passfailAll = 0
+nClustersAll = 0
+for s in range(nSess):
+    subject = insertions[s]['session']['subject']
+    #load saved rpMetrics
+    file = open(savefile + subject + '.pickle','rb')
+    rpMetrics = pickle.load(file)
+    file.close()
+    
+    print('Comparing old and  new RP values for session %d / %d'%(s, nSess))
+    passpass = 0
+    failpass = 0
+    failfail = 0
+    passfail = 0
+    nClusters = len(rpMetrics['oldMetricValue'])
+    nClustersAll += nClusters
+    for c in range(nClusters):
+        if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+            passpass +=1
+            passpassAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
+            failpass +=1
+            failpassAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
+            failfail +=1
+            failfailAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
+            passfail +=1
+            passfailAll +=1
+            
+      
+    if plotEach:
+        fig,ax = plt.subplots(1,1)
+        ax.bar([1,2,3,4], np.array([passpass,failfail,passfail, failpass])/nClusters)
+        pRemain = (passpass + failfail) / nClusters *100 
+        pChange = (passfail + failpass) / nClusters *100
+        ax.set_title('Session %s; %s;  %d clusters; %.2f%% remained and %.2f%% changed'%(s, subject, nClusters, pRemain, pChange ))
+        ax.set_ylabel('Proportion of clusters')
+        ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+               rotation=20)
+        
+    fig,ax = plt.subplots(1,1)
+    ax.bar([1,2,3,4], np.array([passpassAll, failfailAll, passfailAll, failpassAll])/nClustersAll)
+    pRemainAll = (passpassAll + failfailAll) / nClustersAll *100 
+    pChangeAll = (passfailAll + failpassAll) / nClustersAll *100
+    ax.set_title('All sessions:  %d clusters; %.2f%% remained and %.2f%% changed'%(nClustersAll, pRemainAll, pChangeAll ))
+    ax.set_ylabel('Proportion of clusters')
+    ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+           rotation=20)
+        
 
 
 
