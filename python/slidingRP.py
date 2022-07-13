@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 from scipy import stats
-
+import time
 
 
 
@@ -79,7 +79,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
         
         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
             nSpikesBelow2, confMatrix, cont, rp, nACG,
-            firingRate] = slidingRP(st, params)
+            firingRate, secondsElapsed] = slidingRP(st, params)
     
         rpMetrics['cidx'].append(cids[cidx]) 
         rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
@@ -92,13 +92,21 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
                 rpMetrics['confMatrix'] = []
             rpMetrics['confMatrix'].append(confMatrix)
             
+        
+        if 'value' not in rpMetrics:
+            rpMetrics['value'] = []
+        if minContWith90Confidence<=10:
+            rpMetrics['value'].append(1)
+        else: 
+            rpMetrics['value'].append(0)
+            
         if verbose:
             if minContWith90Confidence<=10:
                 pfstring = 'PASS'
             else: 
                 pfstring = 'FAIL'
             print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
-
+            # print('Seconds elapsed: %.2f%%'%secondsElapsed)
     return rpMetrics, cont, rp
 
 
@@ -135,7 +143,7 @@ def slidingRP(spikeTimes, params):
     nACG: the autocorrelogram of the neuron
     firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
     '''
-
+    seconds_start = time.time()
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
     # matrix is [nCont x nRP]
     
@@ -170,8 +178,8 @@ def slidingRP(spikeTimes, params):
     
     nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]+1])
 
-
-    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate
+    secondsElapsed = time.time()-seconds_start
+    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
     
     
     
@@ -361,44 +369,45 @@ def plotSlidingRP(spikeTimes, params):
 
 #%% script testing
 
-params = {}
-params['sampleRate'] = []
-params['sampleRate'] = 30000
-params['binSizeCorr'] = 1 / params['sampleRate']
-# params = SimpleNamespace(**params) #convert to dot notation
-params['returnMatrix'] = True
-params['verbose'] = True
+# params = {}
+# params['sampleRate'] = []
+# params['sampleRate'] = 30000
+# params['binSizeCorr'] = 1 / params['sampleRate']
+# # params = SimpleNamespace(**params) #convert to dot notation
+# params['returnMatrix'] = True
+# params['verbose'] = True
 
-# mat = computeMatrix(spikeTimes, params)
-#load sample data
-datapath = r'E:\Hopkins_CortexLab'
-nickname = 'Hopkins'
-spikeTimes = np.load(datapath + '\\spike_times.npy').flatten() 
-if nickname == 'Hopkins':
-    #convert from samples to seconds
-    spikeTimes = spikeTimes/params['sampleRate']
+# # mat = computeMatrix(spikeTimes, params)
+# #load sample data
+# datapath = r'E:\Hopkins_CortexLab'
+# nickname = 'Hopkins'
+# spikeTimes = np.load(datapath + '\\spike_times.npy').flatten() 
+# if nickname == 'Hopkins':
+#     #convert from samples to seconds
+#     spikeTimes = spikeTimes/params['sampleRate']
 
-spikeClusters = np.load(datapath + '\\spike_clusters.npy')
+# spikeClusters = np.load(datapath + '\\spike_clusters.npy')
 
-#%%
-#run slidingRP for ONE CLUSTER (DEBUGGING)
-params['cidx'] = [0]
-st = spikeTimes[spikeClusters == params['cidx'][0]]
+# #%%
+# #run slidingRP for ONE CLUSTER (DEBUGGING)
+# params['cidx'] = [0]
+# st = spikeTimes[spikeClusters == params['cidx'][0]]
 
-[maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-nSpikesBelow2, confMatrix, cont, rp, nACG,
-firingRate] = slidingRP(st, params)
+# [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+# nSpikesBelow2, confMatrix, cont, rp, nACG,
+# firingRate] = slidingRP(st, params)
 
-#%%
-#run slidingRP for the loaded recording
+# #%%
+# #run slidingRP for the loaded recording
 
-slidingRP_all(spikeTimes, spikeClusters, params = params)
+# slidingRP_all(spikeTimes, spikeClusters, params = params)
 
 
 
-#%%
-#run plotting code for one cluster
+# #%%
+# #run plotting code for one cluster
 
-params['cidx'] = [0]
-st = spikeTimes[spikeClusters == params['cidx'][0]]
-plotSlidingRP(st, params)
+# params['cidx'] = [0]
+# st = spikeTimes[spikeClusters == params['cidx'][0]]
+# plotSlidingRP(st, params)
+

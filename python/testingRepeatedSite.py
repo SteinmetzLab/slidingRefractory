@@ -16,12 +16,14 @@ from scipy.stats import gaussian_kde
 import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\paper-reproducible-ephys')
 sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\metrics\slidingRP')
+sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python')
 #from reproducible_ephys_functions import query
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 import mpl_scatter_density # adds projection='scatter_density'
 from matplotlib.colors import LinearSegmentedColormap
 from one.api import ONE
+from slidingRP import *
 one = ONE()
 
 
@@ -39,6 +41,15 @@ from ibllib.atlas import AllenAtlas
 ba = AllenAtlas()
 
 insertions = get_insertions(level=2, one=one, freeze='biorxiv_2022_05')
+
+#set up params for slidingRP_all
+params = {}
+params['sampleRate'] = []
+params['sampleRate'] = 30000
+params['binSizeCorr'] = 1 / params['sampleRate']
+params['returnMatrix'] = True
+params['verbose'] = True
+
 
 all_recordings = []
 for iIns, ins in enumerate(insertions[0:1]):
@@ -67,12 +78,47 @@ for iIns, ins in enumerate(insertions[0:1]):
         oldMetricValue = [clusters['slidingRP_viol'][x] for x in cluster_idx]
         
         #now rerun code in steinmetzlabrepo
+        print('Loading spike times and clusters...')
+        cluInds = np.array(list(x for x in range(len(spikes.clusters)) if spikes.clusters[x] in cluster_idx)) #this takes forever??
+        spikeTimes = spikes.times[cluInds]
+        spikeClusters = spikes.clusters[cluInds]
         
+        print('Running RP metric...')
+        rpMetrics, cont, rp = slidingRP_all(spikeTimes, spikeClusters, params)
         
+        rpMetrics['oldMetricValue'] = oldMetricValue
+        
+
+        with open('filename.pickle', 'wb') as handle:
+            pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
     except:
         print('error')
+
+#%%
+print('Comparing old and  new RP values...')
+#now compare old metric value to new
+passpass = 0
+failpass = 0
+failfail = 0
+passfail = 0
+nClusters = len(oldMetricValue)
+for c in range(nClusters):
+    if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+        passpass +=1
+    elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
+        failpass +=1
+    elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
+        failfail +=1
+    elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
+        passfail +=1
         
+        
+plt.bar([1,2,3,4], np.array([passpass,failfail,passfail, failpass])/nClusters)
+plt.title('Session #1: 639 clusters: 86.5% remained and 13.5% changed')
+plt.ylabel('Proportion of clusters')
+plt.xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+       rotation=20)
         #%%
         data['cluster_ids'] = clusters['cluster_id'][cluster_idx]
         data['RPmetric'] = clusters['cluster']
