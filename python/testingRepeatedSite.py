@@ -24,6 +24,7 @@ import mpl_scatter_density # adds projection='scatter_density'
 from matplotlib.colors import LinearSegmentedColormap
 from one.api import ONE
 from slidingRP import *
+import pickle
 one = ONE()
 
 
@@ -41,7 +42,7 @@ from ibllib.atlas import AllenAtlas
 ba = AllenAtlas()
 
 insertions = get_insertions(level=2, one=one, freeze='biorxiv_2022_05')
-
+savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\savedRSmetrics\\'
 #set up params for slidingRP_all
 params = {}
 params['sampleRate'] = []
@@ -52,7 +53,7 @@ params['verbose'] = True
 
 
 all_recordings = []
-for iIns, ins in enumerate(insertions[0:1]):
+for iIns, ins in enumerate(insertions):
 
     try:
         print(f'processing {iIns + 1}/{len(insertions)}')
@@ -88,16 +89,17 @@ for iIns, ins in enumerate(insertions[0:1]):
         
         rpMetrics['oldMetricValue'] = oldMetricValue
         
-
-        with open('filename.pickle', 'wb') as handle:
-            pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        with open(savefile + ins['session']['subject'] + '.pickle', 'wb') as handle:
+            pickle.dump(rpMetrics, handle)
         
     except:
         print('error')
 
 #%%
+
+# compare old metric value to new for one session 
 print('Comparing old and  new RP values...')
-#now compare old metric value to new
 passpass = 0
 failpass = 0
 failfail = 0
@@ -119,20 +121,65 @@ plt.title('Session #1: 639 clusters: 86.5% remained and 13.5% changed')
 plt.ylabel('Proportion of clusters')
 plt.xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
        rotation=20)
-        #%%
-        data['cluster_ids'] = clusters['cluster_id'][cluster_idx]
-        data['RPmetric'] = clusters['cluster']
-        
-        #Todo: better way to do this?
-        x = []
-        for cluster in cluster_idx:
-            x.append(list(spikes['times'][np.where(spikes['clusters'] == cluster)[0]]))
-        clusters['ts'] = x
-        # # Find spikes that are from the clusterIDs
-        # spike_idx = np.isin(spikes['clusters'], data['cluster_ids'])
-        # if np.sum(spike_idx) == 0:
-        #     continue
-        all_recordings.append(clusters)
+
+
+#%% 
+# compare old metric value to new one for all sessions 
+nSess = len(insertions)
+plotEach = False
+passpassAll = 0
+failfailAll = 0
+failpassAll = 0
+passfailAll = 0
+nClustersAll = 0
+for s in range(nSess):
+    subject = insertions[s]['session']['subject']
+    #load saved rpMetrics
+    file = open(savefile + subject + '.pickle','rb')
+    rpMetrics = pickle.load(file)
+    file.close()
+    
+    print('Comparing old and  new RP values for session %d / %d'%(s, nSess))
+    passpass = 0
+    failpass = 0
+    failfail = 0
+    passfail = 0
+    nClusters = len(rpMetrics['oldMetricValue'])
+    nClustersAll += nClusters
+    for c in range(nClusters):
+        if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+            passpass +=1
+            passpassAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
+            failpass +=1
+            failpassAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
+            failfail +=1
+            failfailAll +=1
+        elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
+            passfail +=1
+            passfailAll +=1
             
-    except Exception as err:
-        print(f'{pid} errored: {err}')
+      
+    if plotEach:
+        fig,ax = plt.subplots(1,1)
+        ax.bar([1,2,3,4], np.array([passpass,failfail,passfail, failpass])/nClusters)
+        pRemain = (passpass + failfail) / nClusters *100 
+        pChange = (passfail + failpass) / nClusters *100
+        ax.set_title('Session %s; %s;  %d clusters; %.2f%% remained and %.2f%% changed'%(s, subject, nClusters, pRemain, pChange ))
+        ax.set_ylabel('Proportion of clusters')
+        ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+               rotation=20)
+        
+    fig,ax = plt.subplots(1,1)
+    ax.bar([1,2,3,4], np.array([passpassAll, failfailAll, passfailAll, failpassAll])/nClustersAll)
+    pRemainAll = (passpassAll + failfailAll) / nClustersAll *100 
+    pChangeAll = (passfailAll + failpassAll) / nClustersAll *100
+    ax.set_title('All sessions:  %d clusters; %.2f%% remained and %.2f%% changed'%(nClustersAll, pRemainAll, pChangeAll ))
+    ax.set_ylabel('Proportion of clusters')
+    ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+           rotation=20)
+        
+#%%
+print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+
