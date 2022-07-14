@@ -285,54 +285,120 @@ failfailAll = 0
 failpassAll = 0
 passfailAll = 0
 nClustersAll = 0
+
+
+
+for iIns, ins in enumerate(insertions):
+    try:
+        print(f'processing {iIns + 1}/{len(insertions)}')
+        eid = ins['session']['id']
+        probe = ins['probe_name']
+        pid = ins['probe_insertion']
+        #load rpMetrics:
+        subject = ins['session']['subject']
+        #load saved rpMetrics
+        file = open(savefile + subject + '.pickle','rb')
+        rpMetricsTesting = pickle.load(file)
+        file.close()
+
+    
+        # Load in spikesorting
+        sl = SpikeSortingLoader(eid=eid, pname=probe, one=one, atlas=ba)
+        spikes, clusters, channels = sl.load_spike_sorting()
+        clusters = sl.merge_clusters(spikes, clusters, channels)
+
+    
+  
+    
+        clusters['rep_site_acronym'] = combine_regions(clusters['acronym'])
+        # Find clusters that are in the repeated site brain regions
+        cluster_idx = np.sort(np.where(np.isin(clusters['rep_site_acronym'], BRAIN_REGIONS))[0])
+        
+        #save the 'old' (computed in pipeline) slidingRP metric value
+        oldMetricValue = [clusters['slidingRP_viol'][x] for x in cluster_idx]
+        noise_cutoff = [clusters['noise_cutoff'][x] for x in cluster_idx]
+        amp_median = [clusters['amp_median'][x] for x in cluster_idx]
+        IBLgoodLabel = [clusters['label'][x] for x in cluster_idx]
+    
+    
+        rpMetricsTesting['noise_cutoff'] = noise_cutoff
+        rpMetricsTesting['amp_median'] = amp_median
+        rpMetricsTesting['IBLgoodLabel'] = IBLgoodLabel
+        
+        with open(savefile + ins['session']['subject'] + 'Updated.pickle', 'wb') as handle:
+            pickle.dump(rpMetricsTesting, handle)
+    except: 
+        print('data loading problem')
+    
+    
+#%%
+  # now  compare ALL METRICS with updated rp, for all sessions
+nSess = len(insertions)
+plotEach = True
+passpassLabelAll = 0
+failfailLabelAll = 0
+failpassLabelAll = 0
+passfailLabelAll = 0
+nClustersAll = 0
 for s in range(nSess):
     subject = insertions[s]['session']['subject']
     #load saved rpMetrics
-    file = open(savefile + subject + '.pickle','rb')
-    rpMetricsUpdated = pickle.load(file)
+    file = open(savefile + subject + 'Updated.pickle','rb')
+    rpMetrics = pickle.load(file)
     file.close()
     
     print('Comparing old and  new RP values for session %d / %d'%(s, nSess))
-    passpass = 0
-    failpass = 0
-    failfail = 0
-    passfail = 0
+    passpassLabel = 0
+    failpassLabel = 0
+    failfailLabel = 0
+    passfailLabel = 0
     nClusters = len(rpMetrics['oldMetricValue'])
     nClustersAll += nClusters
     for c in range(nClusters):
-        if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
-            passpass +=1
-            passpassAll +=1
-        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
-            failpass +=1
-            failpassAll +=1
-        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
-            failfail +=1
-            failfailAll +=1
+
+        if rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
+        #check whether this even matters: what was the label?
+            if rpMetrics['IBLgoodLabel'][c] < 2/3:
+                #then this didn't matter, the label stays
+                failfailLabel +=1
+                failfailLabelAll +=1 
+            elif rpMetrics['IBLgoodLabel'][c]==2/3:
+                #then this updated the metric (from fail to pass)
+                failpassLabel +=1
+                failpassLabelAll +=1 
         elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
-            passfail +=1
-            passfailAll +=1
-            
+        #check whether this even matters: what was the label?
+            if rpMetrics['IBLgoodLabel'][c] > 2/3:
+                passfailLabel +=1
+                passfailLabelAll +=1 
+                #then this updated the metric (from pass to fail)       
+            elif rpMetrics['IBLgoodLabel'][c]<=2/3:
+                passpassLabel +=1
+                passpassLabelAll +=1
+                #then this didn't matter, the label stays       
+        #also check the old cases that don't matter at all and increment passpass and failfail
+        elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
+            failfailLabel +=1
+            failfailLabelAll +=1   
+        elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+            passpassLabel +=1
+            passpassLabelAll +=1
       
     if plotEach:
         fig,ax = plt.subplots(1,1)
-        ax.bar([1,2,3,4], np.array([passpass,failfail,passfail, failpass])/nClusters)
-        pRemain = (passpass + failfail) / nClusters *100 
-        pChange = (passfail + failpass) / nClusters *100
-        ax.set_title('Session %s; %s;  %d clusters; %.2f%% remained and %.2f%% changed'%(s, subject, nClusters, pRemain, pChange ))
+        ax.bar([1,2,3,4], np.array([passpassLabel,failfailLabel,passfailLabel, failpassLabel])/nClusters)
+        pRemainLabel = (passpassLabel + failfailLabel) / nClusters *100 
+        pChangeLabel = (passfailLabel + failpassLabel) / nClusters *100
+        ax.set_title('Session %s; %s; (iblgoodlabel)  %d clusters; %.2f%% remained and %.2f%% changed'%(s, subject, nClusters, pRemainLabel, pChangeLabel ))
         ax.set_ylabel('Proportion of clusters')
         ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
                rotation=20)
         
     fig,ax = plt.subplots(1,1)
-    ax.bar([1,2,3,4], np.array([passpassAll, failfailAll, passfailAll, failpassAll])/nClustersAll)
-    pRemainAll = (passpassAll + failfailAll) / nClustersAll *100 
-    pChangeAll = (passfailAll + failpassAll) / nClustersAll *100
-    ax.set_title('All sessions:  %d clusters; %.2f%% remained and %.2f%% changed'%(nClustersAll, pRemainAll, pChangeAll ))
+    ax.bar([1,2,3,4], np.array([passpassLabelAll, failfailLabelAll, passfailLabelAll, failpassLabelAll])/nClustersAll)
+    pRemainLabelAll = (passpassLabelAll + failfailLabelAll) / nClustersAll *100 
+    pChangeLabelAll = (passfailLabelAll + failpassLabelAll) / nClustersAll *100
+    ax.set_title('All sessions (iblgood label):  %d clusters; %.2f%% remained and %.2f%% changed'%(nClustersLabelAll, pRemainLabelAll, pChangeLabelAll ))
     ax.set_ylabel('Proportion of clusters')
     ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
            rotation=20)
-        
-
-
-
