@@ -54,6 +54,8 @@ plotSlidingRP(st, params)
 
 [rpMetrics, cont, rp, sc, frrd] = slidingRP_all(spikeTimes, spikeClusters, params = params)
 #%%
+
+
 fig,ax = plt.subplots(1,1)
 ax.scatter(sc[0:10],frrd[0:10])
 ax.set_xlabel('spikecount')
@@ -61,4 +63,25 @@ ax.set_ylabel('firingrate * recDur')
 xlims = ax.get_xlim()
 ax.plot( [0,xlims[1]],[0,xlims[1]] )
 
+#%%
+#look into neurons where spike count is greater than firing rate * recDur 
+# these should be neurons that now pass (spike count) and previously failed  (fr * recDur)
+candidateNeurs = np.where((sc-frrd)>0)[0]
 
+oldVal = np.array([rpMetricsUpdated['oldMetricValue'][x] for x in candidateNeurs])
+newVal = np.array([rpMetricsUpdated['value'][x] for x in candidateNeurs])
+
+print(newVal-oldVal) # there is only one such neuron!
+
+#%%
+# try it the other way:
+oldVal = np.array([rpMetricsUpdated['oldMetricValue'][x] for x in range(len(rpMetricsUpdated['oldMetricValue']))])
+newVal = np.array([rpMetricsUpdated['value'][x] for x in range(len(rpMetricsUpdated['oldMetricValue']))])
+
+idxFailPass = np.where(newVal-oldVal > 0 )[0]
+fig,ax = plt.subplots(1,1)
+ax.scatter(sc[idxFailPass], frrd[idxFailPass])
+ax.set_xlabel('spikecount')
+ax.set_ylabel('firingrate * recDur')
+xlims = ax.get_xlim()
+ax.plot( [0,xlims[1]],[0,xlims[1]] )
