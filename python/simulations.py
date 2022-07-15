@@ -179,6 +179,7 @@ def plotSimulations(pc,params):
     fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.5)
 
     fig.legend(handles, labels, loc='upper center')
+    fig.show()
 
 #%%
 #script testing (to be moved later for import purposes)
@@ -215,10 +216,23 @@ params = {
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
-    'verbose': True    
+    'verbose': True ,
+    'savePCfile': True
     
 }
-
-pc = simulateContNeurons(params)
 #%%
+pc = simulateContNeurons(params)
+
+if params['savePCfile']:
+    savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC'
+    with open(savefile + str(params['nSim']) + 'iter.pickle', 'wb') as handle:
+        pickle.dump(pc, handle)
+            
+#%%
+
+
+file = open(savefile + str(params['nSim']) + 'iter.pickle','rb')
+pc = pickle.load(file)
+file.close()
+
 plotSimulations(pc,params)
