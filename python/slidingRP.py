@@ -379,3 +379,115 @@ def plotSlidingRP(spikeTimes, params):
     ax.set_ylim([0, 100]); 
     
     fig.tight_layout()
+
+
+def fitSigmoidACG(acg, timeBins, params):
+    '''
+    
+
+    Parameters
+    ----------
+    acg : np.array
+        heights of acg bins (probability of spike for each timebin)
+    timeBins : np.array
+        timeBins used when computing acg
+    params : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    estimatedRP:
+        
+    x: 
+        
+    y: 
+
+    '''
+    
+    if len(acg) > len(timeBins):
+        acg = acg[0:len(timeBins)]
+
+    if params['numSpikesThresh'] is None:
+        numSpikesThresh = 20  # need at least this many total spikes to compute fit
+    else:
+        numSpikesThresh = params['numSpikesThresh']
+    
+    peakDistFromEndBin = 5 #todo: params!! 
+        
+    estimated_RP = np.nan #initialize as a nan for cases where it doesn't work
+    
+    if(sum(acg)>numSpikesThresh):   
+
+        #potential todo: insert a case here for if the acg is symmetric?
+        # p0 = [np.mean(ydata),2,1,min(ydata)] #starting point for fit? 
+        minSigmoid = np.mean(acg[rp<0.0005]) #first 0.5 ms of data #todo make this parameter
+        peakIdx = np.argmax(acg)        
+        peakVal = np.max(acg)
+        
+        #2ms around peak
+        timeValuesMin = np.where(rp >= rp[peakIdx]-0.001)[0][0]
+        timeValuesMax = np.where(rp <= rp[peakIdx]+0.001)[0][-1]
+        maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax+1)])
+
+        #if the peak is well before the end of the acg, only fit data up to the peak + n bins
+        if peakIdx < len(acg)-peakDistFromEndBin:
+            acg = acg[0:peakIdx + peakDistFromEndBin]
+            rp = rp[0:peakIdx + peakDistFromEndBin]
+    
+        #fit the sigmoid with max and min fixed
+        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), rp, acg)
+        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
+
+        xSigmoid = np.linspace(0,rp[-1],1000) #evenly spaced vector for plotting sigmoid
+        ySigmoid = sigmoid(x, *fitParams)
+    
+            #find RP            
+        RPEstimateFromPercentageOfSlope = 0.10
+        estimateIdx, _ = closest(y, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
+        estimatedRP = 1000* xSigmoid[estimateIdx] # in ms
+
+
+
+            
+        # except: 
+        #     print('Failed to fit sigmoid')
+            
+            
+        return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+    
+def plotSigmoid(ax, timeBins, sigmoid, estimatedRP):
+    
+        ax.plot(timeBins, sigmoid,'k')
+        ax.plot(timeBins[estimateIdx], sigmoid[estimateIdx],'rx')
+    
+    
+    
+    
+    
+    
+    
+    #helper functions    
+def find_nearest(array, value):
+    array = np.asarray(array)
+    subtracted = (array - value)
+    valid_idx = np.where(subtracted >= 0)[0]
+    if len(valid_idx)>0:
+
+        out = valid_idx[subtracted[valid_idx].argmin()]
+
+    else:
+        out = np.nan
+    
+    return out
+
+
+def sigmoid(x, L, x0, k, b): # L is max value; x0 is the midpoint x value; k is the steepness, b is the baseline shift
+    y = L / (1 + np.exp(-k*(x-x0)))+b
+    return y
+
+
+def closest(lst, K):
+      
+     lst = np.asarray(lst)
+     idx = (np.abs(lst - K)).argmin()
+     return idx, lst[idx]

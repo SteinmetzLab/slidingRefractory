@@ -85,3 +85,8 @@ ax.set_xlabel('spikecount')
 ax.set_ylabel('firingrate * recDur')
 xlims = ax.get_xlim()
 ax.plot( [0,xlims[1]],[0,xlims[1]] )
+
+
+#%% script for testing sigmoid fits
+fitSigmoidACG(acg, timeBins, params)
+plotSigmoid(ax, timeBins, sigmoid, estimatedRP)
