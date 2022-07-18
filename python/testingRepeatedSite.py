@@ -461,7 +461,7 @@ for s in range(nSess):
                 passpassLabelAll +=1
 
             elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0: #WE DON'T CARE BECAUSE IT WILL FAIL ANYWAY
-                failpassLabelAllIgnore+=1    
+                passfailLabelAllIgnore+=1    
             # passfailLabel +=1
                 # passfailLabelAll +=1
             
