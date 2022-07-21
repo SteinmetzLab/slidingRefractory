@@ -9,6 +9,11 @@ code to run simulations for slidingRefractory metric
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import datetime
+
+
+
+
 
 def genST(rate, duration, params = None):
     '''
@@ -59,7 +64,11 @@ def simulateContNeurons(params):
 
     
     #initialize matrices of percent neurons pass
-    passPct = np.zeros([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPct = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPct[:] = np.nan
+    passPct2MsNoSpikes = np.zeros([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPct2MsNoSpikes[:] = np.nan
+    
     # passPctOld = np.zeros([len(recDurScalarVec), len(rpvec),len(baseRates), len(contPct)])
     start_time = time. time()
     
@@ -79,7 +88,7 @@ def simulateContNeurons(params):
                 cidx=0
                 for c in params['contRates']:
                     contRate = baseRate*c
-                    print('contRate %.2f'%contRate)
+                    print('contRate %.2f'%c)
 
                     # rpidx=np.where(b<rp)[0][-1]+1 #???????
                     # mfunc =np.vectorize(genST)
@@ -95,6 +104,8 @@ def simulateContNeurons(params):
                     # simResOld = np.zeros([nSim])
                     passVec = np.empty(params['nSim'])
                     passVec[:] = np.nan
+                    passVec2MsNoSpikes = np.empty(params['nSim'])
+                    passVec2MsNoSpikes[:] = np.nan
                     for n in range(params['nSim']):
                         st = genST(baseRate,recDur,params) #generate a spike train with the current base rate
                         isi = np.diff(np.insert(st,0,0)) 
@@ -116,13 +127,17 @@ def simulateContNeurons(params):
                         else:
                             passVec[n] = 0
                         
-                        
+                        passVec2MsNoSpikes[n] = passVec[n]
+                        if nSpikesBelow2 ==0:
+                            passVec2MsNoSpikes[n] = 1
                         # c0 = correlograms(combST,np.zeros(len(combST),dtype='int8'),cluster_ids=[0],bin_size=binSize,sample_rate=20000,window_size=.05,symmetrize=False)
                         # simRes[n,:] = np.cumsum(c0[0,0,1:(len(b)-1)])
                         # len(simRes)
                         # simResOld[n] = contamination_alt(np.asarray(combST))
                         # #pass_vec_old.append(int(ce<0.1))
                     passPct[j, i, bidx,cidx]=sum(passVec)/params['nSim']*100
+                    passPct2MsNoSpikes[j, i, bidx,cidx]=sum(passVec2MsNoSpikes)/params['nSim']*100
+
                     # passPctOld[j, i, bidx,cidx]= sum([ce<0.1 for ce in simResOld])/nSim*100
                     cidx+=1
     
@@ -131,108 +146,36 @@ def simulateContNeurons(params):
     current_time = time. time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))       
-    return passPct
+    return passPct, passPct2MsNoSpikes
          
-
-# with open('percentPass%0.0f.pickle'%round(nSim),'wb') as f:
-#     pickle.dump([passPct, passPctOld],f)
-
-
-
-
-
     
-def plotSimulations(pc,params):
-    
-        # for j, recDurScalar in enumerate(params['recDurs']):
-        # recDur = recDurScalar*3600
-        # print('recording Duration %d'%recDur)   
-        # for i, rp in enumerate(params['RPs']):
-        #     print('refractory period duration %.3f'%rp)
-        #     thresh = params['threshold']
-    
-        #     bidx=0
-        #     for baseRate in params['baseRates']:
-        #         print('baseRate %.2f'%baseRate)
-        #         cidx=0
-        #         for c in params['contRates']:
-        #             print('contRate %.2f'%contRate)
-        
+def plotSimulations(pc,params, savefile):
+ 
     colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(params['baseRates'])))
+    fig,axs = plt.subplots(len(params['recDurs']),len(params['RPs']), figsize = (12,3*len(params['recDurs'])))
 
-
-    fig,axs = plt.subplots(len(params['recDurs']),len(params['RPs']), figsize = (12,10))
     for j, recDur in enumerate(params['recDurs']):
         for i, rp in enumerate(params['RPs']):
-            ax = axs[j,i]
+            
+            if len(params['recDurs']) > 1 and len(params['RPs'])>1:
+                ax = axs[j,i]
+            else:
+                ax = axs[(j+1)*i]
             #different base rates get different colors
             for b, baseRate in enumerate(params['baseRates']):
                 ax.plot(params['contRates'], pc[j, i, b,:], '.-',color = colors[b], label = baseRate)
                 ax.set_ylabel('Percent pass')
                 ax.set_xlabel('Proportion contamination')
-                ax.set_title('RP %.3f s; recDur %.3f hours'%(rp, recDur/3600))
-                # ax.legend()
+                ax.set_title('True RP %d ms'%(rp*1000))
+        print(j)
+        fig.text(0.425, 0.92-(.3*j), 'Recording duration: %d hours'%recDur)
    
     handles, labels = ax.get_legend_handles_labels()
     print(handles)
     print(labels)
-    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.5)
+    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
-    fig.legend(handles, labels, loc='upper center')
-    fig.show()
-
-#%%
-#script testing (to be moved later for import purposes)
-
-# from simulations import genST  # this is not working, for some reason it's importing a different simulations gensT
-baseRate = 10 #spks/s
-recDur = 3600 #seconds
-params = {}
-params['checkFR']  = 1
-st = genST(meanRate, recDur, xx = None, params = params)
-
-isi = np.diff(np.insert(st,0,0)) #add a zero to the beginning to includ the "first" isi? 
-isi = np.delete(isi,np.where(isi<rp)[0]) 
-st = np.cumsum(isi)
-if c>0:
-    contST = genST(contRate,recDur)
-else:
-    contST=[]
-combST = np.sort(np.concatenate((st, contST)))
+    fig.legend(handles, labels, loc='upper right')
 
 
-
-#%%
-sampleRate = 30000
-params = {
-    'recDurs': np.array([0.25, 0.5, 1, 2, 5]),  #recording durations (hours)
-    'RPs': np.array([0.001,0.0015, 0.002, 0.003, 0.004, 0.005]), #true RP (s)
-    'baseRates': np.array([ 0.5, 1, 2, 5, 10, 20]), #FR (spk/s)
-    'contRates':  np.arange(0.00,0.225, 0.025), #contamination levels (proportion)
-    'nSim': 20,
-    'threshold': 0.1,
-    'binSize': 1 / sampleRate,
-    'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
-    'checkFR': False,
-    'binSizeCorr': 1 / sampleRate,
-    'returnMatrix': True,
-    'verbose': True ,
-    'savePCfile': True
-    
-}
-#%%
-pc = simulateContNeurons(params)
-
-if params['savePCfile']:
-    savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC'
-    with open(savefile + str(params['nSim']) + 'iter.pickle', 'wb') as handle:
-        pickle.dump(pc, handle)
-            
-#%%
-
-
-file = open(savefile + str(params['nSim']) + 'iter.pickle','rb')
-pc = pickle.load(file)
-file.close()
-
-plotSimulations(pc,params)
+    fig.savefig(savefile, dpi = 500)
