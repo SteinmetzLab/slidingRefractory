@@ -53,7 +53,7 @@ spikeClusters = np.load(datapath + '\\spike_clusters.npy')
 
 #%%
 #run slidingRP for one cluster
-params['cidx'] = [73]
+params['cidx'] = [0]
 st = spikeTimes[spikeClusters == params['cidx'][0]]
 print(len(st))
 [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
@@ -125,5 +125,9 @@ ax.plot( [0,xlims[1]],[0,xlims[1]] )
 
 
 #%% script for testing sigmoid fits
-fitSigmoidACG(acg, timeBins, params)
-plotSigmoid(ax, timeBins, sigmoid, estimatedRP)
+estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(nACG, rp, params)
+
+#%%
+fig,axs = plt.subplots(1,1,figsize = (12,10))
+ax = axs
+plotSigmoid(ax, nACG, xSigmoid, ySigmoid, estimateIdx)

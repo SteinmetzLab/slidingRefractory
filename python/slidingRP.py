@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 from scipy import stats
+from scipy.optimize import curve_fit
 import time
 
 
@@ -238,7 +239,6 @@ def computeMatrix(spikeTimes, params):
         
         # compute observed violations
         obsViol = sum(nACG[0:rpIdx+1]) #TODO this is off slightly (half-bin) from matlab...
-        print(obsViol)
         for cidx in range(len(cont)):
 
             confMatrix[cidx, rpIdx] = 100*computeViol(obsViol, firingRate, 
@@ -308,8 +308,7 @@ def plotSlidingRP(spikeTimes, params):
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (12,4))
     
     ax = axs[0]
-    print(rp)
-    print(nACG)
+
     ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0)) #TODO width??
     ax.set_xlim([0, 5]) 
     ax.set_xlabel('Time from spike (ms)')
@@ -409,7 +408,7 @@ def fitSigmoidACG(acg, timeBins, params):
     if len(acg) > len(timeBins):
         acg = acg[0:len(timeBins)]
 
-    if params['numSpikesThresh'] is None:
+    if 'numSpikesThresh' not in params.keys():
         numSpikesThresh = 20  # need at least this many total spikes to compute fit
     else:
         numSpikesThresh = params['numSpikesThresh']
@@ -422,45 +421,38 @@ def fitSigmoidACG(acg, timeBins, params):
 
         #potential todo: insert a case here for if the acg is symmetric?
         # p0 = [np.mean(ydata),2,1,min(ydata)] #starting point for fit? 
-        minSigmoid = np.mean(acg[rp<0.0005]) #first 0.5 ms of data #todo make this parameter
+        minSigmoid = np.mean(acg[timeBins<0.0005]) #first 0.5 ms of data #todo make this parameter
         peakIdx = np.argmax(acg)        
         peakVal = np.max(acg)
         
         #2ms around peak
-        timeValuesMin = np.where(rp >= rp[peakIdx]-0.001)[0][0]
-        timeValuesMax = np.where(rp <= rp[peakIdx]+0.001)[0][-1]
+        timeValuesMin = np.where(timeBins >= timeBins[peakIdx]-0.001)[0][0]
+        timeValuesMax = np.where(timeBins <= timeBins[peakIdx]+0.001)[0][-1]
         maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax+1)])
 
         #if the peak is well before the end of the acg, only fit data up to the peak + n bins
         if peakIdx < len(acg)-peakDistFromEndBin:
             acg = acg[0:peakIdx + peakDistFromEndBin]
-            rp = rp[0:peakIdx + peakDistFromEndBin]
+            timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
     
         #fit the sigmoid with max and min fixed
-        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), rp, acg)
+        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), timeBins, acg)
         fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
 
-        xSigmoid = np.linspace(0,rp[-1],1000) #evenly spaced vector for plotting sigmoid
-        ySigmoid = sigmoid(x, *fitParams)
+        xSigmoid = np.linspace(0, timeBins[-1], 1000) #evenly spaced vector for plotting sigmoid
+        ySigmoid = sigmoid(xSigmoid, *fitParams)
     
             #find RP            
         RPEstimateFromPercentageOfSlope = 0.10
-        estimateIdx, _ = closest(y, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
+        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
         estimatedRP = 1000* xSigmoid[estimateIdx] # in ms
-
-
-
-            
-        # except: 
-        #     print('Failed to fit sigmoid')
-            
-            
+        
         return estimatedRP, estimateIdx, xSigmoid, ySigmoid
     
 def plotSigmoid(ax, timeBins, sigmoid, estimatedRP):
     
         ax.plot(timeBins, sigmoid,'k')
-        ax.plot(timeBins[estimateIdx], sigmoid[estimateIdx],'rx')
+        ax.plot(timeBins[estimatedRP], sigmoid[estimatedRP],'rx')
     
     
     
