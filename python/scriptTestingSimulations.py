@@ -263,4 +263,4 @@ k = stats.poisson.ppf(1-confLimit, violLimit);
 
 # % now what is the value of the true CDF just below that value? that's the
 # % proportion of simulations that should pass
-propPass = stats.poisson.cdf(k-1, violTrue); #% k can be negative, in which case it returns zero
+propPass = stats.poisson.cdf(k-1, violTrue); % k can be negative, in which case it returns zero
