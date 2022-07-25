@@ -238,7 +238,7 @@ def computeMatrix(spikeTimes, params):
         
         # compute observed violations
         obsViol = sum(nACG[0:rpIdx+1]) #TODO this is off slightly (half-bin) from matlab...
-
+        print(obsViol)
         for cidx in range(len(cont)):
 
             confMatrix[cidx, rpIdx] = 100*computeViol(obsViol, firingRate, 
@@ -308,6 +308,8 @@ def plotSlidingRP(spikeTimes, params):
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (12,4))
     
     ax = axs[0]
+    print(rp)
+    print(nACG)
     ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0)) #TODO width??
     ax.set_xlim([0, 5]) 
     ax.set_xlabel('Time from spike (ms)')
