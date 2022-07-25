@@ -167,15 +167,57 @@ def plotSimulations(pc,params, savefile):
                 ax.set_ylabel('Percent pass')
                 ax.set_xlabel('Proportion contamination')
                 ax.set_title('True RP %d ms'%(rp*1000))
-        print(j)
-        fig.text(0.425, 0.92-(.3*j), 'Recording duration: %d hours'%recDur)
+        fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
    
     handles, labels = ax.get_legend_handles_labels()
-    print(handles)
-    print(labels)
     fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
     fig.legend(handles, labels, loc='upper right')
 
 
     fig.savefig(savefile, dpi = 500)
+    
+    
+    fig,axs = plt.subplots(len(params['contRates'][::2]),len(params['RPs']), figsize = (12*2,3*len(params['recDurs'])))
+    for j, contRate in enumerate(params['contRates'][::2]):
+        print(j)
+        for i, rp in enumerate(params['RPs']):
+            
+            if len(params['recDurs']) > 1 and len(params['RPs'])>1:
+                ax = axs[j,i]
+            else:
+                ax = axs[(j+1)*i]
+            #different base rates get different colors
+            for b, baseRate in enumerate(params['baseRates']):
+                ax.plot(params['recDurs'], pc[:, i, b,j*2], '.-',color = colors[b], label = baseRate)
+                ax.set_ylabel('Percent pass')
+                ax.set_xlabel('recording Duration')
+                ax.set_title('True RP %d ms'%(rp*1000))
+        fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
+    fig.subplots_adjust(left=0.5, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+
+    fig.legend(handles, labels, loc='upper right')
+    fig.show()
+    
+    
+    
+    fig,axs = plt.subplots(len(params['recDurs']), len(params['contRates'][::2]), figsize = (12*2,3*len(params['recDurs'])))
+    for j, recDur in enumerate(params['recDurs']):
+        print(j)
+        for i, contRate in enumerate(params['contRates'][::2]):
+            
+            if len(params['recDurs']) > 1 and len(params['contRates'])>1:
+                ax = axs[j,i]
+            else:
+                ax = axs[(j+1)*i]
+            #different base rates get different colors
+            for b, baseRate in enumerate(params['baseRates']):
+                ax.plot(params['RPs'], pc[j,:, b,i*2], '.-',color = colors[b], label = baseRate)
+                ax.set_ylabel('Percent pass')
+                ax.set_xlabel('True RP')
+                ax.set_title('contamination %.2f '%contRate)
+        fig.text(0.65, 0.9-(.17*j), 'Recording Duration: %d hours'%recDur)
+    fig.subplots_adjust(left=0.5, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+
+    fig.legend(handles, labels, loc='upper right')
+    fig.show()
