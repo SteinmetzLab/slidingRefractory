@@ -232,7 +232,7 @@ subject = insertions[s]['session']['subject']
 file = open(savefile + subject + '.pickle','rb')
 rpMetrics = pickle.load(file)
 file.close()    
- 
+sampleRate = 30000
 timeBins = np.arange(1/sampleRate, 1, 1/sampleRate)
 nClusters = len(rpMetrics['oldMetricValue'])
 for cluster_id in range(nClusters)[0:10]:   
@@ -240,7 +240,8 @@ for cluster_id in range(nClusters)[0:10]:
     st = spikeTimes[spikeClusters==c] 
     spikeCount = len(st)
     sampleRate = 30000
-    
+    recDur = st[-1]-st[0]
+    n_bins_hist = int(recDur / histWin)
     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
     nSpikesBelow2, confMatrix, cont, rp, nACG,
     firingRate,xx] = slidingRP(st, params)
@@ -478,36 +479,8 @@ for s in range(nSess):
                 passfailLabel +=1
                 passfailLabelAll +=1
         
-        
-        
-        # and rpMetrics['value'][c] ==1:
-        # #check whether this even matters: what was the label?
-        #     if rpMetrics['IBLgoodLabel'][c] < 2/3:
-        #         #then this didn't matter, the label stays
-        #         failfailLabel +=1
-        #         failfailLabelAll +=1 
-        #     elif rpMetrics['IBLgoodLabel'][c]==2/3:
-        #         #then this updated the metric (from fail to pass)
-        #         failpassLabel +=1
-        #         failpassLabelAll +=1 
-        # elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
-        # #check whether this even matters: what was the label?
-        #     if rpMetrics['IBLgoodLabel'][c] > 2/3:
-        #         passfailLabel +=1
-        #         passfailLabelAll +=1 
-        #         #then this updated the metric (from pass to fail)       
-        #     elif rpMetrics['IBLgoodLabel'][c]<=2/3:
-        #         passpassLabel +=1
-        #         passpassLabelAll +=1
-        #         #then this didn't matter, the label stays       
-        # #also check the old cases that don't matter at all and increment passpass and failfail
-        # elif rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
-        #     failfailLabel +=1
-        #     failfailLabelAll +=1   
-        # elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
-        #     passpassLabel +=1
-        #     passpassLabelAll +=1
-      
+
+
     if plotEach:
         fig,ax = plt.subplots(1,1)
         ax.bar([1,2,3,4], np.array([passpassLabel,failfailLabel,passfailLabel, failpassLabel])/nClusters)
@@ -526,6 +499,120 @@ ax.set_title('All sessions (iblgood label):  %d clusters; %.2f%% remained and %.
 ax.set_ylabel('Proportion of clusters')
 ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
        rotation=20)
+    
+    #%%
+nSess = len(insertions)
+plotEach = False
+passpassLabelAll = 0
+failfailLabelAll = 0
+failpassLabelAll = 0
+passfailLabelAll = 0
+nClustersAll = 0
+passMetricsAll = 0
+failMetricsAll = 0
+
+failpassLabelAllIgnore = 0
+passfailLabelAllIgnore = 0
+
+totalPass = 0
+totalFail = 0
+
+for s in range(nSess):
+    subject = insertions[s]['session']['subject']
+    #load saved rpMetrics
+    file = open(savefile + subject + 'Updated.pickle','rb')
+    rpMetrics = pickle.load(file)
+    file.close()
+    
+    
+    #total pass
+    nPassSess = sum([x == 1 for x in rpMetrics['IBLgoodLabel']])
+    totalPass += nPassSess
+    #total fail
+    nFailSess = sum([x < 1 for x in rpMetrics['IBLgoodLabel']])
+    totalFail += nFailSess
+    
+    
+    print('Comparing old and  new RP values for session %d / %d'%(s, nSess))
+    passpassLabel = 0
+    failpassLabel = 0
+    failfailLabel = 0
+    passfailLabel = 0
+    nClusters = len(rpMetrics['oldMetricValue'])
+    nClustersAll += nClusters
+    for c in range(nClusters):
+
+        
+
+        if rpMetrics['IBLgoodLabel'][c] < 1 and rpMetrics['oldMetricValue'][c] == 0: #neurons that fail IBL good and specifically RP metric
+            failMetricsAll +=1
+            if rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==1:
+                if rpMetrics['IBLgoodLabel'][c] < 2/3: #then this won't be enough to save it
+                    failpassLabelAllIgnore+=1
+                else:
+                    failpassLabel +=1
+                    failpassLabelAll +=1
+            if rpMetrics['oldMetricValue'][c] == 0 and rpMetrics['value'][c] ==0:
+                failfailLabel +=1
+                failfailLabelAll +=1
+
+        
+        elif rpMetrics['IBLgoodLabel'][c] < 1 and rpMetrics['oldMetricValue'][c] == 1: #neurons that fail IBL good but not because of RP metric
+            failMetricsAll +=1
+            if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+                passpassLabel +=1
+                passpassLabelAll +=1
+
+            elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0: #WE DON'T CARE BECAUSE IT WILL FAIL ANYWAY
+                passfailLabelAllIgnore+=1    
+            # passfailLabel +=1
+                # passfailLabelAll +=1
+            
+        
+        
+
+        elif rpMetrics['IBLgoodLabel'][c]== 1:  #neurons that pass IBL good (so thus passed old RP metric)
+            passMetricsAll +=1
+            if rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==1:
+                passpassLabel +=1
+                passpassLabelAll +=1
+
+            elif rpMetrics['oldMetricValue'][c] == 1 and rpMetrics['value'][c] ==0:
+                passfailLabel +=1
+                passfailLabelAll +=1
+        
+
+
+    if plotEach:
+        fig,ax = plt.subplots(1,1)
+        ax.bar([1,2,3,4], np.array([passpassLabel,failfailLabel,passfailLabel, failpassLabel])/nClusters)
+        pRemainLabel = (passpassLabel + failfailLabel + passfailLabelAllIgnore + failpassLabelAllIgnore) / nClusters *100 
+        pChangeLabel = (passfailLabel + failpassLabel) / nClusters *100
+        ax.set_title('Session %s; %s; (iblgoodlabel)  %d clusters; %.2f%% remained and %.2f%% changed'%(s, subject, nClusters, pRemainLabel, pChangeLabel ))
+        ax.set_ylabel('Proportion of clusters')
+        ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+               rotation=20)
+        
+fig,ax = plt.subplots(1,1)
+ax.bar([1,2,3,4], np.array([passpassLabelAll, failfailLabelAll, passfailLabelAll, failpassLabelAll])/nClustersAll)
+pRemainLabelAll = (passpassLabelAll + failfailLabelAll + passfailLabelAllIgnore + failpassLabelAllIgnore) / nClustersAll *100
+pChangeLabelAll = (passfailLabelAll + failpassLabelAll) / nClustersAll *100
+ax.set_title('All sessions (iblgood label):  %d clusters; %.2f%% remained and %.2f%% changed'%(nClustersAll, pRemainLabelAll, pChangeLabelAll ))
+ax.set_ylabel('Proportion of clusters')
+ax.set_xticks([1, 2,3,4], ['Pass/Pass', 'Fail/Fail', 'Pass/Fail','Fail/Pass'],
+       rotation=20)
+    
+
+fig,ax = plt.subplots(1,1)
+ax.bar([1,2,4,5], np.array([totalPass, totalFail, totalPass-passfailLabelAll + failpassLabelAll, totalFail - failpassLabelAll+passfailLabelAll])/nClustersAll)
+pRemainLabelAll = (passpassLabelAll + failfailLabelAll + passfailLabelAllIgnore + failpassLabelAllIgnore) / nClustersAll *100
+pChangeLabelAll = (passfailLabelAll + failpassLabelAll) / nClustersAll *100
+ax.set_title('RS clusters:  %d clusters; %.2f%% remained and %.2f%% changed\n \n Previous version                        Updated version'%(nClustersAll, pRemainLabelAll, pChangeLabelAll ) )
+ax.set_ylabel('Proportion of clusters')
+ax.set_xticks([1, 2,4,5], ['Pass', 'Fail', 'Pass','Fail'],
+       rotation=20)
+    
+ 
     
     #%%
     #sanity check compare with yanliang's numbers
@@ -565,3 +652,13 @@ Out[14]: 0.1953799053715558
 numClusters:
 (3152+8955+7051+4734+4852)
 Out[15]: 28744
+
+
+#%%
+#look into neurons that fail --> pass
+failPassIdx = [c for c in range(len(rpMetrics['oldMetricValue'])) if rpMetrics['oldMetricValue'][c] ==0 and rpMetrics['value'][c] ==1 ]
+
+for clu in failPassIdx:
+    params['cidx'] = failPassIdx
+    st = spikeTimes[spikeClusters == params['cidx'][0]]
+    plotSlidingRP(st, params)
