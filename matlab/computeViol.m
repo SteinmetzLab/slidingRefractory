@@ -1,6 +1,6 @@
 
 
-function confidenceScore = computeViol(...
+function [confidenceScore, expectedViol] = computeViol(...
     obsViol, firingRate, spikeCount, refDur, contaminationProp)
 
 % refDur is the refractory period duration in seconds

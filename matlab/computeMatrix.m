@@ -1,7 +1,11 @@
 
 function [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
 
-cont = 0.5:0.5:35; 
+if nargin>1 && isfield(params, 'cont')
+    cont = params.cont;
+else
+    cont = 0.5:0.5:35; % contamination levels at which to assess confidence
+end
 % rpEdges = (0:10*30)/30000; % 10 ms at 30kHz
 rpBinSize = 1/30000;
 rpEdges = 0:rpBinSize:10/1000;
