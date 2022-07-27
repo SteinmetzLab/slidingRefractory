@@ -13,7 +13,8 @@ function [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
 [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params); 
 % matrix is [nCont x nRP]
 
-testTimes = rp>0.0005; 
+testTimes = rp>0.0005;
+
 
 maxConfidenceAt10Cont = max(confMatrix(cont==10, testTimes)); 
 
@@ -22,7 +23,10 @@ maxConfidenceAt10Cont = max(confMatrix(cont==10, testTimes));
 minContWith90Confidence = cont(minI);  
 if isempty(minContWith90Confidence); minContWith90Confidence = NaN; end
 
+
 [~,minRP] = max(confMatrix(minI,testTimes)); 
+% minRP
+% minRP+find(testTimes,1)
 timeOfLowestCont = rp(minRP+find(testTimes,1));
 if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
 

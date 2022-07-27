@@ -3,13 +3,16 @@
 % script for testing sliding refractory period code
 
 %% paths
+githubDir = 'C:\Users\Steinmetz Lab User\Documents\GitHub\';
 addpath(genpath(fullfile(githubDir, 'npy-matlab')))
 addpath(genpath(fullfile(githubDir, 'slidingRefractory')))
+addpath(genpath(fullfile('C:\Users\Steinmetz Lab User\Documents\MATLAB', 'spikes')))
+
 
 %% load
 
-allst = readNPY('D:\Hopkins\spike_times.npy'); 
-clu = readNPY('D:\Hopkins\spike_clusters.npy'); 
+allst = readNPY('E:\Hopkins_CortexLab\spike_times.npy'); 
+clu = readNPY('E:\Hopkins_CortexLab\spike_clusters.npy'); 
 
 allst = double(allst)/30000;
 cids = unique(clu);

@@ -28,8 +28,8 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
     ----------
     spikeTimes : numpy.ndarray
         array of spike times (ms)
-    spikeClusters : TYPE
-        DESCRIPTION.
+    spikeClusters : numpy.ndarray
+        array of spike cluster ids that corresponds to spikeTimes.
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
         params.sampleRate : sample rate of the recording (Hz)
@@ -218,7 +218,7 @@ def computeMatrix(spikeTimes, params):
     
     cont = np.arange(0.5, 35, 0.5)  # vector of contamination values to test
     rpBinSize = 1 / 30000  
-    rpEdges = np.arange(0, 10/1000, rpBinSize) # in ms  
+    rpEdges = np.arange(0, 10/1000, rpBinSize) # in s  
     rp = rpEdges + np.mean(np.diff(rpEdges)[0])/2 # vector of refractory period durations to test 
     
     #compute firing rate and spike count
@@ -382,6 +382,93 @@ def plotSlidingRP(spikeTimes, params):
     fig.tight_layout()
 
 
+def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, rp, params):
+
+
+    # if params and 'returnMatrix' in params:
+    #     returnMatrix = params['returnMatrix'] 
+    # else:
+    #     returnMatrix = False
+    
+    
+    if params and 'verbose' in params:
+        verbose = params['verbose']; 
+    else:
+        verbose = False
+        
+    if params and 'sampleRate' in params:
+        sampleRate = params['sampleRate']
+    else:
+        sampleRate = 30000
+    if params and 'binSizeCorr' in params:
+        binSizeCorr = params['binSizeCorr']
+    else:
+        binSizeCorr = 1/30000
+    
+    cids = np.unique(spikeClusters)
+    
+    #initialize rpMetrics as dict
+    rpFit = {}
+    rpFit['cidx'] = []
+    rpFit['rpEstimate']  = []
+    rpFit['brainRegion'] = []
+    # rpMetrics ['maxConfidenceAt10Cont'] = []
+    # rpMetrics['minContWith90Confidence'] = []
+    # rpMetrics['timeOfLowestCont'] = []
+    # rpMetrics['nSpikesBelow2'] = []
+    
+    # if verbose:
+    #     print("Computing metrics for %d clusters \n" % len(cids))
+     
+    # frrd = np.empty(len(cids))
+    # frrd[:] = np.nan    
+    # sc = np.empty(len(cids))
+    # sc[:] = np.nan
+    for cidx in range(len(cids)):
+        st = spikeTimes[spikeClusters==cids[cidx]] 
+        brainRegion = brainRegions[cidx]
+        # print('computingACG')
+
+        #compute acg
+    #setup for acg
+        clustersIds = [0] # call the cluster id 0 (not used, but required input for correlograms)
+        spikeClustersACG = np.zeros(len(st), dtype = 'int8') # each spike time gets cluster id 0 
+  
+        nACG = correlograms(st, spikeClustersACG, cluster_ids = clustersIds, bin_size = binSizeCorr, sample_rate = sampleRate, window_size=2,symmetrize=False)[0][0] #compute acg
+
+        # print('estimating RP')
+
+        #estimate rp
+        try:
+            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(nACG, rp, params)
+            
+            
+            rpFit['cidx'].append(cids[cidx]) 
+            rpFit['rpEstimate'].append(estimatedRP)
+            rpFit['brainRegion'].append(brainRegion)
+        # # rpMetrics['brainRegion'].append(minContWith90Confidence)
+            if verbose:
+
+                print('Estimated RP for cluster %d is %.2f ms'%(cids[cidx],estimatedRP))
+        except:
+            continue
+
+
+    
+#' %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
+        # #     # print('Seconds elapsed: %.2f%%'%secondsElapsed)
+        
+        # except:
+        #     continue
+    
+            
+        
+            
+
+
+    return rpFit
+
+
 def fitSigmoidACG(acg, timeBins, params):
     '''
     
@@ -404,7 +491,6 @@ def fitSigmoidACG(acg, timeBins, params):
     y: 
 
     '''
-    
     if len(acg) > len(timeBins):
         acg = acg[0:len(timeBins)]
 
@@ -415,10 +501,8 @@ def fitSigmoidACG(acg, timeBins, params):
     
     peakDistFromEndBin = 5 #todo: params!! 
         
-    estimated_RP = np.nan #initialize as a nan for cases where it doesn't work
-    
+    estimatedRP = np.nan #initialize as a nan for cases where it doesn't work
     if(sum(acg)>numSpikesThresh):   
-
         #potential todo: insert a case here for if the acg is symmetric?
         # p0 = [np.mean(ydata),2,1,min(ydata)] #starting point for fit? 
         minSigmoid = np.mean(acg[timeBins<0.0005]) #first 0.5 ms of data #todo make this parameter
@@ -436,25 +520,41 @@ def fitSigmoidACG(acg, timeBins, params):
             timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
     
         #fit the sigmoid with max and min fixed
-        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), timeBins, acg)
+        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), timeBins, acg)       
+        
+        
         fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
 
-        xSigmoid = np.linspace(0, timeBins[-1], 1000) #evenly spaced vector for plotting sigmoid
+        xSigmoid = timeBins#np.linspace(0, timeBins[-1], timeBins[-]) #evenly spaced vector for plotting sigmoid
         ySigmoid = sigmoid(xSigmoid, *fitParams)
     
             #find RP            
         RPEstimateFromPercentageOfSlope = 0.10
         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
         estimatedRP = 1000* xSigmoid[estimateIdx] # in ms
+
+    else:
+        print('not able to')
+        estimatedRP = np.nan
+        estimateIdx = np.nan
+        xSigmoid = np.nan
+        ySigmoid = np.nan
         
-        return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+    return estimatedRP, estimateIdx, xSigmoid, ySigmoid
     
-def plotSigmoid(ax, timeBins, sigmoid, estimatedRP):
-    
-        ax.plot(timeBins, sigmoid,'k')
-        ax.plot(timeBins[estimatedRP], sigmoid[estimatedRP],'rx')
-    
-    
+def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
+    if len(acg) > len(timeBins):
+        acg = acg[0:len(timeBins)]
+
+    ax.bar(timeBins, acg, width = np.diff(timeBins)[0],alpha = 0.5)
+    ax.plot(timeBins, ySigmoid,'k')
+    ax.plot(timeBins[estimatedIdx], ySigmoid[estimatedIdx],'rx')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.set_title('ACG with fit, estimated RP is %.2f ms'%estimatedRP)
+    ax.set_ylabel('Number of spikes')
+    ax.set_xlabel('Time (s)')
+    return acg
     
     
     
