@@ -128,6 +128,10 @@ ax.plot( [0,xlims[1]],[0,xlims[1]] )
 estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(nACG, rp, params)
 
 #%%
-fig,axs = plt.subplots(1,1,figsize = (12,10))
+fig,axs = plt.subplots(1,1,figsize = (6,5))
 ax = axs
-plotSigmoid(ax, nACG, xSigmoid, ySigmoid, estimateIdx)
+acg = plotSigmoid(ax, nACG, xSigmoid, ySigmoid, estimateIdx, estimatedRP)
+
+
+#%%
+rpEstimates = fitSigmoidACG_All(spikeTimes, spikeClusters, rp, params)
