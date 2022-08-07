@@ -662,3 +662,4 @@ for clu in failPassIdx:
     params['cidx'] = failPassIdx
     st = spikeTimes[spikeClusters == params['cidx'][0]]
     plotSlidingRP(st, params)
+
