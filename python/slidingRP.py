@@ -91,12 +91,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
         rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
-        
-        spikeCount = len(st)
-        recDur = st[-1]-st[0]
-        frrd[cidx] = firingRate * recDur
-        sc[cidx] = spikeCount
-        
+       
         
         if returnMatrix:
             if 'confMatrix' not in rpMetrics:
@@ -117,11 +112,8 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
             else: 
                 pfstring = 'FAIL'
             print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
-            # print('Seconds elapsed: %.2f%%'%secondsElapsed)
-    
-    # fig,ax = plt.subplots(1,1)
-    # ax.scatter(scfr,fr,'k.')
-    return rpMetrics, cont, rp, sc, frrd
+
+    return rpMetrics, cont, rp
 
 
 def slidingRP(spikeTimes, params):
@@ -131,21 +123,17 @@ def slidingRP(spikeTimes, params):
     
     Parameters
     ----------
-    spikeTimes : TYPE
-        DESCRIPTION.
-    params : TYPE
-        DESCRIPTION.
+    spikeTimes : numpy.ndarray
+        array of spike times (ms) for one cluster
+
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
+        params.sampleRate : sample rate of the recording (Hz)
 
     Returns
     -------
-    None.
-    
-    
-    inputs:
-        spikeTimes: spike times vector for a single unit (in ms) 
-        params: TODO
-        
-    returns: 
+
+
     
     maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
     minContWith90Confidence: Minimum contamination for which you have >=90% confidence
@@ -179,10 +167,10 @@ def slidingRP(spikeTimes, params):
         minRP = np.argmax(confMatrix[minI,testTimes])
 
 
-    except:     #TODO check that this doesn't have any other kind of error
+    except:    
         minContWith90Confidence = np.nan
     
-        minRP = np.nan# np.argmax(confMatrix[minI,testTimes])
+        minRP = np.nan
 
     try:
         timeOfLowestCont = rp[minRP+np.where(testTimes)[0][0]+1]
