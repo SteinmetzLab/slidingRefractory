@@ -5,3 +5,4 @@
 plotSlidingRP.m
 *.pickle
 *.pdf
+*.pyc
