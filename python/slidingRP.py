@@ -19,7 +19,7 @@ import time
 
 
 
-def slidingRP_all(spikeTimes, spikeClusters, params = None):
+def slidingRP_all(spikeTimes, spikeClusters, **params):
     '''
     
     Compute the metric for each cluster in a recording
@@ -75,10 +75,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params = None):
     if verbose:
         print("Computing metrics for %d clusters \n" % len(cids))
      
-    frrd = np.empty(len(cids))
-    frrd[:] = np.nan    
-    sc = np.empty(len(cids))
-    sc[:] = np.nan
+
     for cidx in range(len(cids)):
         st = spikeTimes[spikeClusters==cids[cidx]] 
         
