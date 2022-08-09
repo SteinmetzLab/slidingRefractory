@@ -5,3 +5,5 @@
 plotSlidingRP.m
 *.pickle
 *.pdf
+*.pyc
+*.egg-info/
