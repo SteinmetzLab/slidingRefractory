@@ -29,7 +29,7 @@ if isempty(minContWith90Confidence); minContWith90Confidence = NaN; end
 [~,minRP] = max(confMatrix(minI,testTimes)); 
 % minRP
 % minRP+find(testTimes,1)
-timeOfLowestCont = rp(minRP+find(testTimes,1));
+timeOfLowestCont = rp(minRP+find(testTimes,1)-1);
 if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
 
 nSpikesBelow2 = sum(nACG(1:find(rp>0.002,1)));
