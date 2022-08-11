@@ -2,11 +2,16 @@
 
 function plotSlidingRP(spikeTimes, params)
 
+if nargin<2 || ~isstruct(params)
+    params = struct(); params.cidx = [];
+else
+    if ~isfield(params, 'cidx'); params.cidx = []; end
+end
+
 [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
     nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
     = slidingRP(spikeTimes, params);
 
-nSpikesBelow2
 f = figure; f.Color = 'w';
 fp = f.Position;
 f.Position = [fp(1) fp(2) 1300 369];
@@ -16,7 +21,11 @@ bar(rp*1000, nACG, 1,'FaceColor', 'k', 'EdgeAlpha', 0);
 xlim([0 5]); 
 xlabel('Time from spike (ms)');
 ylabel('ACG count (spks)'); 
-t1 = title(sprintf('Cluster #%d: FR=%.2f', params.cidx, firingRate)); 
+if ~isempty(params.cidx)
+    t1 = title(sprintf('Cluster #%d: FR=%.2f', params.cidx, firingRate)); 
+else
+    t1 = title(sprintf('FR=%.2f', firingRate)); 
+end
 hold on; 
 fill([0 1 1 0]*0.5, [0 0 1 1]*max(ylim()), 'k', 'FaceAlpha', 0.2, 'EdgeAlpha', 0); 
 box off; 

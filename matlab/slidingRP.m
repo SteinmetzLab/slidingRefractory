@@ -10,6 +10,8 @@ function [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
 % - Minimum contamination for which you have >=90% confidence
 % - Time at which best score happens
 
+
+
 [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params); 
 % matrix is [nCont x nRP]
 
