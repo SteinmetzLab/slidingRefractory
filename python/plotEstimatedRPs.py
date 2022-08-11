@@ -380,3 +380,91 @@ fig.show()
 
 #%%
 
+
+
+
+fig,axs = plt.subplots(1,1,figsize = (5,3))
+ax = axs
+ax.hist(cortexAllDatasets, 100, histtype = 'step', color = 'blue', label = 'Cortex')
+ax.hist(thalamusAllDatasets, 100, histtype = 'step', color = 'green', label = 'Thalamus')
+ax.hist(hippocampusAllDatasets, 100,  histtype = 'step', color = 'purple', label = 'Hippocampus')
+
+ax.set_xlabel('Estimated RP (ms)')
+ax.set_ylabel('Number of neurons')
+ax.spines.right.set_visible(False)
+ax.spines.top.set_visible(False)
+
+
+plt.legend()
+plt.tight_layout()
+plt.suptitle('All Datasets',y=1.1)
+fig.show()
+
+
+
+
+#%%
+fig,axs = plt.subplots(1,1,figsize = (5,3))
+ax = axs
+ax.hist(cortexAllRS, 100, histtype = 'step', color = 'blue', label = 'Cortex', linestyle = '-')
+ax.hist(thalamusAllRS, 100, histtype = 'step', color = 'green', label = 'Thalamus', linestyle = '-')
+ax.hist(hippocampusAllRS, 100,  histtype = 'step', color = 'purple', label = 'Hippocampus', linestyle = '-')
+
+
+ax.hist(cortexAllSteinmetz, 100, histtype = 'step', color = 'blue', linestyle = '--')
+ax.hist(thalamusAllSteinmetz, 100, histtype = 'step', color = 'green', linestyle = '--')
+ax.hist(hippocampusAllSteinmetz, 100,  histtype = 'step', color = 'purple', linestyle = '--')
+
+ax.hist(cortexAllAllen, 100, histtype = 'step', color = 'blue', linestyle = ':')
+ax.hist(thalamusAllAllen, 100, histtype = 'step', color = 'green', linestyle = ':')
+ax.hist(hippocampusAllAllen, 100,  histtype = 'step', color = 'purple', linestyle = ':')
+
+ax.set_xlabel('Estimated RP (ms)')
+ax.set_ylabel('Number of neurons')
+ax.spines.right.set_visible(False)
+ax.spines.top.set_visible(False)
+
+
+#add arrows:
+    
+ind = np.nanmedian(cortexAllRS)
+n = len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '-')
+ind = np.nanmedian(cortexAllSteinmetz)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '--')
+ind = np.nanmedian(cortexAllAllen)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = ':')
+
+ind = np.nanmedian(thalamusAllRS)
+# n = len(thalamusAll[(thalamusAll > ind*0.95) & (thalamusAll <  ind*1.05)])/2 #y value of overall histogram
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = '-')
+ind = np.nanmedian(thalamusAllSteinmetz)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = 'dashed')
+ind = np.nanmedian(thalamusAllAllen)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = ':')
+
+ind = np.nanmedian(hippocampusAllRS)
+# n = len(hippocampusAll[(hippocampusAll > ind*0.95) & (hippocampusAll <  ind*1.05)])/2 #y value of overall histogram
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '-')
+ind = np.nanmedian(hippocampusAllSteinmetz)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '--')
+ind = np.nanmedian(hippocampusAllAllen)
+ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = ':')
+
+
+
+
+
+
+
+ax.plot(np.NaN, np.NaN, '-', color='black', label='IBL')
+ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz 2019')
+ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
+
+plt.legend(frameon=False)
+plt.tight_layout()
+# plt.suptitle('All Datasets',y=1.1)
+fig.show()
+
+plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs.pdf', dpi=300, format='pdf')
+# cortexAllRS, cortexAllSteinmetz, cortexAllAllen
