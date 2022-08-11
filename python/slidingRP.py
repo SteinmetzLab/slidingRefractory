@@ -39,10 +39,13 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     rpMetrics: dict
         keys:
             maxConfidenceAt10Cont
-            minContWith90Confidence
+            minContWith90Confidence 
             timeOfLowestCont
             nSpikesBelow2
             confMatrix (optional, if returnMatrix ==1)
+        note: minContWith90Confidence, timeOfLowestCont will return np.nan 
+        for neurons with too few spikes -- these neurons have "empty" 
+        confidence and should be rejected. 
     cont: nd.array
         Vector of contamination values tested      
     rp: nd.array
