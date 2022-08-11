@@ -2,6 +2,10 @@
 function [rpMetrics, cont, rp] = slidingRP_all(spikeTimes, spikeClusters, params)
 % compute the metric for each cluster in a recording
 
+if nargin<3
+    params = struct();
+end
+
 if ~isempty(params) && isfield(params, 'returnMatrix')
     returnMatrix = params.returnMatrix; 
 else
@@ -11,7 +15,7 @@ end
 if ~isempty(params) && isfield(params, 'verbose')
     verbose = params.verbose; 
 else
-    verbose = false;
+    verbose = true;
 end
 
 cids = unique(spikeClusters); 
