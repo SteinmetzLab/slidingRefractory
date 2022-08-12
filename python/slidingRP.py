@@ -113,10 +113,10 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
                 pfstring = 'FAIL'
             print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
 
-    return rpMetrics, cont, rp
+    return rpMetrics
 
 
-def slidingRP(spikeTimes, params):
+def slidingRP(spikeTimes, params = None):
 
     '''     
     Compute the metric for one cluster
@@ -145,6 +145,16 @@ def slidingRP(spikeTimes, params):
     nACG: the autocorrelogram of the neuron
     firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
     '''
+
+    if params is None:
+        params = {}
+        params['sampleRate'] = 30000
+        params['binSizeCorr'] = 1 / params['sampleRate']
+        params['returnMatrix'] = True
+        params['verbose'] = True
+        params['cidx'] = [0]
+
+
     seconds_start = time.time()
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
     # matrix is [nCont x nRP]
@@ -271,7 +281,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     return confidenceScore
 
 
-def plotSlidingRP(spikeTimes, params):
+def plotSlidingRP(spikeTimes, params = None):
     '''
     
 
@@ -288,6 +298,8 @@ def plotSlidingRP(spikeTimes, params):
     None.
 
     '''
+    if params is None: 
+        clusterlabel = False
 
     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
         nSpikesBelow2, confMatrix, cont, rp, nACG, 
@@ -301,7 +313,8 @@ def plotSlidingRP(spikeTimes, params):
     ax.set_xlim([0, 5]) 
     ax.set_xlabel('Time from spike (ms)')
     ax.set_ylabel('ACG count (spks)')
-    t1 = ('Cluster #%d: FR=%.2f' %(params['cidx'][0], firingRate))
+    if clusterlabel:
+        t1 = ('Cluster #%d: FR=%.2f' %(params['cidx'][0], firingRate))
     ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -533,13 +546,15 @@ def fitSigmoidACG(acg, timeBins, params):
 def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
     if len(acg) > len(timeBins):
         acg = acg[0:len(timeBins)]
+    print(acg)
+    ax.bar(timeBins*1000, acg, width = np.diff(timeBins*1000)[0],alpha = 0.5)
+    ax.set_xlim(0,5)
 
-    ax.bar(timeBins, acg, width = np.diff(timeBins)[0],alpha = 0.5)
-    ax.plot(timeBins, ySigmoid,'k')
-    ax.plot(timeBins[estimatedIdx], ySigmoid[estimatedIdx],'rx')
+    ax.plot(timeBins*1000, ySigmoid,'k')
+    ax.plot(timeBins[estimatedIdx]*1000, ySigmoid[estimatedIdx],'rx')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    ax.set_title('ACG with fit, estimated RP is %.2f ms'%estimatedRP)
+    ax.set_title('Estimated RP:%.2f ms'%estimatedRP)
     ax.set_ylabel('Number of spikes')
     ax.set_xlabel('Time (s)')
     return acg
