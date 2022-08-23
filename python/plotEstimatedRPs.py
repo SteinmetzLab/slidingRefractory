@@ -404,31 +404,58 @@ fig.show()
 
 
 #%%
+nBins = 20
 fig,axs = plt.subplots(1,1,figsize = (5,3))
 ax = axs
-ax.hist(cortexAllRS, 100, histtype = 'step', color = 'blue', label = 'Cortex', linestyle = '-')
-ax.hist(thalamusAllRS, 100, histtype = 'step', color = 'green', label = 'Thalamus', linestyle = '-')
-ax.hist(hippocampusAllRS, 100,  histtype = 'step', color = 'purple', label = 'Hippocampus', linestyle = '-')
+cc = cortexAllRS[~np.isnan(cortexAllRS)]
+xx = sum(~np.isnan(cortexAllRS))
+ax.hist(cc, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'blue', label = 'Cortex', linestyle = '-')
+
+xx = sum(~np.isnan(thalamusAllRS))
+tt = thalamusAllRS[~np.isnan(thalamusAllRS)]
+ax.hist(tt, nBins,weights = np.ones(xx) / xx, histtype = 'step', color = 'green', label = 'Thalamus', linestyle = '-')
+
+xx = sum(~np.isnan(hippocampusAllRS))
+hh= hippocampusAllRS[~np.isnan(hippocampusAllRS)]
+
+ax.hist(hh, nBins, weights = np.ones(xx) /xx, histtype = 'step', color = 'purple', label = 'Hippocampus', linestyle = '-')
+ax.set_ylim(0,.3)
+# plt.hist(data, weights=np.ones(len(data)) / len(data))
 
 
-ax.hist(cortexAllSteinmetz, 100, histtype = 'step', color = 'blue', linestyle = '--')
-ax.hist(thalamusAllSteinmetz, 100, histtype = 'step', color = 'green', linestyle = '--')
-ax.hist(hippocampusAllSteinmetz, 100,  histtype = 'step', color = 'purple', linestyle = '--')
 
-ax.hist(cortexAllAllen, 100, histtype = 'step', color = 'blue', linestyle = ':')
-ax.hist(thalamusAllAllen, 100, histtype = 'step', color = 'green', linestyle = ':')
-ax.hist(hippocampusAllAllen, 100,  histtype = 'step', color = 'purple', linestyle = ':')
+cc = cortexAllSteinmetz[~np.isnan(cortexAllSteinmetz)]
+xx = sum(~np.isnan(cortexAllSteinmetz))
+ax.hist(cc, nBins,  weights = np.ones(xx) / xx,histtype = 'step', color = 'blue', linestyle = '--')
+xx = sum(~np.isnan(thalamusAllSteinmetz))
+tt = thalamusAllSteinmetz[~np.isnan(thalamusAllSteinmetz)]
+ax.hist(tt, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'green', linestyle = '--')
+xx = sum(~np.isnan(hippocampusAllSteinmetz))
+hh= hippocampusAllSteinmetz[~np.isnan(hippocampusAllSteinmetz)]
+ax.hist(hh, nBins, weights = np.ones(xx) / xx,  histtype = 'step', color = 'purple', linestyle = '--')
+
+cc = cortexAllAllen[~np.isnan(cortexAllAllen)]
+xx = sum(~np.isnan(cortexAllAllen))
+ax.hist(cc, nBins,  weights = np.ones(xx) / xx,histtype = 'step', color = 'blue', linestyle = ':')
+xx = sum(~np.isnan(thalamusAllAllen))
+tt = thalamusAllAllen[~np.isnan(thalamusAllAllen)]
+ax.hist(tt, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'green', linestyle = ':')
+xx = sum(~np.isnan(hippocampusAllAllen))
+hh= hippocampusAllAllen[~np.isnan(hippocampusAllAllen)]
+ax.hist(hh, nBins, weights = np.ones(xx) / xx,  histtype = 'step', color = 'purple', linestyle = ':')
 
 ax.set_xlabel('Estimated RP (ms)')
-ax.set_ylabel('Number of neurons')
+ax.set_ylabel('Proportion of neurons')
 ax.spines.right.set_visible(False)
 ax.spines.top.set_visible(False)
 
 
 #add arrows:
-    
+lenArrow = .2
+lenHead = .01
+wiArrow = .1
 ind = np.nanmedian(cortexAllRS)
-n = len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
+n = .25#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
 ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '-')
 ind = np.nanmedian(cortexAllSteinmetz)
 ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '--')
@@ -438,7 +465,7 @@ ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_lengt
 ind = np.nanmedian(thalamusAllRS)
 # n = len(thalamusAll[(thalamusAll > ind*0.95) & (thalamusAll <  ind*1.05)])/2 #y value of overall histogram
 ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = '-')
-ind = np.nanmedian(thalamusAllSteinmetz)
+ind = np.nanmedian(thalamusAllSteinmetz) - .4
 ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = 'dashed')
 ind = np.nanmedian(thalamusAllAllen)
 ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = ':')
@@ -468,3 +495,38 @@ fig.show()
 
 plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs.pdf', dpi=300, format='pdf')
 # cortexAllRS, cortexAllSteinmetz, cortexAllAllen
+
+#%%
+
+import matplotlib.pyplot as plt
+
+from scipy.ndimage.filters import gaussian_filter1d
+plt.rcParams.update({'font.size': 14})
+
+def plot_metric(data, bins, x_axis_label, color, max_value=-1):
+    
+    h, b = np.histogram(data, bins=bins, density=True)
+
+    x = b[:-1]
+    y = gaussian_filter1d(h, 1)
+
+    plt.plot(x, y, color=color)
+    plt.xlabel(x_axis_label)
+    plt.gca().get_yaxis().set_visible(False)
+    [plt.gca().spines[loc].set_visible(False) for loc in ['right', 'top', 'left']]
+    if max_value < np.max(y) * 1.1:
+        max_value = np.max(y) * 1.1
+    plt.ylim([0, max_value])
+    
+    return max_value
+
+bins = np.linspace(-3,2,100)
+max_value = -np.inf
+
+for idx, region in enumerate(region_dict.keys()):
+    
+    data = np.log10(units[units.ecephys_structure_acronym.isin(region_dict[region])]['firing_rate'])
+    print('%s has %d neurons'%(region,len(data)))
+    max_value = plot_metric(data, bins, 'log$_{10}$ firing rate (Hz)', color_dict[region], max_value)
+    
+_ = plt.legend(region_dict.keys())
