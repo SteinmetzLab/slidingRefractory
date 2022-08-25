@@ -3,8 +3,21 @@
 Created on Wed Aug  3 12:02:56 2022
 
 @author: Noam Roth
+
+Code to plot histograms of estimated RPs, as computed in computeEstimatedRPs.py
+
+Runs for 3 datasets: IBL repeated site; Steinmetz 2019; Allen 
+
 """
 #%% 
+
+#set filter parameters for firing rate and amplitude across all 3 datasets
+minFR = 20; minAmp = 100
+
+
+
+
+#%%
 #plot IBL data
 one = ONE()
 insertions = get_insertions(level=2, one=one, freeze='biorxiv_2022_05')
@@ -31,11 +44,11 @@ for s in range(nSess):
     rpEstimates = pickle.load(file)
     file.close()
 
-    ca1 = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'CA1'])
-    po  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'PO'])
-    dg  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'DG'])
-    visa  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'PPC'])
-    lp= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'LP'])
+    ca1 = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'CA1' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    po  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'PO' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    dg  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'DG' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    visa  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'PPC' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    lp= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] == 'LP' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     
     ca1[ca1<.05] =np.nan
     dg[dg<.05] = np.nan
@@ -70,6 +83,7 @@ for s in range(nSess):
         visaAll = np.concatenate((visaAll,visa))
         
         
+
 cortexAllRS = visaAll
 thalamusAllRS = np.concatenate((poAll, lpAll))
 hippocampusAllRS = np.concatenate((ca1All, dgAll))
@@ -147,7 +161,7 @@ for e,eid in enumerate(sessions):
     file.close()
 
 
-    minFR = 5; minAmp = 50
+
     #find neurons in each of the target brain regions that pass the firing rate and amplitude criteria
     hippocampus = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['CA', 'CA1', 'CA2', 'CA3','DG', 'POST', 'SUB'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     cortex  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['ACA', 'AUD','ILA' , 'MOp', 'MOs',  'OLF', 'ORB', 'ORBm',
@@ -155,13 +169,16 @@ for e,eid in enumerate(sessions):
                      'VISp', 'VISpm', 'VISrl'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     thalamus= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['TH', 'CL', 'LD', 'LGd', 'LH', 'LP', 'MD', 'MG','PO', 'POL', 
                      'PT','RT','SPF','VAL', 'VPL', 'VPM' ] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
-    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['SNr','APN', 'IC','MB','MRN', 'NB','PAG','RN','SCig', 'SCm',  'SCs', 'SCsg'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR]])
+    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['SNr','APN', 'IC','MB','MRN', 'NB','PAG','RN','SCig', 'SCm',  'SCs', 'SCsg'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     
+    
+    #get rid of very low values #todo -- change this once filtered by neurons code is done!!
     hippocampus[hippocampus<.05] =np.nan
     thalamus[thalamus<.05] = np.nan
     cortex[cortex<.05] =np.nan
     midbrain[midbrain<.05] =np.nan
     
+    #if this flag is True, plot the histogram for each session individually (sanity check)
     if plotEach:
         fig,axs = plt.subplots(2,2,figsize = (12,10))
         ax = axs[0,0]
@@ -175,6 +192,8 @@ for e,eid in enumerate(sessions):
         ax.hist(visa, 100)
         ax.set_title('cortex median: %.2f'%np.nanmedian(visa))
     
+    
+    #concatenate each session's values for each region to a vector of all values for that region
     if len(hippocampusAll) == 0:
         hippocampusAll = hippocampus
     else:    
@@ -200,7 +219,8 @@ cortexAllSteinmetz = cortexAll
 thalamusAllSteinmetz = thalamusAll
 hippocampusAllSteinmetz = hippocampusAll
 midbrainAllSteinmetz = midbrainAll
-#%%        
+#%%   
+#plot estimated RPs for all sessions from the Steinmetz 2019 dataset     
 fig,axs = plt.subplots(2,2,figsize = (8,6))
 ax = axs[0,0]
 ax.hist(cortexAllSteinmetz, 100)
@@ -268,10 +288,10 @@ for j, session_id in enumerate(sessions):
         rpEstimates = pickle.load(f)
 
 
-    hippocampus = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'hippocampus'])
-    cortex  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'cortex'])
-    thalamus= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'thalamus'])
-    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'midbrain'])
+    hippocampus = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'hippocampus' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    cortex  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'cortex' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    thalamus= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'thalamus' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['parentRegion'][i] == 'midbrain' and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     
     hippocampus[hippocampus<.05] =np.nan
     thalamus[thalamus<.05] = np.nan
@@ -472,10 +492,9 @@ ax.set_ylabel('Proportion of neurons')
 ax.spines.right.set_visible(False)
 ax.spines.top.set_visible(False)
 
-def add_median_arrows(ax, data, lenArrow, lenHead, wiArrow, color, linestyle):
+def add_median_arrows(ax, data, y_value, lenArrow, lenHead, wiArrow, color, linestyle):
     ind = np.nanmedian(data)
-    n = .22 # to do: change from hard-coded
-    ax.annotate('', xy=(ind,n), xytext=(ind,n+lenArrow+lenHead),
+    ax.annotate('', xy=(ind, y_value), xytext=(ind,y_value + lenArrow + lenHead),
         arrowprops={'arrowstyle': '->','color':color, 'ls': linestyle})
     
 #add arrows:
@@ -483,19 +502,19 @@ lenArrow = .05
 lenHead = 0
 wiArrow = 0
 ind = np.nanmedian(cortexAllRS)
-n = 0.1#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
+n = 0.2#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
 
-add_median_arrows(ax, cortexAllRS, lenArrow, lenHead, wiArrow, 'blue', 'solid')
-add_median_arrows(ax, cortexAllSteinmetz, lenArrow, lenHead, wiArrow, 'blue', 'dashed')
-add_median_arrows(ax, cortexAllAllen, lenArrow, lenHead, wiArrow, 'blue', 'dotted')
+add_median_arrows(ax, cortexAllRS, n, lenArrow, lenHead, wiArrow, 'blue', 'solid')
+add_median_arrows(ax, cortexAllSteinmetz, n, lenArrow, lenHead, wiArrow, 'blue', 'dashed')
+add_median_arrows(ax, cortexAllAllen, n, lenArrow, lenHead, wiArrow, 'blue', 'dotted')
 
-add_median_arrows(ax, thalamusAllRS, lenArrow, lenHead, wiArrow, 'green', 'solid')
-add_median_arrows(ax, thalamusAllSteinmetz, lenArrow, lenHead, wiArrow, 'green', 'dashed')
-add_median_arrows(ax, thalamusAllAllen, lenArrow, lenHead, wiArrow, 'green', 'dotted')
+add_median_arrows(ax, thalamusAllRS, n,  lenArrow, lenHead, wiArrow, 'green', 'solid')
+add_median_arrows(ax, thalamusAllSteinmetz, n, lenArrow, lenHead, wiArrow, 'green', 'dashed')
+add_median_arrows(ax, thalamusAllAllen, n, lenArrow, lenHead, wiArrow, 'green', 'dotted')
 
-add_median_arrows(ax, hippocampusAllRS, lenArrow, lenHead, wiArrow, 'purple', 'solid')
-add_median_arrows(ax, hippocampusAllSteinmetz, lenArrow, lenHead, wiArrow, 'purple', 'dashed')
-add_median_arrows(ax, hippocampusAllAllen, lenArrow, lenHead, wiArrow, 'purple', 'dotted')
+add_median_arrows(ax, hippocampusAllRS, n, lenArrow, lenHead, wiArrow, 'purple', 'solid')
+add_median_arrows(ax, hippocampusAllSteinmetz, n, lenArrow, lenHead, wiArrow, 'purple', 'dashed')
+add_median_arrows(ax, hippocampusAllAllen, n, lenArrow, lenHead, wiArrow, 'purple', 'dotted')
 
 
 
@@ -506,22 +525,13 @@ ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
 
 plt.legend(frameon=False)
 plt.tight_layout()
-# plt.suptitle('All Datasets',y=1.1)
 fig.show()
 
-plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs.pdf', dpi=300, format='pdf')
-# cortexAllRS, cortexAllSteinmetz, cortexAllAllen
+plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs%dAmp_%dFR.pdf'%(minAmp,minFR), dpi=300, format='pdf')
 
-#%%
 
-xx = sum(~np.isnan(thalamusAllRS))
-tt = thalamusAllRS[~np.isnan(thalamusAllRS)]
-ax.hist(tt, nBins,weights = np.ones(xx) / xx, histtype = 'step', color = 'green', label = 'Thalamus', linestyle = '-')
-
-xx = sum(~np.isnan(hippocampusAllRS))
-hh= hippocampusAllRS[~np.isnan(hippocampusAllRS)]
-
-ax.hist(hh, nBins, weights = np.ones(xx) /xx, histtype = 'step', color = 'purple', label = 'Hippocampus', linestyle = '-')
-ax.set_ylim(0,.3)
-# plt.hist(data, weights=np.ones(len(data)) / len(data))
-
+#%% TODO tomorrow:
+    
+    # scatter plots: rpEstimate vs fr and rpEstimate vs amplitude
+    # histograms with different subselections: change amp and fr and run this code for a few different seleections of the parameters
+    # if time: look into low thalamus example neurons!
