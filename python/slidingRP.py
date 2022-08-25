@@ -383,29 +383,8 @@ def plotSlidingRP(spikeTimes, params = None):
     fig.tight_layout()
 
 
-def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, rp, params):
+def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
 
-
-    # if params and 'returnMatrix' in params:
-    #     returnMatrix = params['returnMatrix'] 
-    # else:
-    #     returnMatrix = False
-    
-    
-    if params and 'verbose' in params:
-        verbose = params['verbose']; 
-    else:
-        verbose = False
-        
-    if params and 'sampleRate' in params:
-        sampleRate = params['sampleRate']
-    else:
-        sampleRate = 30000
-    if params and 'binSizeCorr' in params:
-        binSizeCorr = params['binSizeCorr']
-    else:
-        binSizeCorr = 1/30000
-    
     cids = np.unique(spikeClusters)
     
     #initialize rpMetrics as dict
@@ -413,64 +392,39 @@ def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, rp, params):
     rpFit['cidx'] = []
     rpFit['rpEstimate']  = []
     rpFit['brainRegion'] = []
-    # rpMetrics ['maxConfidenceAt10Cont'] = []
-    # rpMetrics['minContWith90Confidence'] = []
-    # rpMetrics['timeOfLowestCont'] = []
-    # rpMetrics['nSpikesBelow2'] = []
-    
-    # if verbose:
-    #     print("Computing metrics for %d clusters \n" % len(cids))
-     
-    # frrd = np.empty(len(cids))
-    # frrd[:] = np.nan    
-    # sc = np.empty(len(cids))
-    # sc[:] = np.nan
+    rpFit['amp'] = []
+    rpFit['fr'] = []
+
     for cidx in range(len(cids)):
         st = spikeTimes[spikeClusters==cids[cidx]] 
         brainRegion = brainRegions[cidx]
-        # print('computingACG')
+        fr = len(st)/(st[-1]-st[0])
 
-        #compute acg
-    #setup for acg
-        clustersIds = [0] # call the cluster id 0 (not used, but required input for correlograms)
-        spikeClustersACG = np.zeros(len(st), dtype = 'int8') # each spike time gets cluster id 0 
-  
-        nACG = correlograms(st, spikeClustersACG, cluster_ids = clustersIds, bin_size = binSizeCorr, sample_rate = sampleRate, window_size=2,symmetrize=False)[0][0] #compute acg
-
-        # print('estimating RP')
+        sa = spikeAmps[spikeClusters==cids[cidx]] 
+        amp = np.nanmedian(sa)*1000000
 
         #estimate rp
+        minFR = 1 #spks/s
+        minAmp = 50 #uV
+        
         try:
-            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(nACG, rp, params)
-            
-            
+            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
+
             rpFit['cidx'].append(cids[cidx]) 
             rpFit['rpEstimate'].append(estimatedRP)
             rpFit['brainRegion'].append(brainRegion)
-        # # rpMetrics['brainRegion'].append(minContWith90Confidence)
+            rpFit['fr'].append(fr)
+            rpFit['amp'].append(amp)
             if verbose:
 
                 print('Estimated RP for cluster %d is %.2f ms'%(cids[cidx],estimatedRP))
         except:
             continue
 
-
-    
-#' %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2))
-        # #     # print('Seconds elapsed: %.2f%%'%secondsElapsed)
-        
-        # except:
-        #     continue
-    
-            
-        
-            
-
-
     return rpFit
 
 
-def fitSigmoidACG(acg, timeBins, params):
+def fitSigmoidACG(st, timeBins, fr, amp, minFR = 1, minAmp = 50, params = None):
     '''
     
 
@@ -492,6 +446,28 @@ def fitSigmoidACG(acg, timeBins, params):
     y: 
 
     '''
+    if params and 'verbose' in params:
+        verbose = params['verbose']; 
+    else:
+        verbose = False
+        
+    if params and 'sampleRate' in params:
+        sampleRate = params['sampleRate']
+    else:
+        sampleRate = 30000
+    if params and 'binSizeCorr' in params:
+        binSizeCorr = params['binSizeCorr']
+    else:
+        binSizeCorr = 1/30000
+    
+    
+    
+    #setup for acg
+    clustersIds = [0] # call the cluster id 0 (not used, but required input for correlograms)
+    spikeClustersACG = np.zeros(len(st), dtype = 'int8') # each spike time gets cluster id 0 
+    #compute acg
+    acg = correlograms(st, spikeClustersACG, cluster_ids = clustersIds, bin_size = binSizeCorr, sample_rate = sampleRate, window_size=2,symmetrize=False)[0][0] #compute acg
+
     if len(acg) > len(timeBins):
         acg = acg[0:len(timeBins)]
 
@@ -503,7 +479,7 @@ def fitSigmoidACG(acg, timeBins, params):
     peakDistFromEndBin = 5 #todo: params!! 
         
     estimatedRP = np.nan #initialize as a nan for cases where it doesn't work
-    if(sum(acg)>numSpikesThresh):   
+    if fr >= minFR and amp >= minAmp:    #(sum(acg)>numSpikesThresh):   
         #potential todo: insert a case here for if the acg is symmetric?
         # p0 = [np.mean(ydata),2,1,min(ydata)] #starting point for fit? 
         minSigmoid = np.mean(acg[timeBins<0.0005]) #first 0.5 ms of data #todo make this parameter
@@ -514,28 +490,37 @@ def fitSigmoidACG(acg, timeBins, params):
         timeValuesMin = np.where(timeBins >= timeBins[peakIdx]-0.001)[0][0]
         timeValuesMax = np.where(timeBins <= timeBins[peakIdx]+0.001)[0][-1]
         maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax+1)])
-
+    
         #if the peak is well before the end of the acg, only fit data up to the peak + n bins
         if peakIdx < len(acg)-peakDistFromEndBin:
             acg = acg[0:peakIdx + peakDistFromEndBin]
             timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
     
         #fit the sigmoid with max and min fixed
-        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), timeBins, acg)       
-        
-        
-        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
-
-        xSigmoid = timeBins#np.linspace(0, timeBins[-1], timeBins[-]) #evenly spaced vector for plotting sigmoid
-        ySigmoid = sigmoid(xSigmoid, *fitParams)
+        try:
+            popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid ), timeBins, acg)      
+            fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
     
-            #find RP            
-        RPEstimateFromPercentageOfSlope = 0.10
-        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
-        estimatedRP = 1000* xSigmoid[estimateIdx] # in ms
+            xSigmoid = timeBins#np.linspace(0, timeBins[-1], timeBins[-]) #evenly spaced vector for plotting sigmoid
+            ySigmoid = sigmoid(xSigmoid, *fitParams)
+        
+                #find RP            
+            RPEstimateFromPercentageOfSlope = 0.10
+            estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope*(maxSigmoid - minSigmoid) + minSigmoid) 
+            estimatedRP = 1000* xSigmoid[estimateIdx] # in ms
+    
+        except:
+            estimatedRP = np.nan
+            estimateIdx = np.nan
+            xSigmoid = np.nan
+            ySigmoid = np.nan
+    
+                #print('fit error')
+
+        
 
     else:
-        print('not able to')
+        #print('fit error')
         estimatedRP = np.nan
         estimateIdx = np.nan
         xSigmoid = np.nan
@@ -543,10 +528,11 @@ def fitSigmoidACG(acg, timeBins, params):
         
     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
     
+
+
 def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
     if len(acg) > len(timeBins):
         acg = acg[0:len(timeBins)]
-    print(acg)
     ax.bar(timeBins*1000, acg, width = np.diff(timeBins*1000)[0],alpha = 0.5)
     ax.set_xlim(0,5)
 
