@@ -146,13 +146,16 @@ for e,eid in enumerate(sessions):
     rpEstimates = pickle.load(file)
     file.close()
 
-    hippocampus = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['CA', 'CA1', 'CA2', 'CA3','DG', 'POST', 'SUB']])
+
+    minFR = 5; minAmp = 50
+    #find neurons in each of the target brain regions that pass the firing rate and amplitude criteria
+    hippocampus = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['CA', 'CA1', 'CA2', 'CA3','DG', 'POST', 'SUB'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     cortex  = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['ACA', 'AUD','ILA' , 'MOp', 'MOs',  'OLF', 'ORB', 'ORBm',
                      'PIR', 'PL', 'RSP', 'SSp','SSs',  'VISa', 'VISam', 'VISl',
-                     'VISp', 'VISpm', 'VISrl']])
+                     'VISp', 'VISpm', 'VISrl'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
     thalamus= np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['TH', 'CL', 'LD', 'LGd', 'LH', 'LP', 'MD', 'MG','PO', 'POL', 
-                     'PT','RT','SPF','VAL', 'VPL', 'VPM' ]])
-    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['SNr','APN', 'IC','MB','MRN', 'NB','PAG','RN','SCig', 'SCm',  'SCs', 'SCsg']])
+                     'PT','RT','SPF','VAL', 'VPL', 'VPM' ] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR])
+    midbrain = np.array([rpEstimates['rpEstimate'][i] for i in range(len(rpEstimates['brainRegion'])) if rpEstimates['brainRegion'][i] in ['SNr','APN', 'IC','MB','MRN', 'NB','PAG','RN','SCig', 'SCm',  'SCs', 'SCsg'] and  rpEstimates['amp'][i]>minAmp and rpEstimates['fr'][i]>minFR]])
     
     hippocampus[hippocampus<.05] =np.nan
     thalamus[thalamus<.05] = np.nan
@@ -412,7 +415,7 @@ fig.show()
 
 #%%
 
-
+#non-smoothed histograms, all data
 
 
 fig,axs = plt.subplots(1,1,figsize = (5,3))
@@ -434,134 +437,6 @@ fig.show()
 
 
 
-
-#%%
-nBins = 20
-fig,axs = plt.subplots(1,1,figsize = (5,3))
-ax = axs
-cc = cortexAllRS[~np.isnan(cortexAllRS)]
-xx = sum(~np.isnan(cortexAllRS))
-ax.hist(cc, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'blue', label = 'Cortex', linestyle = '-')
-
-xx = sum(~np.isnan(thalamusAllRS))
-tt = thalamusAllRS[~np.isnan(thalamusAllRS)]
-ax.hist(tt, nBins,weights = np.ones(xx) / xx, histtype = 'step', color = 'green', label = 'Thalamus', linestyle = '-')
-
-xx = sum(~np.isnan(hippocampusAllRS))
-hh= hippocampusAllRS[~np.isnan(hippocampusAllRS)]
-
-ax.hist(hh, nBins, weights = np.ones(xx) /xx, histtype = 'step', color = 'purple', label = 'Hippocampus', linestyle = '-')
-ax.set_ylim(0,.3)
-# plt.hist(data, weights=np.ones(len(data)) / len(data))
-
-
-
-cc = cortexAllSteinmetz[~np.isnan(cortexAllSteinmetz)]
-xx = sum(~np.isnan(cortexAllSteinmetz))
-ax.hist(cc, nBins,  weights = np.ones(xx) / xx,histtype = 'step', color = 'blue', linestyle = '--')
-xx = sum(~np.isnan(thalamusAllSteinmetz))
-tt = thalamusAllSteinmetz[~np.isnan(thalamusAllSteinmetz)]
-ax.hist(tt, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'green', linestyle = '--')
-xx = sum(~np.isnan(hippocampusAllSteinmetz))
-hh= hippocampusAllSteinmetz[~np.isnan(hippocampusAllSteinmetz)]
-ax.hist(hh, nBins, weights = np.ones(xx) / xx,  histtype = 'step', color = 'purple', linestyle = '--')
-
-cc = cortexAllAllen[~np.isnan(cortexAllAllen)]
-xx = sum(~np.isnan(cortexAllAllen))
-ax.hist(cc, nBins,  weights = np.ones(xx) / xx,histtype = 'step', color = 'blue', linestyle = ':')
-xx = sum(~np.isnan(thalamusAllAllen))
-tt = thalamusAllAllen[~np.isnan(thalamusAllAllen)]
-ax.hist(tt, nBins, weights = np.ones(xx) / xx, histtype = 'step', color = 'green', linestyle = ':')
-xx = sum(~np.isnan(hippocampusAllAllen))
-hh= hippocampusAllAllen[~np.isnan(hippocampusAllAllen)]
-ax.hist(hh, nBins, weights = np.ones(xx) / xx,  histtype = 'step', color = 'purple', linestyle = ':')
-
-ax.set_xlabel('Estimated RP (ms)')
-ax.set_ylabel('Proportion of neurons')
-ax.spines.right.set_visible(False)
-ax.spines.top.set_visible(False)
-
-
-#add arrows:
-lenArrow = .2
-lenHead = .01
-wiArrow = .1
-ind = np.nanmedian(cortexAllRS)
-n = .25#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '-')
-ind = np.nanmedian(cortexAllSteinmetz)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '--')
-ind = np.nanmedian(cortexAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = ':')
-
-ind = np.nanmedian(thalamusAllRS)
-# n = len(thalamusAll[(thalamusAll > ind*0.95) & (thalamusAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = '-')
-ind = np.nanmedian(thalamusAllSteinmetz) - .4
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = 'dashed')
-ind = np.nanmedian(thalamusAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = ':')
-
-ind = np.nanmedian(hippocampusAllRS)
-# n = len(hippocampusAll[(hippocampusAll > ind*0.95) & (hippocampusAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '-')
-ind = np.nanmedian(hippocampusAllSteinmetz)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '--')
-ind = np.nanmedian(hippocampusAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = ':')
-
-
-
-
-
-
-
-ax.plot(np.NaN, np.NaN, '-', color='black', label='IBL')
-ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz 2019')
-ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
-
-plt.legend(frameon=False)
-plt.tight_layout()
-# plt.suptitle('All Datasets',y=1.1)
-fig.show()
-
-plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs.pdf', dpi=300, format='pdf')
-# cortexAllRS, cortexAllSteinmetz, cortexAllAllen
-
-#%%
-
-import matplotlib.pyplot as plt
-
-from scipy.ndimage.filters import gaussian_filter1d
-plt.rcParams.update({'font.size': 14})
-
-def plot_metric(data, bins, x_axis_label, color, max_value=-1):
-    
-    h, b = np.histogram(data, bins=bins, density=True)
-
-    x = b[:-1]
-    y = gaussian_filter1d(h, 1)
-
-    plt.plot(x, y, color=color)
-    plt.xlabel(x_axis_label)
-    plt.gca().get_yaxis().set_visible(False)
-    [plt.gca().spines[loc].set_visible(False) for loc in ['right', 'top', 'left']]
-    if max_value < np.max(y) * 1.1:
-        max_value = np.max(y) * 1.1
-    # plt.ylim([0, max_value])
-    
-    return max_value
-
-bins = np.linspace(-3,2,100)
-max_value = -np.inf
-
-for idx, region in enumerate(region_dict.keys()):
-    
-    data = np.log10(units[units.ecephys_structure_acronym.isin(region_dict[region])]['firing_rate'])
-    print('%s has %d neurons'%(region,len(data)))
-    max_value = plot_metric(data, bins, 'log$_{10}$ firing rate (Hz)', color_dict[region], max_value)
-    
-_ = plt.legend(region_dict.keys())
 
 
 
@@ -597,37 +472,30 @@ ax.set_ylabel('Proportion of neurons')
 ax.spines.right.set_visible(False)
 ax.spines.top.set_visible(False)
 
-
+def add_median_arrows(ax, data, lenArrow, lenHead, wiArrow, color, linestyle):
+    ind = np.nanmedian(data)
+    n = .22 # to do: change from hard-coded
+    ax.annotate('', xy=(ind,n), xytext=(ind,n+lenArrow+lenHead),
+        arrowprops={'arrowstyle': '->','color':color, 'ls': linestyle})
+    
 #add arrows:
-lenArrow = .03
-lenHead = .01
-wiArrow = .1
+lenArrow = .05
+lenHead = 0
+wiArrow = 0
 ind = np.nanmedian(cortexAllRS)
-n = .25#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '-')
-ind = np.nanmedian(cortexAllSteinmetz)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = '--')
-ind = np.nanmedian(cortexAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='blue', ec='none',linestyle = ':')
+n = 0.1#len(cortexAll[(cortexAll > ind*0.95) & (cortexAll <  ind*1.05)])/2 #y value of overall histogram
 
-ind = np.nanmedian(thalamusAllRS)
-# n = len(thalamusAll[(thalamusAll > ind*0.95) & (thalamusAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = '-')
-ind = np.nanmedian(thalamusAllSteinmetz) - .4
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = 'dashed')
-ind = np.nanmedian(thalamusAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='green', ec='none',linestyle = ':')
+add_median_arrows(ax, cortexAllRS, lenArrow, lenHead, wiArrow, 'blue', 'solid')
+add_median_arrows(ax, cortexAllSteinmetz, lenArrow, lenHead, wiArrow, 'blue', 'dashed')
+add_median_arrows(ax, cortexAllAllen, lenArrow, lenHead, wiArrow, 'blue', 'dotted')
 
-ind = np.nanmedian(hippocampusAllRS)
-# n = len(hippocampusAll[(hippocampusAll > ind*0.95) & (hippocampusAll <  ind*1.05)])/2 #y value of overall histogram
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '-')
-ind = np.nanmedian(hippocampusAllSteinmetz)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = '--')
-ind = np.nanmedian(hippocampusAllAllen)
-ax.arrow(ind, n+lenArrow+lenHead, 0, -lenArrow, head_width=wiArrow*3, head_length=lenHead, width=wiArrow, fc='purple', ec='none',linestyle = ':')
+add_median_arrows(ax, thalamusAllRS, lenArrow, lenHead, wiArrow, 'green', 'solid')
+add_median_arrows(ax, thalamusAllSteinmetz, lenArrow, lenHead, wiArrow, 'green', 'dashed')
+add_median_arrows(ax, thalamusAllAllen, lenArrow, lenHead, wiArrow, 'green', 'dotted')
 
-
-
+add_median_arrows(ax, hippocampusAllRS, lenArrow, lenHead, wiArrow, 'purple', 'solid')
+add_median_arrows(ax, hippocampusAllSteinmetz, lenArrow, lenHead, wiArrow, 'purple', 'dashed')
+add_median_arrows(ax, hippocampusAllAllen, lenArrow, lenHead, wiArrow, 'purple', 'dotted')
 
 
 
