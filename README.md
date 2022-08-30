@@ -4,15 +4,46 @@ Code to perform a new test of whether neurons have contaminated refractory perio
 
 ## Python
 
+### Installation
+Install using pip:
+```commandline
+pip install slidingRP
+```
+
+Install using sources in development mode. First clone the repository.
+```commandline
+cd slidingRefractory
+pip install -e .
+```
+
 ### Minimal working example
 
 ```python
-rpMetrics, cont, rp = slidingRP_all(spikeTimes, spikeClusters, params)
+from pathlib import Path
+import numpy as np
+import pandas as pd
+
+import slidingRP
+
+TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data", "integration")
+
+params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
+spikes = pd.read_parquet(TEST_DATA_PATH.joinpath('spikes.pqt'))
+table = slidingRP.slidingRP_all(spikes.times, spikes.clusters, **params)
+
+assert np.allclose(pd.read_parquet(TEST_DATA_PATH.joinpath("rp_table.pqt")), pd.DataFrame(table), equal_nan=True)
 ```
 
-
-### Run tests
+### Contribute
+#### Run unit tests
 ```commandline
  pytest python/test_*
 ```
 
+#### Upload package
+```commandline
+rm -fR dist
+rm -fR build
+python setup.py sdist bdist_wheel
+twine upload dist/*
+```

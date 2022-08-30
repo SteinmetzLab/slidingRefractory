@@ -7,7 +7,7 @@ with open('requirements.txt') as f:
     require = [x.strip() for x in f.readlines() if not x.startswith('git+')]
 
 setuptools.setup(
-    name="slidingRefractory",
+    name="slidingRP",
     version="0.0.0",
     author="Noam Roth",
     description="Quality metric from spike trains",

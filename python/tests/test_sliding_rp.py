@@ -2,7 +2,7 @@ import numpy as np
 import slidingRP
 from pathlib import Path
 
-TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data")
+TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data", 'unit')
 EXPECTED = {
     167: (0.7968085162939342, np.nan, np.nan, 0),  # FAIL
     274: (100.0, 0.5, 0.0012166666666666667, 2),   # PASS
