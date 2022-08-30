@@ -53,7 +53,7 @@ spikeClusters = np.load(datapath + '\\spike_clusters.npy')
 
 #%%
 #run slidingRP for one cluster
-params['cidx'] = [0]
+params['cidx'] = [20] #or 280
 st = spikeTimes[spikeClusters == params['cidx'][0]]
 print(len(st))
 [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
@@ -66,8 +66,8 @@ firingRate,xx] = slidingRP(st, params)
  #%%
 #run plotting code for one cluster
 #for RE presentation: ran below plus plotSlidingRP with a temporary "bug"
-
-params['cidx'] = [0]
+params = {}
+params['cidx'] = [150]
 st = spikeTimes[spikeClusters == params['cidx'][0]]
 plotSlidingRP(st, params)
 from brainbox.singlecell import firing_rate, acorr
@@ -127,11 +127,34 @@ ax.plot( [0,xlims[1]],[0,xlims[1]] )
 #%% script for testing sigmoid fits
 estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(nACG, rp, params)
 
+
+
 #%%
-fig,axs = plt.subplots(1,1,figsize = (6,5))
+fig,axs = plt.subplots(1,1,figsize = (5,3))
 ax = axs
-acg = plotSigmoid(ax, nACG, xSigmoid, ySigmoid, estimateIdx, estimatedRP)
+acg = nACG
+timeBins = rp
+if len(acg) > len(timeBins):
+    acg = acg[0:len(timeBins)]
+print(acg)
+ax.bar(timeBins*1000, acg, width = np.diff(timeBins*1000)[0],alpha = 0.5)
+ax.set_xlim(0,10)
+x = timeBins*1000
+
+ax.plot(x[0:len(ySigmoid)], ySigmoid,'k')
+ax.plot(timeBins[estimateIdx]*1000, ySigmoid[estimateIdx],'rx')
+ax.spines['right'].set_visible(False)
+ax.spines['top'].set_visible(False)
+ax.set_title('Estimated RP: %.2f ms'%estimatedRP)
+ax.set_ylabel('Number of spikes')
+ax.set_xlabel('Time (ms)')
+
+
+
+# acg = plotSigmoid(ax, nACG, xSigmoid, ySigmoid, estimateIdx, estimatedRP)
+plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\exampleACG.pdf', dpi=300, format='pdf')
 
 
 #%%
-rpEstimates = fitSigmoidACG_All(spikeTimes, spikeClusters, rp, params)
+brainRegions = np.empty(len(np.unique(spikeClusters)))
+rpEstimates = fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, rp, params)

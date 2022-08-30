@@ -2,6 +2,10 @@
 function [rpMetrics, cont, rp] = slidingRP_all(spikeTimes, spikeClusters, params)
 % compute the metric for each cluster in a recording
 
+if nargin<3
+    params = struct();
+end
+
 if ~isempty(params) && isfield(params, 'returnMatrix')
     returnMatrix = params.returnMatrix; 
 else
@@ -11,7 +15,7 @@ end
 if ~isempty(params) && isfield(params, 'verbose')
     verbose = params.verbose; 
 else
-    verbose = false;
+    verbose = true;
 end
 
 cids = unique(spikeClusters); 
@@ -38,8 +42,8 @@ for cidx = 1:numel(cids)
     end
     if verbose
         if minContWith90Confidence<=10; pfstring = 'PASS'; else pfstring = 'FAIL'; end;
-        fprintf(1, '  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d\n', ...
-            cids(cidx), pfstring, maxConfidenceAt10Cont, ...
-            minContWith90Confidence, timeOfLowestCont*1000, nSpikesBelow2);
+        fprintf(1, '  %d: contamination = %.1f%%, %s max conf = %.2f%%, time = %.2f ms, n below 2 ms = %d\n', ...
+            cids(cidx), pfstring, minContWith90Confidence, maxConfidenceAt10Cont, ...
+             timeOfLowestCont*1000, nSpikesBelow2);
     end
 end

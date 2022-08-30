@@ -61,7 +61,7 @@ for iIns, ins in enumerate(insertions):
     spikeClusters = spikes.clusters[cluInds]
     
     print('Running RP metric...')
-    rpMetrics, cont, rp = slidingRP_all(spikeTimes, spikeClusters, params)
+    rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params)
     
     
     if saveLocally:
