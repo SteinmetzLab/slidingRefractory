@@ -38,7 +38,7 @@ def test_multi_clusters():
     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-    table, _, _ = slidingRP.slidingRP_all(spikes_times, spikes_clusters, params)
+    table = slidingRP.slidingRP_all(spikes_times, spikes_clusters, **params)
     for i, clu in enumerate(table['cidx']):
         assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
                                  table['minContWith90Confidence'][i],
