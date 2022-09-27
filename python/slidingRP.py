@@ -196,9 +196,7 @@ def slidingRP(spikeTimes, params = None):
     
     
 def computeMatrix(spikeTimes, params): 
-    '''
-    
-
+    """
     Parameters
     ----------
     spikeTimes : numpy.ndarray
@@ -210,39 +208,34 @@ def computeMatrix(spikeTimes, params):
     Returns
     -------
     None.
-
-    '''
+    """
     
     
     cont = np.arange(0.5, 35, 0.5)  # vector of contamination values to test
     rpBinSize = 1 / 30000  
-    rpEdges = np.arange(0, 10/1000, rpBinSize) # in s  
-    rp = rpEdges + np.mean(np.diff(rpEdges)[0])/2 # vector of refractory period durations to test 
+    rpEdges = np.arange(0, 10/1000, rpBinSize)  # in s
+    rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2 # vector of refractory period durations to test
     
     #compute firing rate and spike count
-    spikeCount = len(spikeTimes)
+    n_spikes = spikeTimes.size
     #setup for acg
-    clustersIds = [0] # call the cluster id 0 (not used, but required input for correlograms)
-    spikeClustersACG = np.zeros(len(spikeTimes), dtype = 'int8') # each spike time gets cluster id 0 
+    clustersIds = [0]  # call the cluster id 0 (not used, but required input for correlograms)
+    spikeClustersACG = np.zeros(n_spikes, dtype=np.int8)  # each spike time gets cluster id 0
 
     # compute an acg in 1s bins to compute the firing rate  
     nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = 1, sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
-    firingRate = nACG[1] / spikeCount
+    firingRate = nACG[1] / n_spikes
         
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = params['binSizeCorr'], sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
+    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'], sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
 
-    confMatrix = np.empty((len(cont), len(rp)))
-    confMatrix[:] = np.nan
-    for rpIdx in range(len(rp)):
-        
-        # compute observed violations
-        obsViol = sum(nACG[0:rpIdx+1]) #TODO this is off slightly (half-bin) from matlab...
-        for cidx in range(len(cont)):
+    # confMatrix = np.zeros((cont.size, rp.size)) * np.nan
+    # for ir in np.arange(confMatrix.shape[1]):
+    #     # compute observed violations
+    #     obsViol = np.sum(nACG[0:ir + 1])  # TODO this is off slightly (half-bin) from matlab...
+    #     for cidx in np.arange(confMatrix.shape[0]):
+    #         confMatrix[cidx, ir] = 100 * computeViol(obsViol, firingRate, n_spikes, rp[ir] + rpBinSize / 2, cont[cidx] / 100)  # TODO FIX RP BIN
 
-            confMatrix[cidx, rpIdx] = 100*computeViol(obsViol, firingRate, 
-                          spikeCount, rp[rpIdx]+rpBinSize/2, cont[cidx]/100) #TODO FIX RP BIN
-       
-            
+    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + rpBinSize / 2, cont[:, np.newaxis] / 100)
 
     return confMatrix, cont, rp, nACG, firingRate
 
@@ -274,9 +267,8 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     '''
 
     contaminationRate = firingRate * contaminationProp 
-    expectedViol = contaminationRate* refDur * 2 * spikeCount 
-
-    confidenceScore =  1 - stats.poisson.cdf(obsViol, expectedViol)
+    expectedViol = contaminationRate * refDur * 2 * spikeCount
+    confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
     
     return confidenceScore
 
