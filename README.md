@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import slidingRP
+from slidingRP import metrics
 
 TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data", "integration")
 

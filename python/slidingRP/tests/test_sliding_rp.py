@@ -1,8 +1,8 @@
 import numpy as np
-import slidingRP
+from slidingRP import metrics
 from pathlib import Path
 
-TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data", 'unit')
+TEST_DATA_PATH = Path(__file__).parents[3].joinpath('test-data', 'unit')
 EXPECTED = {
     167: (0.7968085162939342, np.nan, np.nan, 0),  # FAIL
     274: (100.0, 0.5, 0.0012166666666666667, 2),   # PASS
@@ -30,7 +30,7 @@ def test_single_cluster():
     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
     for clu in np.unique(spikes_clusters):
         sel = spikes_clusters == clu
-        out = slidingRP.slidingRP(spikes_times[sel], params)
+        out = metrics.slidingRP(spikes_times[sel], params)
         assert EXPECTED[clu] == out[:4]
 
 
@@ -38,7 +38,7 @@ def test_multi_clusters():
     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-    table = slidingRP.slidingRP_all(spikes_times, spikes_clusters, **params)
+    table = metrics.slidingRP_all(spikes_times, spikes_clusters, **params)
     for i, clu in enumerate(table['cidx']):
         assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
                                  table['minContWith90Confidence'][i],
