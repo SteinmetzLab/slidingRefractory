@@ -9,4 +9,6 @@ plotSlidingRP.m
 python/__pycache__/simulations.cpython-38.pyc
 *.pkl
 
+build/
+dist/
 *.egg-info/

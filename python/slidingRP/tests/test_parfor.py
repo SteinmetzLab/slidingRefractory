@@ -10,10 +10,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import datetime
 import time
-from simulations import genST
+from slidingRP.simulations import genST
 import scipy
 import multiprocessing   
-from slidingRP import *
+from slidingRP.metrics import *
  
 # def func(n): 
 #     for i in range(1000): 

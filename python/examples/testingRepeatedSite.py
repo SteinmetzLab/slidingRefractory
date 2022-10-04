@@ -23,13 +23,13 @@ ssl._create_default_https_context = ssl._create_unverified_context
 import mpl_scatter_density # adds projection='scatter_density'
 from matplotlib.colors import LinearSegmentedColormap
 from one.api import ONE
-from slidingRP import *
+from slidingRP.metrics import *
 import pickle
 one = ONE()
 
 
 from phylib.stats import correlograms
-from RP_plotting import *
+from slidingRP.RP_plotting import *
 import matplotlib as mpl
 mpl.rcParams['pdf.fonttype'] = 42 #sets fonts as editable
 
