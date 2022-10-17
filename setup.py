@@ -8,12 +8,12 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="slidingRP",
-    version="1.0.0a",
+    version="1.0.0",
     author="Noam Roth",
     description="Quality metric from spike trains",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/oliche/viewephys",
+    url="https://github.com/SteinmetzLab/slidingRefractory",
     project_urls={
         "Bug Tracker": "https://github.com/SteinmetzLab/slidingRefractory/issues",
     },

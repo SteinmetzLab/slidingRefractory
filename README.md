@@ -25,11 +25,13 @@ import pandas as pd
 
 from slidingRP import metrics
 
-TEST_DATA_PATH = Path(slidingRP.__file__).parent.parent.joinpath("test-data", "integration")
+# get the small test datasets from the github repository first
+repo_path = "/home/ibladmin/Documents/PYTHON/int-brain-lab/slidingRefractory"
+TEST_DATA_PATH = Path(repo_path).joinpath("test-data", "integration")
 
 params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
 spikes = pd.read_parquet(TEST_DATA_PATH.joinpath('spikes.pqt'))
-table = slidingRP.slidingRP_all(spikes.times, spikes.clusters, **params)
+table = metrics.slidingRP_all(spikes.times, spikes.clusters, **params)
 
 assert np.allclose(pd.read_parquet(TEST_DATA_PATH.joinpath("rp_table.pqt")), pd.DataFrame(table), equal_nan=True)
 ```
