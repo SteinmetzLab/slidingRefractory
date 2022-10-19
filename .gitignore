@@ -10,3 +10,8 @@ python/__pycache__/simulations.cpython-38.pyc
 *.pkl
 
 *.egg-info/
+*.svg
+*.png
+*.ai
+*.pyc
+*.pyc

@@ -7,8 +7,7 @@ Created on Thu Jul 21 08:29:37 2022
 script for running and plotting various simulations
 """
 
-import simulations
-from simulations import *
+from simulationsFunctions import *
 import pickle
 import numpy as np
 from phylib.stats import correlograms
@@ -19,7 +18,6 @@ import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
 import time
-from slidingRP import *
 
 
 #%%
@@ -46,10 +44,10 @@ combST = np.sort(np.concatenate((st, contST)))
 #%%
 sampleRate = 30000
 params = {
-    'recDurs': np.array([0.25, 0.5, 1, 2, 5]),  #recording durations (hours)
+    'recDurs': np.array([1]),#%0.25, 0.5, 1, 2,3,4, 5]),  #recording durations (hours)
     'RPs': np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': np.array([0.1, 0.25, 0.5, 1, 5, 10,20]), #F1, 2, 5, 10 , 20 R (spk/s)
-    'contRates':  np.arange(0.00,0.225, 0.01), #contamination levels (proportion) #.025
+    'contRates':  np.arange(0.00,0.225, 0.01),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.225, 0.01), #contamination levels (proportion) #.025
     'nSim': 20,
     'threshold': 0.1,
     'binSize': 1 / sampleRate,
@@ -61,7 +59,7 @@ params = {
     'savePCfile': True
     
 }
-#%%
+
 [pc, pc2MsNoSpikes] = simulateContNeurons(params)
 import datetime
 
@@ -73,21 +71,30 @@ savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefrac
 results = [pc, pc2MsNoSpikes, params]
 if params['savePCfile']:
     with open(savefile, 'wb') as handle:
-        pickle.dump(pc, handle)
-     
-        
+        pickle.dump(results, handle)
      
         #%%
-savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
+# savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
+
+savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
 #load data
+
+import datetime
+
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+
 file = open(savefile,'rb')
 results = pickle.load(file)
 file.close()
 
-#prep for figure saving
-figsavefile1 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pdf'
-figsavefile2 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes.pdf'
+pc = results[0]
+pc2MsNoSpikes = results[1]
+params = results[2]
 
+
+#prep for figure saving
+figsavefile1 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.svg'
+figsavefile2 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes.pdf'
 
 plotSimulations(pc, params, figsavefile1)
 plotSimulations(pc2MsNoSpikes, params, figsavefile2)

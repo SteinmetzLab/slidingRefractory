@@ -9,10 +9,30 @@ Code to plot histograms of estimated RPs, as computed in computeEstimatedRPs.py
 Runs for 3 datasets: IBL repeated site; Steinmetz 2019; Allen 
 
 """
+
+#%% imports
+import sys
+sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\paper-reproducible-ephys')
+sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\metrics\slidingRP')
+sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python')
+#from reproducible_ephys_functions import query
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+import mpl_scatter_density # adds projection='scatter_density'
+from matplotlib.colors import LinearSegmentedColormap
+from one.api import ONE
+from slidingRP import *
+import pickle
+one = ONE()
+#pull down RS data
+from reproducible_ephys_functions import filter_recordings, labs, BRAIN_REGIONS, query, get_insertions
+from reproducible_ephys_functions import combine_regions, BRAIN_REGIONS, get_insertions, save_data_path, save_dataset_info
+
+
 #%% 
 
 #set filter parameters for firing rate and amplitude across all 3 datasets
-minFR = 20; minAmp = 100
+minFR = 5; minAmp = 50
 
 
 
@@ -496,6 +516,13 @@ def add_median_arrows(ax, data, y_value, lenArrow, lenHead, wiArrow, color, line
     ind = np.nanmedian(data)
     ax.annotate('', xy=(ind, y_value), xytext=(ind,y_value + lenArrow + lenHead),
         arrowprops={'arrowstyle': '->','color':color, 'ls': linestyle})
+ 
+# add Ns
+def add_Nneurons(ax, dataset, x,y, color):
+    # x = legendPosition.x0
+    # y = legendPosition.y0
+    nNeur = len(dataset)
+    ax.annotate(str(nNeur), xy=(x,y), color = color)
     
 #add arrows:
 lenArrow = .05
@@ -515,17 +542,33 @@ add_median_arrows(ax, thalamusAllAllen, n, lenArrow, lenHead, wiArrow, 'green', 
 add_median_arrows(ax, hippocampusAllRS, n, lenArrow, lenHead, wiArrow, 'purple', 'solid')
 add_median_arrows(ax, hippocampusAllSteinmetz, n, lenArrow, lenHead, wiArrow, 'purple', 'dashed')
 add_median_arrows(ax, hippocampusAllAllen, n, lenArrow, lenHead, wiArrow, 'purple', 'dotted')
-
-
+ 
 
 
 ax.plot(np.NaN, np.NaN, '-', color='black', label='IBL')
-ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz 2019')
+ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz')
 ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
 
-plt.legend(frameon=False)
-plt.tight_layout()
-fig.show()
+leg = ax.legend(frameon=False, loc = 'upper right', bbox_to_anchor=(.9,1))
+fig.canvas.draw()
+p = leg.get_window_extent()
+
+
+add_Nneurons(ax, cortexAllRS, 6.7,0.128, 'blue')
+add_Nneurons(ax, thalamusAllRS, 7.5,0.128, 'green')
+add_Nneurons(ax, hippocampusAllRS, 8.5,0.128, 'purple')
+
+add_Nneurons(ax, cortexAllSteinmetz, 8.0,0.107, 'blue')
+add_Nneurons(ax, thalamusAllSteinmetz, 9.0,0.107, 'green')
+add_Nneurons(ax, hippocampusAllSteinmetz, 9.95,0.107, 'purple')
+
+add_Nneurons(ax, cortexAllAllen, 7.1,0.086, 'blue')
+add_Nneurons(ax, thalamusAllAllen, 8.3,0.086, 'green')
+add_Nneurons(ax, hippocampusAllAllen, 9.3,0.086, 'purple')
+
+
+#plt.tight_layout()
+# fig.show()
 
 plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs%dAmp_%dFR.pdf'%(minAmp,minFR), dpi=300, format='pdf')
 
