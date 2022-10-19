@@ -33,7 +33,11 @@ from reproducible_ephys_functions import combine_regions, BRAIN_REGIONS, get_ins
 
 #set filter parameters for firing rate and amplitude across all 3 datasets
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 minFR = 5; minAmp = 50
+=======
+minFR = 1; minAmp = 50
+>>>>>>> Stashed changes
 =======
 minFR = 1; minAmp = 50
 >>>>>>> Stashed changes
@@ -555,6 +559,7 @@ ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz')
 ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 leg = ax.legend(frameon=False, loc = 'upper right', bbox_to_anchor=(.9,1))
 fig.canvas.draw()
 p = leg.get_window_extent()
@@ -576,6 +581,8 @@ add_Nneurons(ax, hippocampusAllAllen, 9.3,0.086, 'purple')
 #plt.tight_layout()
 # fig.show()
 =======
+=======
+>>>>>>> Stashed changes
 leg = plt.legend(frameon=False)
 
 
