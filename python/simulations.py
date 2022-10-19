@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import datetime
-
+import slidingRP
 import time
 import slidingRP
 from slidingRP import slidingRP
@@ -122,7 +122,7 @@ def simulateContNeurons(params):
                         
                         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
                              nSpikesBelow2, confMatrix, cont, rpVec, nACG,
-                             firingRate, secondsElapsed] = slidingRP(combST, params)
+                             firingRate, secondsElapsed] = slidingRP.slidingRP(combST, params)
                         
                         if minContWith90Confidence <=10:
                             passVec[n] = 1
