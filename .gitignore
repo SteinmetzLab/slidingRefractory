@@ -12,3 +12,6 @@ python/__pycache__/simulations.cpython-38.pyc
 build/
 dist/
 *.egg-info/
+*.svg
+*.png
+*.ai
