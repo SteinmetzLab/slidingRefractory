@@ -66,15 +66,28 @@ firingRate,xx] = slidingRP(st, params)
  #%%
 #run plotting code for one cluster
 #for RE presentation: ran below plus plotSlidingRP with a temporary "bug"
-params = {}
-params['cidx'] = [150]
-st = spikeTimes[spikeClusters == params['cidx'][0]]
-plotSlidingRP(st, params)
+for i in [34, 47]:#range(30,50):
+    params = {}
+    params['cidx'] = [i]
+    
+    params['sampleRate'] = 30000
+    params['binSizeCorr'] = 1 / params['sampleRate']
+    # params = SimpleNamespace(**params) #convert to dot notation
+    params['returnMatrix'] = True
+    params['verbose'] = True
+    params['clusterLabel'] = True
+    params['savefig'] = True
+    params['figpath']= r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\examples' + "\\exampleNeuron%s.svg"%params['cidx'][0]
+    st = spikeTimes[spikeClusters == params['cidx'][0]]
+    plotSlidingRP(st, params)
+
+
+#%%
 from brainbox.singlecell import firing_rate, acorr
 
 hist_win = 0.05
 fr_win = 1
-if(1):
+if(0):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize = (12,4))
     st = st[:-500]
     fr = firing_rate(st, hist_win = hist_win, fr_win=fr_win)
@@ -83,6 +96,7 @@ if(1):
     ax.set_title('Firing Rate')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Rate (spks/s)')
+
 
 
 

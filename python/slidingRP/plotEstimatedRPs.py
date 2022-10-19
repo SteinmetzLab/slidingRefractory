@@ -9,10 +9,38 @@ Code to plot histograms of estimated RPs, as computed in computeEstimatedRPs.py
 Runs for 3 datasets: IBL repeated site; Steinmetz 2019; Allen 
 
 """
+
+#%% imports
+import sys
+sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\paper-reproducible-ephys')
+sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\metrics\slidingRP')
+sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python')
+#from reproducible_ephys_functions import query
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+import mpl_scatter_density # adds projection='scatter_density'
+from matplotlib.colors import LinearSegmentedColormap
+from one.api import ONE
+from slidingRP import *
+import pickle
+one = ONE()
+#pull down RS data
+from reproducible_ephys_functions import filter_recordings, labs, BRAIN_REGIONS, query, get_insertions
+from reproducible_ephys_functions import combine_regions, BRAIN_REGIONS, get_insertions, save_data_path, save_dataset_info
+
+
 #%% 
 
 #set filter parameters for firing rate and amplitude across all 3 datasets
-minFR = 20; minAmp = 100
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+minFR = 5; minAmp = 50
+=======
+minFR = 1; minAmp = 50
+>>>>>>> Stashed changes
+=======
+minFR = 1; minAmp = 50
+>>>>>>> Stashed changes
 
 
 
@@ -466,6 +494,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 nBins = 20
 fig,axs = plt.subplots(1,1,figsize = (5,3))
 ax = axs
+plt.title('min amplitude:%d  min FR: %d'%(minAmp,minFR))
 
 def plot_hists(ax, data, color, linestyle, label= None):
     cc = data[~np.isnan(data)]
@@ -496,6 +525,13 @@ def add_median_arrows(ax, data, y_value, lenArrow, lenHead, wiArrow, color, line
     ind = np.nanmedian(data)
     ax.annotate('', xy=(ind, y_value), xytext=(ind,y_value + lenArrow + lenHead),
         arrowprops={'arrowstyle': '->','color':color, 'ls': linestyle})
+ 
+# add Ns
+def add_Nneurons(ax, dataset, x,y, color):
+    # x = legendPosition.x0
+    # y = legendPosition.y0
+    nNeur = len(dataset)
+    ax.annotate(str(nNeur), xy=(x,y), color = color)
     
 #add arrows:
 lenArrow = .05
@@ -515,17 +551,67 @@ add_median_arrows(ax, thalamusAllAllen, n, lenArrow, lenHead, wiArrow, 'green', 
 add_median_arrows(ax, hippocampusAllRS, n, lenArrow, lenHead, wiArrow, 'purple', 'solid')
 add_median_arrows(ax, hippocampusAllSteinmetz, n, lenArrow, lenHead, wiArrow, 'purple', 'dashed')
 add_median_arrows(ax, hippocampusAllAllen, n, lenArrow, lenHead, wiArrow, 'purple', 'dotted')
-
-
+ 
 
 
 ax.plot(np.NaN, np.NaN, '-', color='black', label='IBL')
-ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz 2019')
+ax.plot(np.NaN, np.NaN, '--', color='black', label='Steinmetz')
 ax.plot(np.NaN, np.NaN, ':', color='black', label='Allen')
 
-plt.legend(frameon=False)
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+leg = ax.legend(frameon=False, loc = 'upper right', bbox_to_anchor=(.9,1))
+fig.canvas.draw()
+p = leg.get_window_extent()
+
+
+add_Nneurons(ax, cortexAllRS, 6.7,0.128, 'blue')
+add_Nneurons(ax, thalamusAllRS, 7.5,0.128, 'green')
+add_Nneurons(ax, hippocampusAllRS, 8.5,0.128, 'purple')
+
+add_Nneurons(ax, cortexAllSteinmetz, 8.0,0.107, 'blue')
+add_Nneurons(ax, thalamusAllSteinmetz, 9.0,0.107, 'green')
+add_Nneurons(ax, hippocampusAllSteinmetz, 9.95,0.107, 'purple')
+
+add_Nneurons(ax, cortexAllAllen, 7.1,0.086, 'blue')
+add_Nneurons(ax, thalamusAllAllen, 8.3,0.086, 'green')
+add_Nneurons(ax, hippocampusAllAllen, 9.3,0.086, 'purple')
+
+
+#plt.tight_layout()
+# fig.show()
+=======
+=======
+>>>>>>> Stashed changes
+leg = plt.legend(frameon=False)
+
+
+p = leg.get_texts()
+
+ax.annotate('Annotation Text', (p.p0[0], p.p1[1]), (p.p0[0], p.p1[1]), 
+            xycoords='figure pixels', zorder=9)
+
+n = -.01
+x = 1.2
+plt.text(6*x, 0.12-n, str(len(cortexAllRS)), color = 'blue')
+plt.text(6.4*x+.2, 0.12-n, str(len(thalamusAllRS)), color = 'green')
+plt.text(6.8*x+.4, 0.12-n, str(len(hippocampusAllRS)), color = 'purple')
+
+plt.text(7.8*x, 0.1-n, str(len(cortexAllSteinmetz)), color = 'blue')
+plt.text(8.2*x+.2, 0.1-n, str(len(thalamusAllSteinmetz)), color = 'green')
+plt.text(8.8*x+.4, 0.1-n, str(len(hippocampusAllSteinmetz)), color = 'purple')
+
+plt.text(6.2*x, 0.081-n, str(len(cortexAllAllen)), color = 'blue')
+plt.text(6.8*x, 0.081-n, str(len(thalamusAllAllen)), color = 'green')
+plt.text(7.3*x+.4, 0.081-n, str(len(hippocampusAllAllen)), color = 'purple')
+
+
+
+# for text in leg.get_texts():
+#     plt.setp(text, color = 'w')
 plt.tight_layout()
 fig.show()
+>>>>>>> Stashed changes
 
 plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\estimatedRPs%dAmp_%dFR.pdf'%(minAmp,minFR), dpi=300, format='pdf')
 
@@ -535,3 +621,42 @@ plt.savefig(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefra
     # scatter plots: rpEstimate vs fr and rpEstimate vs amplitude
     # histograms with different subselections: change amp and fr and run this code for a few different seleections of the parameters
     # if time: look into low thalamus example neurons!
+
+fig,axs = plt.subplots(2,1,figsize = (5,4))
+
+savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\savedRSFits\\'
+
+nSess = len(insertions)
+plotEach = False
+ca1All = []
+dgAll = []
+poAll = []
+lpAll = []
+visaAll = []
+
+
+
+for s in range(nSess):
+    subject = insertions[s]['session']['subject']
+    #load saved rpMetrics
+    try:
+        file = open(savefile + subject + '.pickle','rb')
+    except:
+        continue
+    rpEstimates = pickle.load(file)
+    file.close()
+    ax = axs[0]
+
+    ax.scatter(rpEstimates['rpEstimate'],rpEstimates['amp'],s = 5,color = 'k')    
+    ax.set_xlim(0,2)
+    
+    ax = axs[1]
+
+    ax.scatter(rpEstimates['rpEstimate'],rpEstimates['fr'],s = 5,color = 'k')    
+    ax.set_xlim(0,2)
+    ax.set_ylim(0,30)
+
+fig.tight_layout() # Or equivalently,  "plt.tight_layout()"
+axs[1].set_xlabel('Estimated RP (ms)')
+axs[0].set_ylabel('median amplitude (uV)')
+axs[1].set_ylabel('mean firing rate (spks/s)')

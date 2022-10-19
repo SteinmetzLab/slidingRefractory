@@ -292,6 +292,8 @@ def plotSlidingRP(spikeTimes, params = None):
     '''
     if params is None: 
         clusterlabel = False
+    else:
+        clusterlabel = params['clusterLabel']
 
     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
         nSpikesBelow2, confMatrix, cont, rp, nACG, 
@@ -349,12 +351,15 @@ def plotSlidingRP(spikeTimes, params = None):
     
     
     if minContWith90Confidence >= 10:
+        print('FAIL')
         axs[0].set_title(t1, color='r')                   
         axs[1].set_title(t2,color = 'r')
     elif nSpikesBelow2 == 0:
+        print('NOSPIKES2')
         axs[0].set_title(t1, color='b')                   
         axs[1].set_title(t2,color = 'b')
     else:
+        print('PASS')
         axs[0].set_title(t1, color='g')                   
         axs[1].set_title(t2,color = 'g')
         
@@ -363,7 +368,7 @@ def plotSlidingRP(spikeTimes, params = None):
     ax = axs[2]
     ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'k', linewidth = 2.0)
     ax.set_xlabel('Time from spike (ms)')
-    ax.set_ylabel('Confidence of \leq10% contamination (%)')
+    ax.set_ylabel('Confidence of ≤10% contamination (%)')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     
@@ -373,7 +378,9 @@ def plotSlidingRP(spikeTimes, params = None):
     ax.set_ylim([0, 100]); 
     
     fig.tight_layout()
-
+    
+    if params['savefig']:
+        plt.savefig(params['figpath'], dpi=300)
 
 def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
 

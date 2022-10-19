@@ -10,12 +10,9 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import datetime
-import slidingRP
+
 import time
 import slidingRP
-from slidingRP import slidingRP
-
-
 
 def genST(rate, duration, params = None):
     '''
@@ -122,7 +119,7 @@ def simulateContNeurons(params):
                         
                         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
                              nSpikesBelow2, confMatrix, cont, rpVec, nACG,
-                             firingRate, secondsElapsed] = slidingRP.slidingRP(combST, params)
+                             firingRate, secondsElapsed] = slidingRP(combST, params)
                         
                         if minContWith90Confidence <=10:
                             passVec[n] = 1
@@ -169,7 +166,7 @@ def plotSimulations(pc,params, savefile):
                 ax.set_ylabel('Percent pass')
                 ax.set_xlabel('Proportion contamination')
                 ax.set_title('True RP %d ms'%(rp*1000))
-        fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
+        fig.text(0.425, 1-(.17*j), 'Recording duration: %d hours'%recDur)
    
     handles, labels = ax.get_legend_handles_labels()
     fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
@@ -188,7 +185,11 @@ def plotSimulations(pc,params, savefile):
             if len(params['recDurs']) > 1 and len(params['RPs'])>1:
                 ax = axs[j,i]
             else:
-                ax = axs[(j+1)*i]
+                ax = axs[j,i]
+
+                # print(len(axs))
+                # print(ax)
+                # ax = axs[(j+1)*i]
             #different base rates get different colors
             for b, baseRate in enumerate(params['baseRates']):
                 ax.plot(params['recDurs'], pc[:, i, b,j*2], '.-',color = colors[b], label = baseRate)
