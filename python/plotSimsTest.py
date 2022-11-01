@@ -5,7 +5,10 @@ Created on Thu Sep  1 09:20:53 2022
 @author: Noam Roth
 plot simulations
 """
-
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pickle
 
 def plotSimulations(pc,params, savefile):
  

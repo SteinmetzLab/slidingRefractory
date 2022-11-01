@@ -7,7 +7,9 @@ Created on Thu Jul 21 08:29:37 2022
 script for running and plotting various simulations
 """
 
-from simulationsFunctions import *
+sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
+
+#from simulationsFunctions import *
 import pickle
 import numpy as np
 from phylib.stats import correlograms
@@ -20,7 +22,7 @@ from scipy.optimize import curve_fit
 import time
 
 
-#%%
+#%% 
 #script testing (to be moved later for import purposes)
 
 # from simulations import genST  # this is not working, for some reason it's importing a different simulations gensT
@@ -41,7 +43,7 @@ combST = np.sort(np.concatenate((st, contST)))
 
 
 
-#%%
+#%% run (and save) simulations for only one recDur
 sampleRate = 30000
 params = {
     'recDurs': np.array([1]),#%0.25, 0.5, 1, 2,3,4, 5]),  #recording durations (hours)
@@ -73,7 +75,7 @@ if params['savePCfile']:
     with open(savefile, 'wb') as handle:
         pickle.dump(results, handle)
      
-        #%%
+        #%% load saved results and plot
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
 
 savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
