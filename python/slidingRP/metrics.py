@@ -217,7 +217,7 @@ def computeMatrix(spikeTimes, params):
     rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2 # vector of refractory period durations to test
     
     #compute firing rate and spike count
-    n_spikes = spikeTimes.size
+    n_spikes = len(spikeTimes)
     #setup for acg
     clustersIds = [0]  # call the cluster id 0 (not used, but required input for correlograms)
     spikeClustersACG = np.zeros(n_spikes, dtype=np.int8)  # each spike time gets cluster id 0
