@@ -77,7 +77,8 @@ if params['savePCfile']:
      
         #%% load saved results and plot
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
-
+from slidingRP import simulations
+from simulations import plotSimulations
 savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
 #load data
 

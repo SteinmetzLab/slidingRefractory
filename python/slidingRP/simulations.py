@@ -12,8 +12,9 @@ import matplotlib.pyplot as plt
 import datetime
 import slidingRP
 import time
-# import slidingRP
-# from slidingRP import slidingRP
+
+from statsmodels.stats.proportion import proportion_confint as binofit
+    #(I had to pip install statsmodels; TODO check for a better package? )
 
 
 
@@ -153,6 +154,10 @@ def simulateContNeurons(params):
     
 def plotSimulations(pc,params, savefile):
  
+    #compute confidence intervals
+    count = pc/100 * params['nSim']
+    CI = binofit(count,params['nSim'])
+    
     colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(params['baseRates'])))
     fig,axs = plt.subplots(len(params['recDurs']),len(params['RPs']), figsize = (12,3*len(params['recDurs'])))
 
@@ -189,9 +194,21 @@ def plotSimulations(pc,params, savefile):
                 ax = axs[j,i]
             else:
                 ax = axs[(j+1)*i]
+                print('hi1')
+                print(axs)
+                print('hi2')
+                print(ax)
             #different base rates get different colors
             for b, baseRate in enumerate(params['baseRates']):
-                ax.plot(params['recDurs'], pc[:, i, b,j*2], '.-',color = colors[b], label = baseRate)
+                
+                lowerCI = CI[0][:, i, b,j*2]
+                upperCI = CI[1][:, i, b,j*2]
+                x = params['recDurs']
+                y =  pc[:, i, b,j*2]
+                ax.plot(x, y, '.-',color = colors[b], label = baseRate)
+                
+                ax.fill_between(x, (y-lowerCI), (y+upperCI), color=colors[b], alpha=.1)
+
                 ax.set_ylabel('Percent pass')
                 ax.set_xlabel('recording Duration')
                 ax.set_title('True RP %d ms'%(rp*1000))
