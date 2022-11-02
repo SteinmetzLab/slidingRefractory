@@ -6,7 +6,7 @@ Created on Thu Jul 21 08:29:37 2022
 
 script for running and plotting various simulations
 """
-
+import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
 
 #from simulationsFunctions import *
@@ -20,7 +20,7 @@ import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
 import time
-
+from slidingRP.simulations import *
 
 #%% 
 #script testing (to be moved later for import purposes)
@@ -50,7 +50,7 @@ params = {
     'RPs': np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': np.array([0.1, 0.25, 0.5, 1, 5, 10,20]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates':  np.arange(0.00,0.225, 0.01),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.225, 0.01), #contamination levels (proportion) #.025
-    'nSim': 20,
+    'nSim': 50,
     'threshold': 0.1,
     'binSize': 1 / sampleRate,
     'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
