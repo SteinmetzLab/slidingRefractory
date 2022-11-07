@@ -78,10 +78,12 @@ if params['savePCfile']:
         #%% load saved results and plot
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
 from slidingRP import simulations
-from simulations import plotSimulations
-savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
-#load data
+# from simulations import plotSimulations
+# savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
 
+
+#load data
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_11_03_21.pickle'
 import datetime
 
 date_now  = datetime.datetime.now().strftime('_%m_%d')
@@ -96,8 +98,8 @@ params = results[2]
 
 
 #prep for figure saving
-figsavefile1 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.svg'
-figsavefile2 = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes.pdf'
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.svg'
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes.svg'
 
 plotSimulations(pc, params, figsavefile1)
 plotSimulations(pc2MsNoSpikes, params, figsavefile2)
