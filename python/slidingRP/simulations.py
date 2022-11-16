@@ -175,7 +175,7 @@ def plotSimulations(pc,params, savefile):
     fig.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.1, 1))
 
 
-    fig.savefig(savefile, dpi = 500)
+    fig.savefig(savefile + '_Main.svg', dpi = 500)
     
     
     fig,axs = plt.subplots(len(params['contRates'][::2]),len(params['RPs']), figsize = (12*2,3*len(params['recDurs'])))
@@ -207,8 +207,8 @@ def plotSimulations(pc,params, savefile):
     fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
     fig.legend(handles, labels, loc='upper right')
-    fig.show()
-    
+    fig.savefig(savefile + '_recDur.svg', dpi = 500)
+
     
     
     fig,axs = plt.subplots(len(params['recDurs']), len(params['contRates'][::2]), figsize = (12*2,3*len(params['recDurs'])))
@@ -235,4 +235,5 @@ def plotSimulations(pc,params, savefile):
     fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
     fig.legend(handles, labels, loc='upper right')
-    fig.show()
+    print('hi')
+    fig.savefig(savefile + '_RP.svg', dpi = 500)

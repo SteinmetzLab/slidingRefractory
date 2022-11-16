@@ -13,13 +13,7 @@ sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
 import pickle
 import numpy as np
 from phylib.stats import correlograms
-from types import SimpleNamespace
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import numpy as np
 from scipy import stats
-from scipy.optimize import curve_fit
-import time
 from slidingRP.simulations import *
 
 #%% 
@@ -77,7 +71,6 @@ if params['savePCfile']:
      
         #%% load saved results and plot
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
-from slidingRP import simulations
 # from simulations import plotSimulations
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
 
@@ -98,8 +91,8 @@ params = results[2]
 
 
 #prep for figure saving
-figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.svg'
-figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes.svg'
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
 
 plotSimulations(pc, params, figsavefile1)
 plotSimulations(pc2MsNoSpikes, params, figsavefile2)
@@ -254,7 +247,6 @@ fig.legend()
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from scipy.special import factorial
 from scipy.stats import poisson
 
 bins = np.arange(25) - 0.5
