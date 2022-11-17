@@ -69,7 +69,7 @@ from slidingRP.simulations import *
 #     with open(savefile, 'wb') as handle:
 #         pickle.dump(results, handle)
      
-        #%% load saved results and plot
+        #% load saved results and plot
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
 # from simulations import plotSimulations
 # savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
@@ -83,11 +83,13 @@ date_now  = datetime.datetime.now().strftime('_%m_%d')
 
 file = open(savefile,'rb')
 results = pickle.load(file)
+
 file.close()
 
 pc = results[0]
 pc2MsNoSpikes = results[1]
 params = results[2]
+
 
 
 #prep for figure saving
