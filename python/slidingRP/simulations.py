@@ -149,37 +149,54 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
     count = pc / 100 * params['nSim'] #number of correct trials 
     CI_scaled = binofit(count,params['nSim'])
     CI = [x*100 for x in CI_scaled]
-    colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(params['baseRates'])))
+    colors = matplotlib.cm.Blues(np.linspace(0, 1, len(params['baseRates'])))
 
     if Fig1:
         if plotType == 'paper':
             #for this figure, plotType = 'full' or plotType = 'paper' are the same.
-            numrows = len(params['recDurs'])
-            numcols = len(params['RPs'])
+            numrows = 1#len(params['recDurs'])
+            numcols = 1#len(params['RPs'])
             numplots = numrows * numcols
-            fig,axs = plt.subplots(numrows,numcols, figsize = (10,10))
+            fig,axs = plt.subplots(numrows,numcols, figsize = (5,5))
+            ax = axs
             titlexval = 0.5
             titleyvals = [1, 0.77, 0.52, 0.27]
 
+
+
+
+
+            # plot just recDur == 2:
+            recDurs = params['recDurs']
+            recDursInd = np.where(recDurs == 2)[0]
+
+            # plot just RP = 2.5:
+            rps = params['RPs']
+            rpInd = np.where(rps == 0.0025)[0]
+
+            # plot just baseRates = [0.5, 1, 5, 10]
+            fr_plot = [0.5, 1, 5, 10]
+            frs = params['baseRates']
+            frInd = [x for x in range(len(frs)) if frs[x] in fr_plot]
+
+
             pltcnt = 0
-            for j, recDur in enumerate(params['recDurs']):
+            for j, recDur in enumerate(recDurs[recDursInd]):
                 print(j)
                 print(recDur)
-                for i, rp in enumerate(params['RPs']):
+                for i, rp in enumerate(rps[rpInd]):
                     pltcnt +=1
-                    if len(params['recDurs']) > 1 and len(params['RPs'])>1:
-                        ax = axs[j,i]
-                    else:
-                        ax = axs[(j+1)*i]
                     #different base rates get different colors
-                    for b, baseRate in enumerate(params['baseRates']):
-                        lowerCI = CI[0][j, i, b,:]
-                        upperCI = CI[1][j, i, b,:]
+                    for b, baseRate in enumerate(frInd):
+                        fr_use = frs[frInd[b]]
+                        lowerCI = CI[0][recDursInd, rpInd, frInd[b],:][0]
+                        upperCI = CI[1][recDursInd, rpInd, frInd[b],:][0]
                         x = params['contRates'] *100
-                        y =  pc[j, i, b,:]
-                        ax.plot(x, y, '.-',color = colors[b], label = baseRate)
+                        y = pc[recDursInd, rpInd, frInd[b],:][0]
 
-                        ax.fill_between(x, lowerCI,upperCI, color=colors[b], alpha=.3)
+                        ax.plot(x, y, '.-',color = colors[frInd[b]], label = fr_use)
+
+                        ax.fill_between(x, lowerCI,upperCI, color=colors[frInd[b]], alpha=.2)
                         if (i == 0):
                             ax.set_ylabel('Percent pass')
                         else:
@@ -207,7 +224,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
             # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
             plt.subplots_adjust(hspace=0.6,wspace=0.5)
             fig.tight_layout()
-            fig.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.1, 1.1))
+            fig.legend(handles, labels, title = 'Base firing rates (spk/s)', loc='upper right',bbox_to_anchor=(1, .9))
 
 
             fig.savefig(savefile + '_Main.svg', dpi = 500)
@@ -368,7 +385,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
             numplots = numrows * numcols
             fig,axs = plt.subplots(numrows, numcols, figsize = (20,20))
             titlexval = 0.5
-            titleyvals = [1, 0.75, 0.5, 0.25] 
+            titleyvals = [1, 0.75, 0.5, 0.25]
             pltcnt = 0
             for j, recDur in enumerate(params['recDurs']):
                 for i, contRate in enumerate(params['contRates'][::2]):
