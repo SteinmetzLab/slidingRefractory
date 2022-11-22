@@ -436,7 +436,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
         ax = axs #for the case of just one subplot
         #plot just contRates 0.08 to 0.12:
         cr = params['contRates'];
-        crInds = np.where((cr >= 0.08) & (cr <= 0.12))[0]
+        crInds = np.where((cr >= 0.07) & (cr <= 0.13))[0]
         #plot just recDur = 1
         rd = params['recDurs']
         rdInd = np.where(rd==1)[0]
@@ -449,10 +449,10 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
 
                 # different base rates get different colors
                 for b, baseRate in enumerate(params['baseRates']):
-                    lowerCI = CI[0][j, i, b, crInds]
-                    upperCI = CI[1][j, i, b, crInds]
+                    lowerCI = CI[0][rdInd, rpInd, b, crInds][0]
+                    upperCI = CI[1][rdInd, rpInd, b, crInds][0]
                     x = cr[crInds] *100
-                    y = pc[j, i, b, crInds]
+                    y = pc[rdInd, rpInd, b, crInds][0]
                     ax.plot(x, y, '.-', color=colors[b], label=baseRate)
                     ax.fill_between(x, lowerCI, upperCI, color=colors[b], alpha=.3)
                     ax.set_ylabel('Percent pass')
@@ -461,7 +461,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
                     ax.spines.right.set_visible(spinesSetting)
                     ax.spines.top.set_visible(spinesSetting)
                     ax.set_title('True RP: %.1f ms; recording duration: %d hour' % (rp[rpInd] * 1000, rd[rdInd]))
-                    ax.xaxis.set_ticks([8, 9, 10, 11,12])
+                    ax.xaxis.set_ticks([7, 8, 9, 10, 11,12, 13])
         # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
         handles, labels = ax.get_legend_handles_labels()
         plt.subplots_adjust(hspace=0.3)
