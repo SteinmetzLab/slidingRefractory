@@ -220,7 +220,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
             numplots = numrows * numcols
             fig, axs = plt.subplots(numrows, numcols, figsize=(20, 20))
             titlexval = 0.5
-            titleyvals = [0.3, 0.5, 0.7, 0.9]
+            titleyvals = [0.9,0.7,0.5,0.3]
 
             pltcnt = 0
             for j, recDur in enumerate(params['recDurs']):
@@ -368,7 +368,7 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False,
             numplots = numrows * numcols
             fig,axs = plt.subplots(numrows, numcols, figsize = (20,20))
             titlexval = 0.5
-            titleyvals = [0.25, 0.5, 0.75, 1]
+            titleyvals = [1, 0.75, 0.5, 0.25] 
             pltcnt = 0
             for j, recDur in enumerate(params['recDurs']):
                 for i, contRate in enumerate(params['contRates'][::2]):
