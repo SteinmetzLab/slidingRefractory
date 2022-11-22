@@ -122,6 +122,8 @@ def simulateContNeurons(params):
                         if nSpikesBelow2 ==0:
                             passVec2MsNoSpikes[n] = 1
 
+                        #Add Hill comparison here
+
                     passPct[j, i, bidx,cidx]=sum(passVec)/params['nSim']*100
                     passPct2MsNoSpikes[j, i, bidx,cidx]=sum(passVec2MsNoSpikes)/params['nSim']*100
 
@@ -135,50 +137,136 @@ def simulateContNeurons(params):
     return passPct, passPct2MsNoSpikes
          
     
-def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False, Fig4 = False, plotType = 'paper'):
+def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = True, Fig3 = False, Fig4 = True, plotType = 'paper'):
     #plot type = 'full' or plot type = 'paper'
     #compute confidence intervals
+
+    if plotType == 'paper':
+        spinesSetting = False
+    else:
+        spinesSetting = True
+
     count = pc / 100 * params['nSim'] #number of correct trials 
     CI_scaled = binofit(count,params['nSim'])
     CI = [x*100 for x in CI_scaled]
     colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(params['baseRates'])))
 
     if Fig1:
-        fig,axs = plt.subplots(len(params['recDurs']),len(params['RPs']), figsize = (12,3*len(params['recDurs'])))
+        if plotType == 'paper':
+            #for this figure, plotType = 'full' or plotType = 'paper' are the same.
+            numrows = len(params['recDurs'])
+            numcols = len(params['RPs'])
+            numplots = numrows * numcols
+            fig,axs = plt.subplots(numrows,numcols, figsize = (10,10))
+            titlexval = 0.5
+            titleyvals = [1, 0.77, 0.52, 0.27]
 
-        for j, recDur in enumerate(params['recDurs']):
-            for i, rp in enumerate(params['RPs']):
+            pltcnt = 0
+            for j, recDur in enumerate(params['recDurs']):
+                print(j)
+                print(recDur)
+                for i, rp in enumerate(params['RPs']):
+                    pltcnt +=1
+                    if len(params['recDurs']) > 1 and len(params['RPs'])>1:
+                        ax = axs[j,i]
+                    else:
+                        ax = axs[(j+1)*i]
+                    #different base rates get different colors
+                    for b, baseRate in enumerate(params['baseRates']):
+                        lowerCI = CI[0][j, i, b,:]
+                        upperCI = CI[1][j, i, b,:]
+                        x = params['contRates'] *100
+                        y =  pc[j, i, b,:]
+                        ax.plot(x, y, '.-',color = colors[b], label = baseRate)
 
-                if len(params['recDurs']) > 1 and len(params['RPs'])>1:
-                    ax = axs[j,i]
+                        ax.fill_between(x, lowerCI,upperCI, color=colors[b], alpha=.3)
+                        if (i == 0):
+                            ax.set_ylabel('Percent pass')
+                        else:
+                            ax.yaxis.set_ticklabels([])
+                        if (pltcnt > (numplots - numcols)):
+                            ax.set_xlabel('Contamination (%)')
+                        if (pltcnt == 1):
+                            ax.set_title('True RP: %.1f ms'%(rp * 1000))
+                        else:
+                            ax.set_title('%.1f ms'%(rp * 1000))
+                        ax.set_ylim(-10, 110)
+                        ax.spines.right.set_visible(spinesSetting)
+                        ax.spines.top.set_visible(spinesSetting)
+                        ax.xaxis.set_ticks([0,10,20])
+                # fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
+                if recDur != 1:
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hours' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
                 else:
-                    ax = axs[(j+1)*i]
-                #different base rates get different colors
-                for b, baseRate in enumerate(params['baseRates']):
-                    lowerCI = CI[0][j, i, b,:]
-                    upperCI = CI[1][j, i, b,:]
-                    x = params['contRates']
-                    y =  pc[j, i, b,:]
-                    ax.plot(x, y, '.-',color = colors[b], label = baseRate)
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hour' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
 
-                    ax.fill_between(x, lowerCI,upperCI, color=colors[b], alpha=.3)
-                    ax.set_ylim((0, 100))
-
-                    ax.set_ylabel('Percent pass')
-                    ax.set_xlabel('Prop. cont.')
-                    ax.set_title('True RP %d ms'%(rp*1000))
-            # fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
-            fig.suptitle('Recording duration: %d hour'%recDur, x=.5, y=1.1)
-
-        handles, labels = ax.get_legend_handles_labels()
-        fig.tight_layout(pad=1, w_pad=1.1, h_pad=1.0)
-        # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
-
-        fig.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.1, 1))
+            handles, labels = ax.get_legend_handles_labels()
+            # fig.tight_layout(pad=1, w_pad=1.1, h_pad=1.3)
+            # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+            plt.subplots_adjust(hspace=0.6,wspace=0.5)
+            fig.tight_layout()
+            fig.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.1, 1.1))
 
 
-        fig.savefig(savefile + '_Main.svg', dpi = 500)
-    
+            fig.savefig(savefile + '_Main.svg', dpi = 500)
+
+
+        if plotType == 'full':
+            # for this figure, plotType = 'full' or plotType = 'paper' are the same.
+            numrows = len(params['recDurs'])
+            numcols = len(params['RPs'])
+            numplots = numrows * numcols
+            fig, axs = plt.subplots(numrows, numcols, figsize=(20, 20))
+            titlexval = 0.5
+            titleyvals = [0.3, 0.5, 0.7, 0.9]
+
+            pltcnt = 0
+            for j, recDur in enumerate(params['recDurs']):
+                for i, rp in enumerate(params['RPs']):
+                    pltcnt += 1
+                    if len(params['recDurs']) > 1 and len(params['RPs']) > 1:
+                        ax = axs[j, i]
+                    else:
+                        ax = axs[(j + 1) * i]
+                    # different base rates get different colors
+                    for b, baseRate in enumerate(params['baseRates']):
+                        lowerCI = CI[0][j, i, b, :]
+                        upperCI = CI[1][j, i, b, :]
+                        x = params['contRates'] * 100
+                        y = pc[j, i, b, :]
+                        ax.plot(x, y, '.-', color=colors[b], label=baseRate)
+
+                        ax.fill_between(x, lowerCI, upperCI, color=colors[b], alpha=.3)
+                        if (i == 0):
+                            ax.set_ylabel('Percent pass')
+                        if (pltcnt > (numplots - numcols)):
+                            ax.set_xlabel('Percent contamination')
+                        if (pltcnt == 1):
+                            ax.set_title('True RP: %.1f ms' % (rp * 1000))
+                        else:
+                            ax.set_title('%.1f ms' % (rp * 1000))
+                        ax.set_ylim(-10, 110)
+                        ax.spines.right.set_visible(spinesSetting)
+                        ax.spines.top.set_visible(spinesSetting)
+                # fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
+                if recDur != 1:
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hours' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
+                else:
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hour' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
+
+            handles, labels = ax.get_legend_handles_labels()
+            # fig.tight_layout(pad=1, w_pad=1.1, h_pad=1.3)
+            # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+            plt.subplots_adjust(hspace=0.3)
+
+            fig.legend(handles, labels, loc='upper right')  # ,bbox_to_anchor=(1.1, 1))
+
+            fig.savefig(savefile + '_Main.svg', dpi=500)
+
     if Fig2:
         if plotType == 'full':
             numrows = len(params['contRates'][::2])
@@ -214,6 +302,8 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
                         else:
                             ax.set_title('%.1f ms; %d'%(rp*1000, contRate*100) + '%')
                         ax.set_ylim(-10, 110)
+                        ax.spines.right.set_visible(spinesSetting)
+                        ax.spines.top.set_visible(spinesSetting)
                 # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
                 fig.suptitle('Proportion contamination: %.2f'%contRate, x=.5, y=1.1)
             handles, labels = ax.get_legend_handles_labels()
@@ -221,17 +311,18 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
             # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
             fig.tight_layout()
             fig.legend(handles, labels, loc='upper right')
-            fig.savefig(savefile + '_recDur.svg', dpi = 500)
+            fig.savefig(savefile + '_recDur_full.svg', dpi = 500)
 
         if plotType == 'paper':
             numrows = 1
             numcols = 1
             numplots = numrows * numcols
-            fig, axs = plt.subplots(numrows, numcols, figsize=(5, 3))
+            fig, axs = plt.subplots(numrows, numcols, figsize=(6, 3))
             ax = axs  # for the case of just one subplot
             # plot just contRates 0.08 to 0.12:
             cr = params['contRates'];
-            crInds = np.where(cr == 0.10)[0]
+            contRatePlot = 0.09
+            crInds = np.where(cr == contRatePlot)[0]
 
             # plot just RP = 2:
             rp = params['RPs']
@@ -259,46 +350,72 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
                         ax.set_xlabel('Recording duration (hours)')
                         ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
                         ax.set_ylim(-10, 110)
+                        ax.spines.right.set_visible(spinesSetting)
+                        ax.spines.top.set_visible(spinesSetting)
                 # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
-                fig.suptitle('Proportion contamination: %.2f' % contRate, x=.5, y=1.1)
+                fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
             handles, labels = ax.get_legend_handles_labels()
 
             # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
             fig.tight_layout()
             # fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1.1, 1))
-            fig.savefig(savefile + '_recDur.svg', dpi=500)
+            fig.savefig(savefile + '_recDur_%d.svg'%(contRatePlot*100), dpi=500)
     
     if Fig3:
-        fig,axs = plt.subplots(len(params['recDurs']), len(params['contRates'][::2]), figsize = (12*2,3*len(params['recDurs'])))
-        for j, recDur in enumerate(params['recDurs']):
-            for i, contRate in enumerate(params['contRates'][::2]):
+        if plotType == 'full':
+            numrows = len(params['recDurs'])
+            numcols = len(params['contRates'][::2])
+            numplots = numrows * numcols
+            fig,axs = plt.subplots(numrows, numcols, figsize = (20,20))
+            titlexval = 0.5
+            titleyvals = [0.25, 0.5, 0.75, 1]
+            pltcnt = 0
+            for j, recDur in enumerate(params['recDurs']):
+                for i, contRate in enumerate(params['contRates'][::2]):
+                    pltcnt +=1
+                    if len(params['recDurs']) > 1 and len(params['contRates'])>1:
+                        ax = axs[j,i]
+                    else:
+                        ax = axs[(j+1)*i]
+                    #different base rates get different colors
+                    for b, baseRate in enumerate(params['baseRates']):
+                        lowerCI = CI[0][j,:, b,i*2]
+                        upperCI = CI[1][j,:, b,i*2]
+                        x = params['RPs']
+                        y =  pc[j,:, b,i*2]
+                        ax.plot(x, y, '.-',color = colors[b], label = baseRate)
+                        ax.fill_between(x, lowerCI, upperCI, color=colors[b], alpha=.3)
+                        if (i == 0):
+                            ax.set_ylabel('Percent pass')
+                        if (pltcnt > (numplots - numcols)):
+                            ax.set_xlabel('True RP')
+                        if (pltcnt == 1):
+                            ax.set_title('Contamination: %.2f' %(contRate) + '%')
+                        else:
+                            ax.set_title('%.2f' % (contRate) + '%')
+                        ax.set_ylim(-10, 110)
+                        ax.spines.right.set_visible(spinesSetting)
+                        ax.spines.top.set_visible(spinesSetting)
 
-                if len(params['recDurs']) > 1 and len(params['contRates'])>1:
-                    ax = axs[j,i]
+
+
+                # fig.text(0.65, 0.9-(.17*j), 'Recording Duration: %d hours'%recDur)
+                if recDur != 1:
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hours' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
                 else:
-                    ax = axs[(j+1)*i]
-                #different base rates get different colors
-                for b, baseRate in enumerate(params['baseRates']):
-                    lowerCI = CI[0][j,:, b,i*2]
-                    upperCI = CI[1][j,:, b,i*2]
-                    x = params['RPs']
-                    y =  pc[j,:, b,i*2]
-                    ax.plot(x, y, '.-',color = colors[b], label = baseRate)
-                    ax.fill_between(x, lowerCI, upperCI, color=colors[b], alpha=.3)
-                    ax.set_ylabel('Percent pass')
-                    ax.set_xlabel('True RP')
-                    ax.set_title('contamination %.2f '%contRate)
-            # fig.text(0.65, 0.9-(.17*j), 'Recording Duration: %d hours'%recDur)
-            fig.suptitle('Recording Duration: %d hour'%recDur, x=.5, y=1.1)
-        fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
-        handles, labels = ax.get_legend_handles_labels()
+                    plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hour' % recDur, ha="center",
+                                va="top", fontsize=14, color="k")
+            # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+            handles, labels = ax.get_legend_handles_labels()
+            fig.tight_layout()
+            plt.subplots_adjust(hspace=0.3)
 
-        fig.legend(handles, labels, loc='upper right')
-        print('hi')
-        fig.savefig(savefile + '_RP.svg', dpi = 500)
+            fig.legend(handles, labels, loc='upper right')
+            fig.savefig(savefile + '_RP.svg', dpi = 500)
 
     if Fig4:
-        fig, axs = plt.subplots(1, 1, figsize=(6, 4))
+        fig, axs = plt.subplots(1, 1, figsize=(3, 5))
         ax = axs #for the case of just one subplot
         #plot just contRates 0.08 to 0.12:
         cr = params['contRates'];
@@ -317,14 +434,19 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
                 for b, baseRate in enumerate(params['baseRates']):
                     lowerCI = CI[0][j, i, b, crInds]
                     upperCI = CI[1][j, i, b, crInds]
-                    x = cr[crInds]
+                    x = cr[crInds] *100
                     y = pc[j, i, b, crInds]
                     ax.plot(x, y, '.-', color=colors[b], label=baseRate)
                     ax.fill_between(x, lowerCI, upperCI, color=colors[b], alpha=.3)
                     ax.set_ylabel('Percent pass')
-                    ax.set_xlabel('contamination Rate')
-            # fig.text(0.65, 0.9-(.17*j), 'Recording Duration: %d hours'%recDur)
-        fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+                    ax.set_xlabel('Contamination (%)')
+                    ax.set_ylim(-10, 110)
+                    ax.spines.right.set_visible(spinesSetting)
+                    ax.spines.top.set_visible(spinesSetting)
+                    ax.set_title('True RP: %.1f ms; recording duration: %d hour' % (rp[rpInd] * 1000, rd[rdInd]))
+                    ax.xaxis.set_ticks([8, 9, 10, 11,12])
+        # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
         handles, labels = ax.get_legend_handles_labels()
+        plt.subplots_adjust(hspace=0.3)
 
         fig.savefig(savefile + '_individual.svg', dpi=500)
