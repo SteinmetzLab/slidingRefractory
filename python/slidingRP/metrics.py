@@ -33,6 +33,8 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
         params.sampleRate : sample rate of the recording (Hz)
+        params.2msNoSpikes : set to True to automatically accept neurons above FRthresh with no spikes below 2ms
+        params.FRthresh : set a FR threshold to reject neurons below this number regardless of metric performance (spks/s)
 
     Returns
     -------
@@ -63,8 +65,17 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
         verbose = params['verbose']; 
     else:
         verbose = False
-    
-    
+
+    if params:
+        print('params already instantiated')
+    else:
+        params = {}
+        #default params
+        params['sampleRate'] = 30000
+        params['binSizeCorr'] = 1/30000
+        params['2msNoSpikesCondition'] = False
+
+
     cids = np.unique(spikeClusters)
     
     #initialize rpMetrics as dict
@@ -74,6 +85,7 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     rpMetrics['minContWith90Confidence'] = []
     rpMetrics['timeOfLowestCont'] = []
     rpMetrics['nSpikesBelow2'] = []
+    rpMetrics['firingRate'] = []
     
     if verbose:
         print("Computing metrics for %d clusters \n" % len(cids))
@@ -91,6 +103,7 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
         rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+        rpMetrics['firingRate'].append(firingRate)
        
         
         if returnMatrix:
@@ -101,10 +114,24 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
         
         if 'value' not in rpMetrics:
             rpMetrics['value'] = []
-        if minContWith90Confidence<=10:
-            rpMetrics['value'].append(1)
-        else: 
-            rpMetrics['value'].append(0)
+        # Set value (pass or reject neuron):
+        if params['2msNoSpikesCondition']: #In this case, reject neurons below FRthresh and accept if no spikes below 2
+            if rpMetrics['firingRate'] < params['FRthresh']:
+                rpMetrics['value'].append(0)
+            else:
+                if rpMetrics['nSpikesBelow2'] == 0:
+                    rpMetrics['value'].append(1)
+                else:
+                    if minContWith90Confidence <= 10:
+                        rpMetrics['value'].append(1)
+                    else:
+                        rpMetrics['value'].append(0)
+
+        else: #regular behavior of the metric, disregarding whether neurons have spikes below 2ms
+            if minContWith90Confidence<=10:
+                rpMetrics['value'].append(1)
+            else:
+                rpMetrics['value'].append(0)
             
         if verbose:
             if minContWith90Confidence<=10:
