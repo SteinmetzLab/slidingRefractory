@@ -116,7 +116,7 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
             rpMetrics['value'] = []
         # Set value (pass or reject neuron):
         if params['2msNoSpikesCondition']: #In this case, reject neurons below FRthresh and accept if no spikes below 2
-            if rpMetrics['firingRate'] < params['FRthresh']:
+            if firingRate < params['FRthresh']:
                 rpMetrics['value'].append(0)
             else:
                 if rpMetrics['nSpikesBelow2'] == 0:
