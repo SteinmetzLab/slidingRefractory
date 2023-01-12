@@ -12,6 +12,17 @@ else
     returnMatrix = false;
 end
 
+if ~isempty(params) && isfield(params, '2msNoSpikesCondition')
+    2msNoSpikesCondition = params.2msNoSpikesCondition;
+    if ~isempty(params) && isfield(params, 'FRthresh')
+        FRthresh = params.FRthresh;
+    else
+        FRthresh = 0.5; %default FR thresh 
+    end   
+else
+    2msNoSpikesCondition = false;
+end
+
 if ~isempty(params) && isfield(params, 'verbose')
     verbose = params.verbose; 
 else
@@ -37,6 +48,41 @@ for cidx = 1:numel(cids)
     rpMetrics(cidx).minContWith90Confidence = minContWith90Confidence;
     rpMetrics(cidx).timeOfLowestCont = timeOfLowestCont;
     rpMetrics(cidx).nSpikesBelow2 = nSpikesBelow2;
+    
+
+
+    %Add returned value of metric (pass or fail)
+    if params['2msNoSpikesCondition']
+        %In this case, reject neurons below FRthresh and accept if no
+        %spikes below 2 (otherwise follow the regular behavior of the
+        %metric)
+        
+            if firingRate < FRthresh
+                rpMetrics(cidx).value = 0;
+            else
+                if nSpikesBelow2 == 0
+                    rpMetrics(cidx).value = 1;
+                else
+                    if minContWith90Confidence <= 10
+                        rpMetrics(cidx).value = 1;
+                    else
+                         rpMetrics(cidx).value = 0;
+                    end
+                end
+            end
+    else 
+        %regular behavior of the metric, disregarding whether neurons have
+        %spikes below 2ms  
+        if minContWith90Confidence <=10
+            rpMetrics(cidx).value = 1;
+        else
+            rpMetrics(cidx).value = 0;
+        end
+    end
+
+    
+    
+    
     if returnMatrix
         rpMetrics(cidx).confMatrix = confMatrix;
     end
