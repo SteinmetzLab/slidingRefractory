@@ -40,10 +40,10 @@ combST = np.sort(np.concatenate((st, contST)))
 #%% run (and save) simulations for only one recDur
 sampleRate = 30000
 params = {
-    'recDurs': np.array([2]),#np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours)
+    'recDurs': np.arange(0.5,3.25,0.25),#([0.5,1,1.5,2,2.5,3]),#np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours)
     'RPs': np.array([0.002]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
-    'baseRates': np.arange(0.05, 1, 0.1) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
-    'contRates':  np.append(np.arange(0.00,0.225, 0.01),.5),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.225, 0.01), #contamination levels (proportion) #.025
+    'baseRates': np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
+    'contRates': np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.225, 0.01), #contamination levels (proportion) #.025
     'nSim': 500,
     'threshold': 0.1,
     'binSize': 1 / sampleRate,

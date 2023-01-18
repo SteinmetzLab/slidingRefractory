@@ -76,8 +76,16 @@ overall_struct['previous_pass']=[]
 overall_struct['pt5_pass'] = []
 overall_struct['pt33_pass'] = []
 overall_struct['pt75_pass'] = []
+overall_struct['dynamic_pass'] = []
+overall_struct['dynamic_threshold'] = []
 
-for i, pid in enumerate(bwm_df['pid'][35:]):
+
+#define a closest function for finding the nearest recording duration and firing rate
+def closest(lst, K):
+    return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
+
+# run the loop
+for i, pid in enumerate(bwm_df['pid']):
 
     #for each trajectory, load spikes
     try:
@@ -95,10 +103,45 @@ for i, pid in enumerate(bwm_df['pid'][35:]):
         continue
     print('Running code for pid number ' + str(i))
     print(subject)
-    params = {}
-    params['sampleRate'] = 1/30000
+
     return_struct = slidingRP_all(spikes.times, spikes.clusters)
 
+    '''
+    goal here is to add:
+    for each recording, pull out the recording length
+    then look up on the heat map, what is the corresponding value for
+     1) 90% reject on 50% contamijnation,
+     2)  50% reject on 20% contamination
+    I guess pick the shortest of these two (but also save them, so you can plot this later)
+    and then for this value, put it in a new struct, tailored, where you run the inclusion criteria based on this value
+
+    '''
+    # first spike to last spike (across all recorded neurons), in hours
+    recordingDuration = (spikes.times[-1]-spikes.times[0]) / 3600
+
+    #load dict of firing rates from contour plots
+    savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\contFRContourDict.pickle'
+    file = open(savefile, 'rb')
+    contContourDict = pickle.load(file)
+    file.close()
+
+    #also load corresponding params for the corresponding recording durations:
+    # load data
+    savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_122.pickle'
+    file = open(savefile, 'rb')
+    results = pickle.load(file)
+    file.close()
+    params = results[2]
+
+    recDurClosest = closest(params['recDurs'], recordingDuration) #closest rec dur for which I've computed contours
+    recDurInd = np.where(params['recDurs'] == recDurClosest)
+
+
+    #The rule is: 20% contamination we want at least 50% reject, for 50% contamination we want at least 90% reject
+    lowContFR = contContourDict[(0.2, 50)][recDurInd]
+    highContFR = contContourDict[(0.5, 90)][recDurInd]
+
+    frThreshRecDur = min(lowContFR, highContFR)
 
 
     for n in range(len(return_struct['cidx'])):
@@ -107,6 +150,13 @@ for i, pid in enumerate(bwm_df['pid'][35:]):
             passfail = 1
         else:
             passfail = 0
+
+        frThresh = frThreshRecDur
+        dynamic_pass = passfail #by default, set the value to the same as the normal metric
+        if return_struct['nSpikesBelow2'][n]==0 and return_struct['firingRate'][n]>frThresh:
+            dynamic_pass = 1 #but, if there are no spikes and fr is higher than the threshold, set to pass
+        if return_struct['firingRate'][n] < frThresh:
+            dynamic_pass = 0 #if the firing rate is less than the threshold, set to fail
 
 
         frThresh = 0.5
@@ -145,6 +195,8 @@ for i, pid in enumerate(bwm_df['pid'][35:]):
         overall_struct['pt5_pass'].append(pt5_pass)
         overall_struct['pt33_pass'].append(pt33_pass)
         overall_struct['pt75_pass'].append(pt75_pass)
+        overall_struct['dynamic_pass'].append(dynamic_pass)
+        overall_struct['dynamic_threshold'].append(frThreshRecDur)
 
         overall_struct['pid'].append(pid)
         overall_struct['eid'].append(eid)
@@ -170,11 +222,13 @@ previous = sum(overall_struct['previous_pass'])
 pt33 = sum(overall_struct['pt33_pass'])
 pt5 = sum(overall_struct['pt5_pass'])
 pt75 = sum(overall_struct['pt75_pass'])
-labels = ['Original metric', '0.33 spks/s', '0.5 spks/s', '0.75 spks/s']
+dynamic = sum(overall_struct['dynamic_pass'])
+labels = ['Original metric', '0.33 spks/s', '0.5 spks/s', '0.75 spks/s', 'Based on Rec Dur']
 title = 'Number of passing neurons with different FR thresholds'
 
 fig,ax = plt.subplots()
-ax.bar(labels, [previous, pt33,pt5,pt75])
+ax.bar(labels, [previous, pt33,pt5,pt75,dynamic], color = '0.6')
+ax.set_ylim([80000, 130000])
 ax.set_ylabel('Number of neurons')
 ax.set_title(title)
 plt.show()
@@ -187,7 +241,9 @@ previous_pct = previous/total_neurons *100
 pt33_pct = pt33/total_neurons * 100
 pt5_pct = pt5/total_neurons * 100
 pt75_pct = pt75/total_neurons * 100
-ax.bar(labels, [previous_pct, pt33_pct,pt5_pct,pt75_pct], color = '0.6')
+dynamic_pct = dynamic/total_neurons *100
+ax.bar(labels, [previous_pct, pt33_pct,pt5_pct,pt75_pct,dynamic_pct], color = '0.6')
 ax.set_ylabel('Percent of total IBL neurons')
 ax.set_title(title)
+ax.set_ylim([30,50])
 plt.show()
