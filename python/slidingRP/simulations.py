@@ -72,7 +72,12 @@ def simulateContNeurons(params):
     passPct[:] = np.nan
     passPct2MsNoSpikes = np.zeros([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
     passPct2MsNoSpikes[:] = np.nan
-    
+
+
+    passPctHill2 = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPctHill2[:] = np.nan
+    passPctHill3 = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPctHill3[:] = np.nan
     # passPctOld = np.zeros([len(recDurScalarVec), len(rpvec),len(baseRates), len(contPct)])
     start_time = time. time()
     
@@ -98,6 +103,11 @@ def simulateContNeurons(params):
                     passVec[:] = np.nan
                     passVec2MsNoSpikes = np.empty(params['nSim'])
                     passVec2MsNoSpikes[:] = np.nan
+
+                    passVecHill2 = np.empty(params['nSim'])
+                    passVecHill2[:] = np.nan
+                    passVecHill3 = np.empty(params['nSim'])
+                    passVecHill3[:] = np.nan
                     for n in range(params['nSim']):
                         if n%20 ==0:
                             print('-',end="")
@@ -127,10 +137,40 @@ def simulateContNeurons(params):
                         if nSpikesBelow2 ==0:
                             passVec2MsNoSpikes[n] = 1
 
-                        #Add Hill comparison here
+                        #Hill comparison with 2ms or 3 ms
+
+                        minISI = 0.001
+
+                        refDur = 0.002
+                        nViol2 = sum(nACG[0:np.where(rpVec > refDur)[0][0] + 1])
+                        violationTime2 = 2 * firingRate * recDur * (refDur - minISI)  #do this two ways with firing rate and len(st)???
+                        violationRate2 = nViol2/violationTime2
+                        fpRate2 = violationRate2/firingRate
+                        if fpRate2 > 1:
+                            fpRate2 = 1
+
+                        refDur = 0.003
+                        nViol3 = sum(nACG[0:np.where(rpVec > refDur)[0][0] + 1])
+                        violationTime3 = 2 * firingRate * recDur * (refDur - minISI)  #do this two ways with firing rate and len(st)???
+                        violationRate3 = nViol3/violationTime3
+                        fpRate3 = violationRate3/firingRate
+                        if fpRate3 > 1:
+                            fpRate3 = 1
+
+                        if fpRate2 <= 0.10:
+                            passVecHill2[n] = 1
+                        else:
+                            passVecHill2[n] = 0
+
+                        if fpRate3 <= 0.10:
+                            passVecHill3[n] = 1
+                        else:
+                            passVecHill3[n] = 0
 
                     passPct[j, i, bidx,cidx]=sum(passVec)/params['nSim']*100
                     passPct2MsNoSpikes[j, i, bidx,cidx]=sum(passVec2MsNoSpikes)/params['nSim']*100
+                    passPctHill2[j, i, bidx,cidx]=sum(passVecHill2)/params['nSim']*100
+                    passPctHill3[j, i, bidx,cidx]=sum(passVecHill3)/params['nSim']*100
 
                     cidx+=1
     
@@ -139,10 +179,12 @@ def simulateContNeurons(params):
     current_time = time. time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))       
-    return passPct, passPct2MsNoSpikes
+    return passPct, passPct2MsNoSpikes, passPctHill2, passPctHill3
          
     
-def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False, Fig4 = False, sensSpecPlot = False, plotType = 'paper'):
+def plotSimulations(pc,params, savefile, input_color = cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
+                    Fig1 = True, Fig2 = False, Fig3 = False, Fig4 = False,
+                    sensSpecPlot = False, plotType = 'paper'):
     #plot type = 'full' or plot type = 'paper'
     #compute confidence intervals
 
@@ -195,17 +237,18 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
 
             # plot just RP = 2:
             rps = params['RPs']
-            rpInd = np.where(rps == 0.002)[0]
+            rpInd = np.where(rps == 0.0015)[0]
 
             # plot just baseRates = [0.5, 1, 5, 10]
             fr_plot = [0.45,1,2,5, 10] #changed on 12/26 to look at all
-            fr_plot = [0.05,0.25,0.45,0.75,1,10]
+            # fr_plot = [0.05,0.25,0.45,0.75,1,10]
+            fr_plot = [0.5, 1, 5, 10]
             # fr_plot = [0.05,0.25,0.45,0.75,1,2, 5,10]
             # fr_plot = params['baseRates']
             frs = params['baseRates']
             frInd = [x for x in range(len(frs)) if frs[x] in fr_plot]
 
-            c = cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+            c = input_color#cc.linear_protanopic_deuteranopic_kbw_5_95_c34
             c = c[::-1] #if using linear_blue37 or protanopic, flip the order
             colors = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(fr_plot))*255).astype(int)]
             # colors = [c[x] for x in np.round(np.linspace(0.25, 1, len(fr_plot))*255).astype(int)]
@@ -267,9 +310,9 @@ def plotSimulations(pc,params, savefile, Fig1 = True, Fig2 = False, Fig3 = False
             # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
             plt.subplots_adjust(hspace=0.6,wspace=0.5)
             fig.tight_layout()
-            # fig.legend(handles, labels, title = 'Firing rate (spk/s)', loc='upper right',bbox_to_anchor=(1, .9))
+            fig.legend(handles, labels, title = 'Firing rate (spk/s)', loc='upper right',bbox_to_anchor=(1, .9))
             handles2, labels2 = ax2.get_legend_handles_labels()
-            # fig2.legend(handles, labels, title = 'Firing rate (spk/s)', loc='upper right',bbox_to_anchor=(1.1, 1))
+            fig2.legend(handles, labels, title = 'Firing rate (spk/s)', loc='upper right',bbox_to_anchor=(1.1, 1))
 
 
             fig.savefig(savefile + '_Main.svg', dpi = 500)
