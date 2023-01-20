@@ -70,20 +70,21 @@ def simulateContNeurons(params):
     #initialize matrices of percent neurons pass
     passPct = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
     passPct[:] = np.nan
+
     passPct2MsNoSpikes = np.zeros([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
     passPct2MsNoSpikes[:] = np.nan
 
+    passPctHalfInactive = np.zeros([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
+    passPctHalfInactive[:] = np.nan
 
     passPctHill2 = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
     passPctHill2[:] = np.nan
+
     passPctHill3 = np.empty([len(params['recDurs']), len(params['RPs']),len(params['baseRates']), len(params['contRates'])])
     passPctHill3[:] = np.nan
-    # passPctOld = np.zeros([len(recDurScalarVec), len(rpvec),len(baseRates), len(contPct)])
+
+    # start time to time simulations
     start_time = time. time()
-    
-    
-    #set up plotting
-    
     for j, recDurScalar in enumerate(params['recDurs']):
         recDur = recDurScalar*3600
         print('recording Duration %d'%recDur)   
@@ -97,17 +98,22 @@ def simulateContNeurons(params):
                 cidx=0
                 for c in params['contRates']:
                     contRate = baseRate*c
-                    # print('contRate %.2f'%c)
 
                     passVec = np.empty(params['nSim'])
                     passVec[:] = np.nan
+
                     passVec2MsNoSpikes = np.empty(params['nSim'])
                     passVec2MsNoSpikes[:] = np.nan
 
+                    passVecHalfInactive = np.empty(params['nSim'])
+                    passVecHalfInactive[:] = np.nan
+
                     passVecHill2 = np.empty(params['nSim'])
                     passVecHill2[:] = np.nan
+
                     passVecHill3 = np.empty(params['nSim'])
                     passVecHill3[:] = np.nan
+
                     for n in range(params['nSim']):
                         if n%20 ==0:
                             print('-',end="")
@@ -115,15 +121,16 @@ def simulateContNeurons(params):
                             print(' ')
                         st = genST(baseRate,recDur,params) #generate a spike train with the current base rate
                         isi = np.diff(np.insert(st,0,0)) 
-                        # print(n,end="")
                         isi = np.delete(isi,np.where(isi<rp)[0]) #get rid of already contaminating spikes (does this make sense??? why are there already contaminating spikes)
                         st = np.cumsum(isi)
+
                         if c>0:
                             contST = genST(contRate,recDur,params)
                         else:
                             contST=[]
                         combST = np.sort(np.concatenate((st, contST))) # put spike times from both spike trains together (and sort chronologically)
-                        
+
+
                         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
                              nSpikesBelow2, confMatrix, cont, rpVec, nACG,
                              firingRate, secondsElapsed] = slidingRP(combST, params)
@@ -137,26 +144,24 @@ def simulateContNeurons(params):
                         if nSpikesBelow2 ==0:
                             passVec2MsNoSpikes[n] = 1
 
+                        #Compare with neurons that stop firing halway through the recording duration
+                        frHalfInactive = combST[0:np.where(combST > recDur / 2)[0][0]] #remove spikes from second half of the recording
+
+                        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+                             nSpikesBelow2, confMatrix, cont, rpVec, nACG,
+                             firingRate, secondsElapsed] = slidingRP(frHalfInactive, params)
+
+                        if minContWith90Confidence <=10:
+                            passVecHalfInactive[n] = 1
+                        else:
+                            passVecHalfInactive[n] = 0
+
+
                         #Hill comparison with 2ms or 3 ms
+                        fpRate2 = HillMetric(firingRate, nACG, rpVec, refDur = 2, minISI = 0)
+                        fpRate3 = HillMetric(firingRate, nACG, rpVec, refDur = 3, minISI = 0)
 
-                        minISI = 0.001
-
-                        refDur = 0.002
-                        nViol2 = sum(nACG[0:np.where(rpVec > refDur)[0][0] + 1])
-                        violationTime2 = 2 * firingRate * recDur * (refDur - minISI)  #do this two ways with firing rate and len(st)???
-                        violationRate2 = nViol2/violationTime2
-                        fpRate2 = violationRate2/firingRate
-                        if fpRate2 > 1:
-                            fpRate2 = 1
-
-                        refDur = 0.003
-                        nViol3 = sum(nACG[0:np.where(rpVec > refDur)[0][0] + 1])
-                        violationTime3 = 2 * firingRate * recDur * (refDur - minISI)  #do this two ways with firing rate and len(st)???
-                        violationRate3 = nViol3/violationTime3
-                        fpRate3 = violationRate3/firingRate
-                        if fpRate3 > 1:
-                            fpRate3 = 1
-
+                        #add these false positive rates to passVec with a threshold of 10% contamination
                         if fpRate2 <= 0.10:
                             passVecHill2[n] = 1
                         else:
@@ -169,6 +174,7 @@ def simulateContNeurons(params):
 
                     passPct[j, i, bidx,cidx]=sum(passVec)/params['nSim']*100
                     passPct2MsNoSpikes[j, i, bidx,cidx]=sum(passVec2MsNoSpikes)/params['nSim']*100
+                    passPctHalfInactive[j, i, bidx,cidx]=sum(passVecHalfInactive)/params['nSim']*100
                     passPctHill2[j, i, bidx,cidx]=sum(passVecHill2)/params['nSim']*100
                     passPctHill3[j, i, bidx,cidx]=sum(passVecHill3)/params['nSim']*100
 
@@ -179,9 +185,26 @@ def simulateContNeurons(params):
     current_time = time. time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))       
-    return passPct, passPct2MsNoSpikes, passPctHill2, passPctHill3
+    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill2, passPctHill3
          
-    
+def HillMetric(firingRAte, nACG, rpVec, refDur, minISI = 0):
+
+    # number of violations between minISI and refDur
+    nViol = sum(nACG[np.where(rpVec>minISI)[0][0] : np.where(rpVec > refDur)[0][0] + 1])
+
+    #time for violations to occur
+    violationTime = 2 * firingRate * recDur * (refDur - minISI)  #TODO: add other way of computing FR and compare
+
+    #rate of violations
+    violationRate2 = nViol / violationTime
+
+    #false positive rate (f_1^p in Hill paper)
+    fpRate = violationRate2 / firingRate
+    #For cases where this is greater than 1, set to 1
+    if fpRate > 1:
+        fpRate = 1
+
+    return fpRate
 def plotSimulations(pc,params, savefile, input_color = cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
                     Fig1 = True, Fig2 = False, Fig3 = False, Fig4 = False,
                     sensSpecPlot = False, plotType = 'paper'):
