@@ -9,7 +9,6 @@ script for running and plotting various simulations
 import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
 
-#from simulationsFunctions import *
 import pickle
 import numpy as np
 from phylib.stats import correlograms
@@ -58,7 +57,7 @@ params = {
 #%%
 
 print('in simulations')
-[pc, pc2MsNoSpikes, pcHill2, pcHill3] = simulateContNeurons(params)
+[pc, pc2MsNoSpikes, pcHalfInactive, pcHill2, pcHill3] = simulateContNeurons(params)
 import datetime
 
 date_now  = datetime.datetime.now().strftime('_%m_%d')
@@ -66,15 +65,10 @@ version = '1' #adjust if running more than once in the same day
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version +  '.pickle'
 
 
-results = [pc, pc2MsNoSpikes, pcHill2, pcHill3, params]
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill3, params]
 if params['savePCfile']:
     with open(savefile, 'wb') as handle:
         pickle.dump(results, handle)
-     
-#         % load saved results and plot
-# savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
-# from simulations import plotSimulations
-# savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\simulationsPC20iter_10_14.pickle'
 
 
 #%%
