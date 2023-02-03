@@ -9,6 +9,7 @@ script for running and plotting various simulations
 import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
 
+
 import pickle
 import numpy as np
 from phylib.stats import correlograms
@@ -40,7 +41,47 @@ combST = np.sort(np.concatenate((st, contST)))
 sampleRate = 30000
 params = {
     'recDurs': np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours)
-    'RPs': np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'RPs': np.array([0.002]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
+    'contRates': np.arange(0.00,0.21, 0.02),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
+    'nSim': 500,
+    'threshold': 0.1,
+    'binSize': 1 / sampleRate,
+    'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
+    'checkFR': False,
+    'binSizeCorr': 1 / sampleRate,
+    'returnMatrix': True,
+    'verbose': True,
+    'savePCfile': True
+
+}
+
+#%% run and save condition with changing firing rates
+for delta in [0.5,-0.5,0.1,-0.1]:
+    params['delta'] = delta
+    print('in simulations:, delta = ', delta)
+    pc= simulateChangingContNeurons(params)
+    import datetime
+    date_now  = datetime.datetime.now().strftime('_%m_%d')
+    version = '2' #adjust if running more than once in the same day
+    if delta < 0:
+        deltaprint = 'neg' + str(int(delta*10))
+    else:
+        deltaprint = str(int(delta*10))
+    savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\resultsIncreaseDecrease\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version + 'delta' + deltaprint +  '.pickle'
+    results = [pc, params]
+    if params['savePCfile']:
+        with open(savefile, 'wb') as handle:
+            pickle.dump(results, handle)
+#%%
+plotfile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\resultsIncreaseDecrease\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version + 'delta' + deltaprint
+plotSimulations(pc,params,plotfile)
+#%%
+#rerun for 5 and 6 ms
+sampleRate = 30000
+params = {
+    'recDurs': np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours)
+    'RPs': np.array([0.001,0.005,0.006]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
     'nSim': 500,
@@ -50,12 +91,13 @@ params = {
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
-    'verbose': True ,
+    'verbose': True,
     'savePCfile': True
 
 }
-#%%
 
+
+#%%
 print('in simulations')
 [pc, pc2MsNoSpikes, pcHalfInactive, pcHill2, pcHill3] = simulateContNeurons(params)
 import datetime
@@ -65,7 +107,8 @@ version = '1' #adjust if running more than once in the same day
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version +  '.pickle'
 
 
-results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill3, params]
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill2, pcHill3, params]
+
 if params['savePCfile']:
     with open(savefile, 'wb') as handle:
         pickle.dump(results, handle)
@@ -86,7 +129,7 @@ from slidingRP.simulations import *
 #load data
 # savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_11_03_21.pickle'
 # savefile= r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_12_26.pickle'
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_181.pickle'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
 file = open(savefile,'rb')
 results = pickle.load(file)
 
@@ -94,10 +137,27 @@ file.close()
 
 pc = results[0]
 pc2MsNoSpikes = results[1]
-pcHill2 = results[2]
-pcHill3 = results[3]
-params = results[4]
+pcHalfInactive = results[2]
+pcHill2 = results[3]
+pcHill3 = results[4]
+params = results[5]
 
+import datetime
+#prep for figure saving
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+#%% make RP plots for regular and Hill
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+
+plotSimulations(pc, params,figsavefile1)
+plotSimulations(pc2MsNoSpikes, params, figsavefile2)
+plotSimulations(pcHill2,params,figsavefile3)
+plotSimulations(pcHill3,params,figsavefile4)
+#NEXT, try this with zoomed in on 7-13 contamination ish (or 8-12)
+
+#%%
 if False:
     #put together two sets of results:
     savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_11_03_21.pickle'
@@ -174,24 +234,211 @@ if False:
     params = params1
     params['baseRates'] = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1, 2,  5,  10, 20]  # [0.75, 2, 3, 4, 7.5]
 
-import datetime
-#prep for figure saving
-date_now  = datetime.datetime.now().strftime('_%m_%d')
-figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
-figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
-figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
-figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+
+RP = 0.0015
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_15msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_15msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_15msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_15msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+figsavefile5 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_15msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'FRHalf'
 
 import colorcet as cc
-plotSimulations(pc, params,figsavefile1)
-plotSimulations(pc2MsNoSpikes, params, figsavefile2)
-plotSimulations(pcHill2,params,figsavefile3,input_color=cc.linear_tritanopic_krw_5_95_c46)
-plotSimulations(pcHill3,params,figsavefile4,input_color=cc.linear_tritanopic_krw_5_95_c46)
+plotSimulations(pc, params,figsavefile1,rp_valFig1=RP)
+plotSimulations(pc2MsNoSpikes, params, figsavefile2,rp_valFig1=RP)
+plotSimulations(pcHill2,params,figsavefile3, rp_valFig1=RP,input_color=cc.linear_tritanopic_krw_5_95_c46)
+plotSimulations(pcHill3,params,figsavefile4,rp_valFig1 = RP,input_color=cc.linear_tritanopic_krw_5_95_c46)
+plotSimulations(pcHalfInactive, params, figsavefile5,rp_valFig1 = RP)
+
+RP = 0.004
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_4msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_4msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_4msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_4msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+figsavefile5 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\results_122_4msRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'FRHalf'
+
+plotSimulations(pc, params,figsavefile1,rp_valFig1=RP)
+plotSimulations(pc2MsNoSpikes, params, figsavefile2,rp_valFig1=RP)
+plotSimulations(pcHill2,params,figsavefile3, rp_valFig1=RP,input_color=cc.linear_tritanopic_krw_5_95_c46)
+plotSimulations(pcHill3,params,figsavefile4,rp_valFig1 = RP,input_color=cc.linear_tritanopic_krw_5_95_c46)
+plotSimulations(pcHalfInactive, params, figsavefile5,rp_valFig1 = RP)
+
+
+#%%
+#replotRecDur
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+
+plotSimulations(pc, params,figsavefile1,rp_valFig1=RP)
+
+#%%
+#replot RP
+RP = 0.015
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+
+plotSimulations(pc, params,figsavefile1,rp_valFig1=RP)
+
+#%%
 
 
 
 figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now
 # plotSensitivitySpecificity(pc,pc2MsNoSpikes,params, figsavefile,5)
+
+
+#%%
+
+
+import sys
+sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
+
+import pickle
+import numpy as np
+from phylib.stats import correlograms
+from scipy import stats
+from slidingRP.simulations import *
+
+#put all RP runs together and plot RP plot (magenta plot)
+# put together two sets of results:
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+file = open(savefile, 'rb')
+results = pickle.load(file)
+file.close()
+
+pc1 = results[0]
+pc2MsNoSpikes1 = results[1]
+pcHalfInactive1 = results[2]
+pcHill21 = results[3]
+pcHill31 = results[4]
+params1 = results[5]
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_241.pickle' #this one has 1, 5, 6
+file = open(savefile, 'rb')
+results = pickle.load(file)
+file.close()
+
+pc2 = results[0]
+pc2MsNoSpikes2 = results[1]
+pcHalfInactive2 = results[2]
+pcHill22 = results[3]
+pcHill32 = results[4]
+params2 = results[5]
+
+pcc1 = np.concatenate((pc1, pc2[:, 1:, :, :]), 1)
+pc = pcc1
+
+pc1 = pc2MsNoSpikes1
+pc2 = pc2MsNoSpikes2
+pcc1 = np.concatenate((pc1, pc2[:, 1:, :, :]), 1)
+pc2MsNoSpikes = pcc1
+
+pc1 = pcHill21
+pc2 = pcHill22
+pcc1 = np.concatenate((pc1, pc2[:, 1:, :, :]), 1)
+pcHill2 = pcc1
+
+pc1 = pcHill31
+pc2 = pcHill32
+pcc1 = np.concatenate((pc1, pc2[:, 1:, :, :]), 1)
+pcHill3 = pcc1
+
+params = params1
+params['RPs'] = np.array( [0.0015, 0.002 , 0.003 , 0.004 , 0.005,0.006])
+#%%
+
+import datetime
+
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+
+plotSimulations(pc, params,figsavefile1)
+plotSimulations(pc2MsNoSpikes, params, figsavefile2)
+plotSimulations(pcHill2,params,figsavefile3)
+plotSimulations(pcHill3,params,figsavefile4)
+
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'zoom'
+figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes' + 'zoom'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'+ 'zoom'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'+ 'zoom'
+
+plotSimulations(pc, params,figsavefile1,zoomCont=True)
+plotSimulations(pc2MsNoSpikes, params, figsavefile2,zoomCont=True)
+plotSimulations(pcHill2,params,figsavefile3,zoomCont=True)
+plotSimulations(pcHill3,params,figsavefile4,zoomCont=True)
+
+
+
+#%%
+#plot main plot for increase decrease
+import datetime
+#prep for figure saving
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+
+version = '2'  # adjust if running more than once in the same day
+
+for delta in [0.5,-0.5,0.1,-0.1]:
+
+    if delta < 0:
+        deltaprint = 'neg' + str(int(delta*10))
+    else:
+        deltaprint = str(int(delta*10))
+    print(deltaprint)
+    savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\resultsIncreaseDecrease\simulationsPC500iter_01_242delta' + deltaprint + '.pickle'
+    file = open(savefile,'rb')
+    results = pickle.load(file)
+    file.close()
+    pc = results[0]
+    params = results[1]
+    #make RP plots for regular and Hill
+    figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\resultsIncreaseDecrease\simulationsPCdelta' + deltaprint + str(params['nSim']) + 'iter' + date_now
+    plotSimulations(pc, params,figsavefile1, Fig1=True, Fig2=False, Fig3=False, Fig4=False,    input_color = cc.linear_green_5_95_c69)
+
+
+
+
+
+
+#%%
+#plot just regular first one and zoom
+import sys
+sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
+
+import pickle
+import numpy as np
+from phylib.stats import correlograms
+from scipy import stats
+from slidingRP.simulations import *
+
+#put all RP runs together and plot RP plot (magenta plot)
+# put together two sets of results:
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+file = open(savefile, 'rb')
+results = pickle.load(file)
+file.close()
+
+pc = results[0]
+
+params = results[5]
+import datetime
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\simulationsPCAll' + str(params['nSim']) + 'iter' + date_now
+plotSimulations(pc, params,figsavefile1,frPlot = [0.5,1,5,10],zoomCont=False, Fig1=True, Fig2=False, Fig3=False, Fig4=False)
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\simulationsPC10' + str(params['nSim']) + 'iter' + date_now
+plotSimulations(pc, params,figsavefile1,frPlot = [10],zoomCont=False, Fig1=True, Fig2=False, Fig3=False, Fig4=False)
+
+#now zoom
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\simulationsPCAll' + str(params['nSim']) + 'iter' + date_now +'zoom'
+plotSimulations(pc, params,figsavefile1,frPlot = [0.5,1,5,10],zoomCont=True, Fig1=True, Fig2=False, Fig3=False, Fig4=False)
+
+figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\simulationsPC10' + str(params['nSim']) + 'iter' + date_now + 'zoom'
+plotSimulations(pc, params,figsavefile1,frPlot = [10],zoomCont=True, Fig1=True, Fig2=False, Fig3=False, Fig4=False)
+
 
 
 #%%

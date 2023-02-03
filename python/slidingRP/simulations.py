@@ -64,6 +64,26 @@ def genST(rate, duration, params=None):
 
     return st
 
+def genChangingST(rate,duration,params,delta):
+
+    # delta is in fractional increase e.g. 0.5
+    nchunk = 100  # parameter, how many chunks to split the data into
+    rate_end = rate * (1 + delta)
+    rate_diff = rate_end - rate
+    rateDiffChunk = rate_diff / (nchunk - 1)
+    rates = np.arange(rate, rate_end + rateDiffChunk, rateDiffChunk)
+
+    chunkLength = duration / nchunk
+    st = np.array([])
+
+    for r in rates:
+        stChunk = genST(r, chunkLength, params)
+        if len(st) > 0:
+            stChunkConcatenate = stChunk + st[-1]
+        else:
+            stChunkConcatenate = stChunk
+        st = np.append(st, stChunkConcatenate)
+    return st
 
 def simulateContNeurons(params):
     # initialize matrices of percent neurons pass
@@ -149,16 +169,23 @@ def simulateContNeurons(params):
                             passVec2MsNoSpikes[n] = 1
 
                         # Compare with neurons that stop firing halway through the recording duration
-                        frHalfInactive = combST[0:np.where(combST > recDur / 2)[0][
-                            0]]  # remove spikes from second half of the recording
+                        frHalfInactive = combST[0:np.where(combST > recDur / 2)[0][0]]
+                             # remove spikes from second half of the recording
 
                         # Here only save minCont to determine pass/fail
                         minContWith90ConfidenceHalfInactive = slidingRP(frHalfInactive, params)[1]
 
-                        if minContWith90Confidence <= 10:
+                        if minContWith90ConfidenceHalfInactive <= 10:
                             passVecHalfInactive[n] = 1
                         else:
                             passVecHalfInactive[n] = 0
+
+
+                        # Compare with neurons that increase or decrease their firing
+
+
+
+
 
                         # Hill comparison with 2ms or 3 ms
                         fpRate2 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.002, minISI=0)
@@ -191,6 +218,73 @@ def simulateContNeurons(params):
     return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill2, passPctHill3
 
 
+def simulateChangingContNeurons(params):
+    # initialize matrices of percent neurons pass
+    delta = params['delta']
+    passPct = np.empty([len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPct[:] = np.nan
+
+    # start time to time simulations
+    start_time = time.time()
+    for j, recDurScalar in enumerate(params['recDurs']):
+        recDur = recDurScalar * 3600
+        print('recording Duration %d' % recDur)
+        for i, rp in enumerate(params['RPs']):
+            print('refractory period duration %.3f' % rp)
+            thresh = params['threshold']
+
+            bidx = 0
+            for baseRate in params['baseRates']:
+                print('baseRate %.2f' % baseRate)
+                cidx = 0
+                for c in params['contRates']:
+                    contRate = baseRate * c
+
+                    passVec = np.empty(params['nSim'])
+                    passVec[:] = np.nan
+
+                    for n in range(params['nSim']):
+                        if n % 20 == 0:
+                            print('-', end="")
+                        if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
+                            print(' ')
+                        st = genChangingST(baseRate, recDur, params,delta)  # generate a spike train with the current base rate
+                        isi = np.diff(np.insert(st, 0, 0))
+                        isi = np.delete(isi, np.where(isi < rp)[
+                            0])  # get rid of already contaminating spikes (does this make sense??? why are there already contaminating spikes)
+                        st = np.cumsum(isi)
+
+                        if c > 0:
+                            contST = genChangingST(contRate, recDur, params,delta)
+                        else:
+                            contST = []
+                        combST = np.sort(np.concatenate(
+                            (st, contST)))  # put spike times from both spike trains together (and sort chronologically)
+
+                        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+                         nSpikesBelow2, confMatrix, cont, rpVec, nACG,
+                         firingRate, secondsElapsed] = slidingRP(combST, params)
+
+                        if minContWith90Confidence <= 10:
+                            passVec[n] = 1
+                        else:
+                            passVec[n] = 0
+
+
+                    passPct[j, i, bidx, cidx] = sum(passVec) / params['nSim'] * 100
+
+                    cidx += 1
+
+                bidx += 1
+
+    current_time = time.time()
+    elapsed_time = current_time - start_time
+    print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))
+
+
+    return passPct
+
+
 def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
     # number of violations between minISI and refDur
     nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0] : np.where(rpVec > refDur)[0][0] + 1])
@@ -210,9 +304,9 @@ def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
     return fpRate
 
 
-def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
-                    Fig1=True, Fig2=False, Fig3=False, Fig4=False,
-                    sensSpecPlot=False, plotType='paper'):
+def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
+                    Fig1=False, Fig2=False, Fig3=True, Fig4=False,
+                    sensSpecPlot=False, plotType='paper', zoomCont = False, addPCflag = 0, highCont=False):
     # plot type = 'full' or plot type = 'paper'
     # compute confidence intervals
 
@@ -242,7 +336,6 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
     colors = matplotlib.cm.Blues(np.linspace(0.2, 1, len(params['baseRates'])))  # never go below .2, hard to see
 
     if Fig1:
-        addPCflag = 1
         if plotType == 'paper':
             print('in plot type paper figure 1')
             # for this figure, plotType = 'full' or plotType = 'paper' are the same.
@@ -263,7 +356,7 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
 
             # plot just RP = 2:
             rps = params['RPs']
-            rpInd = np.where(rps == 0.0015)[0]
+            rpInd = np.where(rps == rp_valFig1)[0]
 
             # plot just baseRates = [0.5, 1, 5, 10]
             fr_plot = [0.45, 1, 2, 5, 10]  # changed on 12/26 to look at all
@@ -272,11 +365,11 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
             # fr_plot = [0.05,0.25,0.45,0.75,1,2, 5,10]
             # fr_plot = params['baseRates']
             frs = params['baseRates']
-            frInd = [x for x in range(len(frs)) if frs[x] in fr_plot]
+            frInd = [x for x in range(len(frs)) if frs[x] in frPlot]
 
             c = input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
             c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
-            colors = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(fr_plot)) * 255).astype(int)]
+            colors = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['baseRates'])) * 255).astype(int)]
             # colors = [c[x] for x in np.round(np.linspace(0.25, 1, len(fr_plot))*255).astype(int)]
 
             pltcnt = 0
@@ -288,27 +381,49 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
                     # different base rates get different colors
                     for b, baseRate in enumerate(frInd):
                         fr_use = frs[frInd[b]]
-                        lowerCI = CI[0][recDursInd, rpInd, frInd[b], :][0]
-                        upperCI = CI[1][recDursInd, rpInd, frInd[b], :][0]
-                        x = params['contRates'] * 100
-                        y = pc[recDursInd, rpInd, frInd[b], :][0]
 
-                        ax.plot(x[:-1], y[:-1], '.-', color=colors[b],
+                        if zoomCont:
+                            lowerCI = CI[0][recDursInd, rpInd, frInd[b], 6:15][0]
+                            upperCI = CI[1][recDursInd, rpInd, frInd[b], 6:15][0]
+                            x = params['contRates'][6:15] * 100
+                            y = pc[recDursInd, rpInd, frInd[b], 6:15][0]
+                            # ax.xaxis.set_ticks([6,7, 8, 9, 10, 11, 12, 13,14])
+
+
+                        else:
+                            lowerCI = CI[0][recDursInd, rpInd, frInd[b], :][0]
+                            upperCI = CI[1][recDursInd, rpInd, frInd[b], :][0]
+                            x = params['contRates'] * 100
+                            y = pc[recDursInd, rpInd, frInd[b], :][0]
+
+                        if highCont:
+                            ax.plot(x[:-1], y[:-1], '.-', color=colors[frInd[b]],
                                 label=fr_use)  # NR changed 12/30 frInd[b] to [b] becaues changed how indexing colors
-                        # ax.plot(25, y[-1], '.',color = colors[b])
+                            ax.fill_between(x[:-1], lowerCI[:-1], upperCI[:-1], color=colors[frInd[b]], alpha=.5)
+
+                        else:
+                            ax.plot(x, y, '.-', color=colors[frInd[b]],
+                                    label=fr_use)  # NR changed 12/30 frInd[b] to [b] becaues changed how indexing colors
+                            ax.fill_between(x, lowerCI, upperCI, color=colors[frInd[b]], alpha=.5)
+
+
 
                         if addPCflag:
                             # find 10% point
                             tenPercentPoint = np.where(x == 10)[0][0]
                             percentCorrect = np.concatenate(
                                 (y[0:(tenPercentPoint + 1)], 100 - y[(tenPercentPoint + 1):]))
-                            ax2.plot(x[:-1], percentCorrect[:-1], color=colors[b])
+                            ax2.plot(x[:-1], percentCorrect[:-1], color=colors[frInd[b]])
                             # ax2.plot(25, percentCorrect[-1], '.', color= colors[b])
 
                             ax2.set_ylabel('Percent Correct')
-                        ax.fill_between(x[:-1], lowerCI[:-1], upperCI[:-1], color=colors[b], alpha=.5)
-                        ax.vlines(x=25, ymin=lowerCI[-1], ymax=upperCI[-1],
-                                  colors=colors[b])
+                        if highCont:
+                            ax.plot(x[:-1], y[:-1], '.-', color=colors[frInd[b]],
+                                    label=fr_use)  # NR changed 12/30 frInd[b] to [b] becaues changed how indexing colors
+
+                            ax.fill_between(x[:-1], lowerCI[:-1], upperCI[:-1], color=colors[frInd[b]], alpha=.5)
+                        # ax.vlines(x=25, ymin=lowerCI[-1], ymax=upperCI[-1],
+                        #           colors=colors[frInd[b]])
                         if (i == 0):
                             ax.set_ylabel('Percent pass')
                         else:
@@ -322,7 +437,7 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
                         ax.set_ylim(-10, 110)
                         ax.spines.right.set_visible(spinesSetting)
                         ax.spines.top.set_visible(spinesSetting)
-                        ax.xaxis.set_ticks([0, 10, 20])
+                        # ax.xaxis.set_ticks([0, 10, 20])
                         ax.vlines(10, -10, 110, color='k')
                 # fig.text(0.425, 0.9-(.17*j), 'Recording duration: %d hours'%recDur)
                 if recDur != 1:
@@ -342,7 +457,11 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
             fig2.legend(handles, labels, title='Firing rate (spk/s)', loc='upper right', bbox_to_anchor=(1.1, 1))
 
             fig.savefig(savefile + '_Main.svg', dpi=500)
-            fig2.savefig(savefile + '_MainPC.svg', dpi=500)
+            fig.savefig(savefile + '_Main.png', dpi=500)
+            print(savefile)
+            if addPCflag:
+                fig2.savefig(savefile + '_MainPC.svg', dpi=500)
+                fig2.savefig(savefile + '_MainPC.png', dpi=500)
         if plotType == 'heatmap':
             print('in plot type heatmap figure 1')
             # for this figure, plotType = 'full' or plotType = 'paper' are the same.
@@ -431,6 +550,8 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
 
             fig.savefig(savefile + '_Main.svg', dpi=500)
             fig2.savefig(savefile + '_MainPC.svg', dpi=500)
+            fig.savefig(savefile + '_Main.png', dpi=500)
+            fig2.savefig(savefile + '_MainPC.png', dpi=500)
 
         if plotType == 'full':
             # for this figure, plotType = 'full' or plotType = 'paper' are the same.
@@ -484,8 +605,8 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
 
             fig.legend(handles, labels, loc='upper right')  # ,bbox_to_anchor=(1.1, 1))
 
-            fig.savefig(savefile + '_Main.svg', dpi=500)
-
+            fig.savefig(savefile + '_Main.png', dpi=500)
+            # fig.savefig(savefile + '_Main.svg', dpi=500)
     if Fig2:
         if plotType == 'full':
             numrows = len(params['contRates'][::2])
@@ -546,36 +667,39 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
             rpInd = np.where(rps == 0.002)[0]
 
             # plot just fr = 5:
-            frs = params['baseRates']
-            frInd = np.where(frs == 5)[0]
+            frs = np.array(params['baseRates'])
+            frInd = np.where(frs == 5)[0][0]
 
             # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
+            c = cc.b_linear_bgyw_15_100_c67#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+            c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
+            colors = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['recDurs'])) * 255).astype(int)]
 
-            colors_recDur = ['purple', 'green', 'blue', 'magenta']
+
 
             pltcnt = 0
-            linewidths = [0.5, 1, 2, 3]
+            linewidths = [1,1,1,1]#[0.5, 1, 2, 3]
             for j, recDur in enumerate(params['recDurs']):
                 for i, rp in enumerate(rps[rpInd]):
                     pltcnt += 1
 
                     # different base rates get different colors
-                    for b, baseRate in enumerate(frs[frInd]):
-                        # Todo change x axis
-                        lowerCI = CI[0][j, rpInd[0], frInd[0], :]
-                        upperCI = CI[1][j, rpInd[0], frInd[0], :]
-                        x = cr * 100
-                        y = pc[j, rpInd[0], frInd[0], :]
-                        ax.plot(x, y, '.-', color=colors_recDur[frInd[0]], linewidth=linewidths[j], label=recDur)
+                    # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+                    b = 0
+                    baseRate = frs[frInd]# Todo change x axis
+                    lowerCI = CI[0][j, rpInd[0], frInd, :]
+                    upperCI = CI[1][j, rpInd[0], frInd, :]
+                    x = cr * 100
+                    y = pc[j, rpInd[0], frInd, :]
+                    ax.plot(x, y, '.-', color=colors[j], linewidth=linewidths[j], label=recDur)
 
-                        ax.fill_between(x, lowerCI, upperCI, color=colors_recDur
-                        [frInd[0]], alpha=.3)
-                        ax.set_ylabel('Percent pass')
-                        ax.set_xlabel('Contamination (%)')
-                        # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
-                        ax.set_ylim(-10, 110)
-                        ax.spines.right.set_visible(spinesSetting)
-                        ax.spines.top.set_visible(spinesSetting)
+                    ax.fill_between(x, lowerCI, upperCI, color=colors[j], alpha=.3)
+                    ax.set_ylabel('Percent pass')
+                    ax.set_xlabel('Contamination (%)')
+                    # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
+                    ax.set_ylim(-10, 110)
+                    ax.spines.right.set_visible(spinesSetting)
+                    ax.spines.top.set_visible(spinesSetting)
                 # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
                 # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
             handles, labels = ax.get_legend_handles_labels()
@@ -584,6 +708,8 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
             fig.tight_layout()
             fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Recording duration (hrs)')
             fig.savefig(savefile + '_recDur.svg', dpi=500)
+            fig.savefig(savefile + '_recDur.png', dpi=500)
+
 
         if plotType == 'paper_full':
             numrows = len(params['baseRates'])
@@ -691,6 +817,73 @@ def plotSimulations(pc, params, savefile, input_color=cc.linear_protanopic_deute
 
             fig.legend(handles, labels, loc='upper right')
             fig.savefig(savefile + '_RP.svg', dpi=500)
+        if plotType == 'paper':
+            numrows = 1
+            numcols = 1
+            numplots = numrows * numcols
+            fig, axs = plt.subplots(numrows, numcols, figsize=(4, 5))
+            ax = axs  # for the case of just one subplot
+            # plot just contRates 0.08 to 0.12:
+            cr = params['contRates'];
+
+            # plot just RP = 2:
+            # rps = params['RPs']
+            # rpInd = np.where(rps == 0.002)[0]
+            #plot just  recDur = 2:
+            recDurs = params['recDurs']
+            rdInd = np.where(recDurs == 2)[0]
+
+            # plot just fr = 5:
+            frs = np.array(params['baseRates'])
+            frInd = np.where(frs == 5)[0][0]
+
+            # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
+            c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+            c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
+            colors = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)]
+
+
+            pltcnt = 0
+            linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
+            for j, recDur in enumerate(recDurs[rdInd]):
+                for i, rp in enumerate(params['RPs']):
+
+                    # different base rates get different colors
+                    # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+                    b = 0
+                    baseRate = frs[frInd]# Todo change x axis
+                    if zoomCont:
+                        lowerCI = CI[0][rdInd[0], i, frInd, 7:14]
+                        upperCI = CI[1][rdInd[0], i, frInd, 7:14]
+                        x = cr[7:14] * 100
+                        y = pc[rdInd[0], i, frInd, 7:14]
+
+                    else:
+                        lowerCI = CI[0][rdInd[0], i, frInd, :]
+                        upperCI = CI[1][rdInd[0], i, frInd, :]
+                        x = cr * 100
+                        y = pc[rdInd[0], i, frInd, :]
+
+
+
+                    ax.plot(x, y, '.-', color=colors[i], linewidth=linewidths[i], label=rp*1000)
+
+                    ax.fill_between(x, lowerCI, upperCI, color=colors[j], alpha=.3)
+                    ax.set_ylabel('Percent pass')
+                    ax.set_xlabel('Contamination (%)')
+                    # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
+                    ax.set_ylim(-10, 110)
+                    ax.spines.right.set_visible(spinesSetting)
+                    ax.spines.top.set_visible(spinesSetting)
+                # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
+                # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
+            handles, labels = ax.get_legend_handles_labels()
+
+            # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+            fig.tight_layout()
+            fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
+            fig.savefig(savefile + '_RP.svg', dpi=500)
+            fig.savefig(savefile + '_RP.png', dpi=500)
 
     if Fig4:
         fig, axs = plt.subplots(1, 1, figsize=(3, 5))

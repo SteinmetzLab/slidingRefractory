@@ -11,6 +11,7 @@ regular slidingRP
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 from one.api import ONE
 from brainbox.io.one import SessionLoader
 from brainbox.io.one import SpikeSortingLoader
@@ -18,7 +19,7 @@ from brainwidemap import bwm_query, load_good_units, load_trials_and_mask, filte
     download_aggregate_tables
 from slidingRP.metrics import slidingRP_all
 import pickle
-
+#%%
 # one = ONE()
 print('instantiate one')
 one = ONE()
@@ -78,12 +79,13 @@ overall_struct['pt33_pass'] = []
 overall_struct['pt75_pass'] = []
 overall_struct['dynamic_pass'] = []
 overall_struct['dynamic_threshold'] = []
-
+overall_struct['prev_RP']=[]
+overall_struct['label']=[]
 
 #define a closest function for finding the nearest recording duration and firing rate
 def closest(lst, K):
     return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
-
+#%%
 # run the loop
 for i, pid in enumerate(bwm_df['pid']):
 
@@ -105,6 +107,8 @@ for i, pid in enumerate(bwm_df['pid']):
     print(subject)
 
     return_struct = slidingRP_all(spikes.times, spikes.clusters)
+
+
 
     '''
     goal here is to add:
@@ -146,6 +150,15 @@ for i, pid in enumerate(bwm_df['pid']):
 
     for n in range(len(return_struct['cidx'])):
 
+        #log if this neuron passes generally
+        try:
+            cid = return_struct['cidx'][n]
+            label = clusters.label[np.where(clusters.cluster_id == cid)[0][0]]
+            prev_RP =clusters.slidingRP_viol[np.where(clusters.cluster_id == cid)[0][0]]
+        except:
+            label = np.nan
+            prev_RP = np.nan
+
         if return_struct['minContWith90Confidence'][n] <= 10:
             passfail = 1
         else:
@@ -186,6 +199,10 @@ for i, pid in enumerate(bwm_df['pid']):
 
 
         overall_struct['cidx'].append(return_struct['cidx'][n])
+
+        overall_struct['prev_RP'].append(prev_RP)
+        overall_struct['label'].append(label)
+
         overall_struct['maxConfidenceAt10Cont'].append(return_struct['maxConfidenceAt10Cont'][n])
         overall_struct['minContWith90Confidence'].append(return_struct['minContWith90Confidence'][n])
         overall_struct['timeOfLowestCont'].append(return_struct['timeOfLowestCont'][n])
@@ -209,15 +226,46 @@ for i, pid in enumerate(bwm_df['pid']):
 
 
 
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\saved_2msIBL.pkl'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\saved_2msIBL_v2.pkl'
 with open(savefile, 'wb') as f:
     pickle.dump(overall_struct, f)
 #%%
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\saved_2msIBL.pkl'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\saved_2msIBL_v2.pkl'
 
 with open(savefile, 'rb') as f:
     overall_struct = pickle.load(f)
-    #%%
+#%%
+#here, only look at those which prev_RP=0, recDurRP=1, and label = 0.66
+
+prevRP = np.array(overall_struct['prev_RP'])
+dynamic_pass = np.array(overall_struct['dynamic_pass'])
+label = np.array(overall_struct['label'])
+previous = len(np.where(label==1)[0]) #neurons that pass all 3 metrics currently!
+added_with_dynamic2ms = np.where((prevRP==0) & (dynamic_pass == 1) & (label == 2/3))[0]
+dynamic = len(added_with_dynamic2ms) + previous #the number of units (added w dynamic plus pervious pass)
+
+#compute percent
+total_neurons = len(overall_struct['pt5_pass'])
+previous_pct = previous/total_neurons *100
+dynamic_pct = dynamic/total_neurons *100
+
+labels = ['Original metric', 'Proposed adjustment']
+
+fig, ax1 = plt.subplots(figsize = (5.5,5))
+# ax2 = ax1.twinx()
+
+ax1.bar(labels, [previous,dynamic], color = '0.6')
+ax1.set_ylabel('Number of passing neurons')
+# ax2.bar(labels, [previous_pct,dynamic_pct], color = '0.6')
+# ax2.set_ylabel('Percent of passing neurons')
+plt.tight_layout()
+plt.show()
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\2msComparison'
+fig.savefig( savefile+ '_recDur.png', dpi=500)
+
+
+#%%
 previous = sum(overall_struct['previous_pass'])
 pt33 = sum(overall_struct['pt33_pass'])
 pt5 = sum(overall_struct['pt5_pass'])
@@ -247,3 +295,74 @@ ax.set_ylabel('Percent of total IBL neurons')
 ax.set_title(title)
 ax.set_ylim([30,50])
 plt.show()
+
+#%%
+fig, ax1 = plt.subplots(figsize = (5.5,5))
+ax2 = ax1.twinx()
+
+previous = sum(overall_struct['previous_pass'])
+# pt33 = sum(overall_struct['pt33_pass'])
+# pt5 = sum(overall_struct['pt5_pass'])
+# pt75 = sum(overall_struct['pt75_pass'])
+dynamic = sum(overall_struct['dynamic_pass'])
+
+total_neurons = len(overall_struct['pt5_pass'])
+
+previous_pct = previous/total_neurons *100
+# pt33_pct = pt33/total_neurons * 100
+# pt5_pct = pt5/total_neurons * 100
+# pt75_pct = pt75/total_neurons * 100
+dynamic_pct = dynamic/total_neurons *100
+
+
+labels = ['Original metric', 'Proposed adjustment']
+
+ax1.bar(labels, [previous,dynamic], color = '0.6')
+ax1.set_ylabel('Number of passing neurons')
+ax2.bar(labels, [previous_pct,dynamic_pct], color = '0.6')
+ax2.set_ylabel('Percent of passing neurons')
+plt.tight_layout()
+plt.show()
+
+
+
+#%%
+
+#plot minFR as a function of recDur
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\contFRContourDict.pickle'
+file = open(savefile, 'rb')
+contContourDict = pickle.load(file)
+file.close()
+
+#need to also load in the corresponding params file for the correct recording durations
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_122.pickle'
+file = open(savefile, 'rb')
+results = pickle.load(file)
+file.close()
+
+params = results[-1] #the last in the results
+
+
+frThreshRecDur = []
+recDurVec = params['recDurs']
+for recordingDuration in recDurVec:
+    recDurClosest = closest(params['recDurs'], recordingDuration)  # closest rec dur for which I've computed contours
+    recDurInd = np.where(params['recDurs'] == recDurClosest)
+    # The rule is: 20% contamination we want at least 50% reject, for 50% contamination we want at least 90% reject
+    lowContFR = contContourDict[(0.2, 50)][recDurInd]
+    highContFR = contContourDict[(0.5, 90)][recDurInd]
+    print(lowContFR)
+    frThreshRecDur.append(max(lowContFR, highContFR)[0])
+#%%
+fig,ax = plt.subplots()
+ax.plot(recDurVec,frThreshRecDur,'.-',color = 'k')
+ax.set_xlabel('Recording duration (hrs)')
+ax.set_ylabel('Minimum passing FR (spks/s)')
+
+ax.spines.right.set_visible(False)
+ax.spines.top.set_visible(False)
+# ax.set_yticks()
+plt.show()
+
+#todo: make spines go away, make dots instead of line, make yticks fewer
+
