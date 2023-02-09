@@ -98,6 +98,10 @@ def simulateContNeurons(params):
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPctHalfInactive[:] = np.nan
 
+    passPctHill15 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctHill15[:] = np.nan
+
     passPctHill2 = np.empty(
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPctHill2[:] = np.nan
@@ -130,6 +134,9 @@ def simulateContNeurons(params):
 
                     passVecHalfInactive = np.empty(params['nSim'])
                     passVecHalfInactive[:] = np.nan
+
+                    passVecHill15 = np.empty(params['nSim'])
+                    passVecHill15[:] = np.nan
 
                     passVecHill2 = np.empty(params['nSim'])
                     passVecHill2[:] = np.nan
@@ -188,10 +195,17 @@ def simulateContNeurons(params):
 
 
                         # Hill comparison with 2ms or 3 ms
+                        fpRate15 = HillMetric(firingRate, recDur, nACG, rpVec, refDur=0.0015, minISI=0)
                         fpRate2 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.002, minISI=0)
                         fpRate3 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.003, minISI=0)
 
                         # add these false positive rates to passVec with a threshold of 10% contamination
+                        if fpRate15 <= 0.10:
+                            passVecHill15[n] = 1
+                        else:
+                            passVecHill15[n] = 0
+
+
                         if fpRate2 <= 0.10:
                             passVecHill2[n] = 1
                         else:
@@ -205,6 +219,7 @@ def simulateContNeurons(params):
                     passPct[j, i, bidx, cidx] = sum(passVec) / params['nSim'] * 100
                     passPct2MsNoSpikes[j, i, bidx, cidx] = sum(passVec2MsNoSpikes) / params['nSim'] * 100
                     passPctHalfInactive[j, i, bidx, cidx] = sum(passVecHalfInactive) / params['nSim'] * 100
+                    passPctHill15[j, i, bidx, cidx] = sum(passVecHill15) / params['nSim'] * 100
                     passPctHill2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
                     passPctHill3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
 
@@ -215,7 +230,7 @@ def simulateContNeurons(params):
     current_time = time.time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))
-    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill2, passPctHill3
+    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill15, passPctHill2, passPctHill3
 
 
 def simulateChangingContNeurons(params):

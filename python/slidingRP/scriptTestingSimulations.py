@@ -81,7 +81,7 @@ plotSimulations(pc,params,plotfile)
 sampleRate = 30000
 params = {
     'recDurs': np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours)
-    'RPs': np.array([0.001,0.005,0.006]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'RPs': np.array([0.001,0.002,0.003,0.004,0.005,0.006]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
     'nSim': 500,
@@ -99,7 +99,7 @@ params = {
 
 #%%
 print('in simulations')
-[pc, pc2MsNoSpikes, pcHalfInactive, pcHill2, pcHill3] = simulateContNeurons(params)
+[pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3] = simulateContNeurons(params)
 import datetime
 
 date_now  = datetime.datetime.now().strftime('_%m_%d')
@@ -107,7 +107,7 @@ version = '1' #adjust if running more than once in the same day
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version +  '.pickle'
 
 
-results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill2, pcHill3, params]
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15,pcHill2, pcHill3, params]
 
 if params['savePCfile']:
     with open(savefile, 'wb') as handle:
@@ -438,6 +438,13 @@ plotSimulations(pc, params,figsavefile1,frPlot = [0.5,1,5,10],zoomCont=True, Fig
 
 figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\simulationsPC10' + str(params['nSim']) + 'iter' + date_now + 'zoom'
 plotSimulations(pc, params,figsavefile1,frPlot = [10],zoomCont=True, Fig1=True, Fig2=False, Fig3=False, Fig4=False)
+
+
+
+
+#%%
+#run to look at
+
 
 
 
