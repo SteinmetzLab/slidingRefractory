@@ -287,7 +287,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     refDur : float
         refractory period duration in seconds
     contaminationProp : float
-        the allowed contamination (proportion) i.e. 0.1 for 10% contamination
+        the contamination (proportion) i.e. 0.1 for 10% contamination
 
     Returns
     -------
@@ -298,10 +298,16 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
 
     '''
 
-    contaminationRate = firingRate * contaminationProp 
+    # the rate (spk/s) of the contamination level we are testing (contaminationProp)
+    contaminationRate = firingRate * contaminationProp
+
+    # the number of violations (spikes) we expect to see under this contamination rate
     expectedViol = contaminationRate * refDur * 2 * spikeCount
+
+    # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
+    # observed violations and under the assumption of Poisson firing
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
-    
+
     return confidenceScore
 
 
