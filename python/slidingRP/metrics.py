@@ -27,7 +27,7 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     Parameters
     ----------
     spikeTimes : numpy.ndarray
-        array of spike times (ms)
+        array of spike times (s)
     spikeClusters : numpy.ndarray
         array of spike cluster ids that corresponds to spikeTimes.
     params : dict
@@ -151,7 +151,7 @@ def slidingRP(spikeTimes, params = None):
     Parameters
     ----------
     spikeTimes : numpy.ndarray
-        array of spike times (ms) for one cluster
+        array of spike times (s) for one cluster
 
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
@@ -229,7 +229,7 @@ def computeMatrix(spikeTimes, params):
     spikeTimes : numpy.ndarray
         array of spike times (ms)
     params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)
         params.sampleRate : sample rate of the recording (Hz)
 
     Returns
@@ -239,8 +239,20 @@ def computeMatrix(spikeTimes, params):
     
     
     cont = np.arange(0.5, 35, 0.5)  # vector of contamination values to test
-    rpBinSize = 1 / 30000  
-    rpEdges = np.arange(0, 10/1000, rpBinSize)  # in s
+
+    #set bin size for ACG
+    if params and 'sampleRate' in params:
+        sampleRate = params['sampleRate']
+    else:
+        sampleRate = 30000
+    if params and 'binSizeCorr' in params:
+        binSizeCorr = params['binSizeCorr']
+    elif params and 'sampleRate' in params:
+        binSizeCorr = 1 / sampleRate
+    else:
+        binSizeCorr = 1 / 30000
+
+    rpEdges = np.arange(0, 10/1000, binSizeCorr)  # in s
     rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2 # vector of refractory period durations to test
     
     #compute firing rate and spike count
@@ -255,14 +267,7 @@ def computeMatrix(spikeTimes, params):
         
     nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'], sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
 
-    # confMatrix = np.zeros((cont.size, rp.size)) * np.nan
-    # for ir in np.arange(confMatrix.shape[1]):
-    #     # compute observed violations
-    #     obsViol = np.sum(nACG[0:ir + 1])  # TODO this is off slightly (half-bin) from matlab...
-    #     for cidx in np.arange(confMatrix.shape[0]):
-    #         confMatrix[cidx, ir] = 100 * computeViol(obsViol, firingRate, n_spikes, rp[ir] + rpBinSize / 2, cont[cidx] / 100)  # TODO FIX RP BIN
-
-    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + rpBinSize / 2, cont[:, np.newaxis] / 100)
+    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + binSizeCorr / 2, cont[:, np.newaxis] / 100)
 
     return confMatrix, cont, rp, nACG, firingRate
 
