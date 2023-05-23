@@ -16,7 +16,6 @@ import colorcet as cc
 from statsmodels.stats.proportion import proportion_confint as binofit
 
 
-# (I had to pip install statsmodels; TODO check for a better package? )
 
 
 def genST(rate, duration, params=None):
@@ -850,7 +849,8 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 
             # plot just fr = 5:
             frs = np.array(params['baseRates'])
-            frInd = np.where(frs == 5)[0][0]
+            frInd = np.where(frs == 2)[0][0]
+            print('Firing rate is 2')
 
             # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
             c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34

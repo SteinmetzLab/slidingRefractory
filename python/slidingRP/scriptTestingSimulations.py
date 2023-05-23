@@ -15,7 +15,7 @@ import numpy as np
 from phylib.stats import correlograms
 from scipy import stats
 from slidingRP.simulations import *
-
+#%%
 #%%
 #script testing (to be moved later for import purposes)
 
