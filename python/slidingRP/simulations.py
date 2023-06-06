@@ -945,6 +945,7 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
     for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
         count = pc / 100 * params['nSim']  # number of correct trials
         print('computing CI')
+        print('hi')
         CI_scaled = binofit(count, params['nSim'])
         CI = [x * 100 for x in CI_scaled]
         print(CI)
