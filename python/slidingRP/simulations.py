@@ -938,7 +938,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
         fig.savefig(savefile + '_individual.svg', dpi=500)
 
 
-def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2):
+def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
     spinesSetting = False
     fig, axs = plt.subplots(1, 1, figsize=(4, 5))
     ax = axs  # for the case of just one subplot
@@ -991,7 +991,7 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
                 lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
                 upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
                 x = cr * 100
-                y = pc[rdInd[0], i, frInd, :]
+                y = pc[rdInd[0], rpInd[0], frInd, :]
 
 
 

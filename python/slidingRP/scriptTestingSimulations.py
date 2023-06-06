@@ -116,7 +116,7 @@ if params['savePCfile']:
     with open(savefile, 'wb') as handle:
         pickle.dump(results, handle)
 
-
+#%%
 
 #also run for different confidences:
 params['confidence'] = 80
@@ -134,7 +134,6 @@ results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15,pcHill2, pcHill3, params]
 if params['savePCfile']:
     with open(savefile, 'wb') as handle:
         pickle.dump(results, handle)
-
 
 
 
@@ -166,11 +165,12 @@ import numpy as np
 from phylib.stats import correlograms
 from scipy import stats
 from slidingRP.simulations import *
-
+#%%
 #load data
 # savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_11_03_21.pickle'
 # savefile= r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_12_26.pickle'
-# savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+
+#old 500 iterations, but no 1.5
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
 
 file = open(savefile,'rb')
@@ -184,7 +184,6 @@ pcHalfInactive = results[2]
 pcHill2 = results[3]
 pcHill3 = results[4]
 params = results[5]
-
 
 #%%
 import datetime
@@ -201,6 +200,37 @@ plotSimulations(pc, params,figsavefile1)
 plotSimulations(pc2MsNoSpikes, params, figsavefile2)
 plotSimulations(pcHill2,params,figsavefile3)
 plotSimulations(pcHill3,params,figsavefile4)
+
+
+#%%
+#new fewer iterations, but has 1.5
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC10iter_06_061.pickle'
+file = open(savefile,'rb')
+results = pickle.load(file)
+
+file.close()
+
+pcSliding = results[0]
+pc2MsNoSpikes = results[1]
+pcHalfInactive = results[2]
+pcHill15 = results[3]
+pcHill2 = results[4]
+pcHill3 = results[5]
+params = results[6]
+
+
+import datetime
+#prep for figure saving
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+#make RP plots for regular and Hill
+nSim = 500
+figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlay' + str(params['nSim']) + 'iter' + date_now
+
+plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,figsavefile, rpPlot=3)
+
+
+
+
 #NEXT, try this with zoomed in on 7-13 contamination ish (or 8-12)
 
 #%%
