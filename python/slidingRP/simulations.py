@@ -1006,12 +1006,12 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
                 ax.spines.top.set_visible(spinesSetting)
             # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
-    handles, labels = ax.get_legend_handles_labels()
+    handles, xx = ax.get_legend_handles_labels()
     labels = ['sliding refractory metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
     fig.tight_layout()
     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
-    
+
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
 
