@@ -938,6 +938,87 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
         fig.savefig(savefile + '_individual.svg', dpi=500)
 
 
+def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2):
+    spinesSetting = False
+
+    for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
+        count = pc / 100 * params['nSim']  # number of correct trials
+        CI_scaled = binofit(count, params['nSim'])
+        CI = [x * 100 for x in CI_scaled]
+
+        numrows = 1
+        numcols = 1
+        numplots = numrows * numcols
+        fig, axs = plt.subplots(numrows, numcols, figsize=(4, 5))
+        ax = axs  # for the case of just one subplot
+        # plot just contRates 0.08 to 0.12:
+        cr = params['contRates'];
+
+        # plot just RP = rpPlot:
+        rps = params['RPs']
+        rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
+        #plot just  recDur = 2:
+        recDurs = params['recDurs']
+        rdInd = np.where(recDurs == 2)[0]
+
+        # plot just fr = 5:
+        frs = np.array(params['baseRates'])
+        frInd = np.where(frs == 2)[0][0]
+        print('Firing rate is 2')
+
+        # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
+        c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+        c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
+        if p==0:
+            color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][1]
+        else:
+            colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
+            color = colors[p]
+
+
+        pltcnt = 0
+        linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
+        for j, recDur in enumerate(recDurs[rdInd]):
+            for i, rp in enumerate(rps[rpInd]):
+
+                # different base rates get different colors
+                # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+                b = 0
+                baseRate = frs[frInd]# Todo change x axis
+
+
+
+                lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
+                upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
+                x = cr * 100
+                y = pc[rdInd[0], i, frInd, :]
+
+
+
+                ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
+
+                ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
+                ax.set_ylabel('Percent pass')
+                ax.set_xlabel('Contamination (%)')
+                # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
+                ax.set_ylim(-10, 110)
+                ax.spines.right.set_visible(spinesSetting)
+                ax.spines.top.set_visible(spinesSetting)
+            # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
+            # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
+    handles, labels = ax.get_legend_handles_labels()
+
+    # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+    fig.tight_layout()
+    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
+    fig.savefig(savefile + '_RP.svg', dpi=500)
+    fig.savefig(savefile + '_RP.png', dpi=500)
+
+
+
+
+
+
 def plotSensitivitySpecificity(pcOrig, pc2Ms, params, savefile, plusMinusThresh):
     """
 

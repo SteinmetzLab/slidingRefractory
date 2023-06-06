@@ -6,6 +6,8 @@ Created on Thu Jul 21 08:29:37 2022
 
 script for running and plotting various simulations
 """
+
+#%%
 import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\phylib')
 
@@ -84,10 +86,11 @@ params = {
     'RPs': np.array([0.001,0.002,0.003,0.004,0.005,0.006]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
-    'nSim': 500,
+    'nSim': 10,
     'threshold': 0.1,
     'binSize': 1 / sampleRate,
     'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
+    'confidence': 90,
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
@@ -114,6 +117,44 @@ if params['savePCfile']:
         pickle.dump(results, handle)
 
 
+
+#also run for different confidences:
+params['confidence'] = 80
+print('in simulations. 80 conf')
+[pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3] = simulateContNeurons(params)
+import datetime
+
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+version = '80' #adjust if running more than once in the same day
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version +  '.pickle'
+
+
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15,pcHill2, pcHill3, params]
+
+if params['savePCfile']:
+    with open(savefile, 'wb') as handle:
+        pickle.dump(results, handle)
+
+
+
+
+params['confidence'] = 99
+print('in simulations, 99 conf')
+[pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3] = simulateContNeurons(params)
+import datetime
+
+date_now  = datetime.datetime.now().strftime('_%m_%d')
+version = '99' #adjust if running more than once in the same day
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(params['nSim']) + 'iter' + date_now + version +  '.pickle'
+
+
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15,pcHill2, pcHill3, params]
+
+if params['savePCfile']:
+    with open(savefile, 'wb') as handle:
+        pickle.dump(results, handle)
+
+
 #%%
 
 import sys
@@ -129,7 +170,9 @@ from slidingRP.simulations import *
 #load data
 # savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_11_03_21.pickle'
 # savefile= r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_12_26.pickle'
+# savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+
 file = open(savefile,'rb')
 results = pickle.load(file)
 
@@ -142,10 +185,13 @@ pcHill2 = results[3]
 pcHill3 = results[4]
 params = results[5]
 
+
+#%%
 import datetime
 #prep for figure saving
 date_now  = datetime.datetime.now().strftime('_%m_%d')
-#%% make RP plots for regular and Hill
+#make RP plots for regular and Hill
+nSim = 500
 figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now
 figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
 figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
@@ -373,6 +419,7 @@ plotSimulations(pcHill3,params,figsavefile4,zoomCont=True)
 
 #%%
 #plot main plot for increase decrease
+nSim = 500
 import datetime
 #prep for figure saving
 date_now  = datetime.datetime.now().strftime('_%m_%d')
