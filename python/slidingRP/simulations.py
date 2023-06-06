@@ -940,17 +940,15 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 
 def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2):
     spinesSetting = False
-
+    fig, axs = plt.subplots(1, 1, figsize=(4, 5))
+    ax = axs  # for the case of just one subplot
     for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
         count = pc / 100 * params['nSim']  # number of correct trials
+        print('computing CI')
         CI_scaled = binofit(count, params['nSim'])
         CI = [x * 100 for x in CI_scaled]
+        print(CI)
 
-        numrows = 1
-        numcols = 1
-        numplots = numrows * numcols
-        fig, axs = plt.subplots(numrows, numcols, figsize=(4, 5))
-        ax = axs  # for the case of just one subplot
         # plot just contRates 0.08 to 0.12:
         cr = params['contRates'];
 
@@ -970,10 +968,10 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
         c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
         if p==0:
-            color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][1]
+            color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
         else:
             colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
-            color = colors[p]
+            color = colors[p-1]
 
 
         pltcnt = 0
