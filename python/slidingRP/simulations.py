@@ -1011,6 +1011,7 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
     fig.tight_layout()
     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
+    
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
 
