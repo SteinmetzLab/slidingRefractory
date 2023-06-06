@@ -943,6 +943,7 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2
     fig, axs = plt.subplots(1, 1, figsize=(4, 5))
     ax = axs  # for the case of just one subplot
     for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
+        count = []
         count = pc / 100 * params['nSim']  # number of correct trials
         print('computing CI')
         print('hi')
