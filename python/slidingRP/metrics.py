@@ -81,8 +81,8 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     #initialize rpMetrics as dict
     rpMetrics = {}
     rpMetrics['cidx'] = []
-    rpMetrics ['maxConfidenceAt10Cont'] = []
-    rpMetrics['minContWith90Confidence'] = []
+    rpMetrics ['maxConfidenceAtContaminationThresh'] = []
+    rpMetrics['minContAtConfidenceThresh'] = []
     rpMetrics['timeOfLowestCont'] = []
     rpMetrics['nSpikesBelow2'] = []
     rpMetrics['firingRate'] = []
@@ -94,13 +94,13 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     for cidx in range(len(cids)):
         st = spikeTimes[spikeClusters==cids[cidx]] 
         
-        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+        [maxConfidenceAtContaminationThresh, minContAtConfidenceThresh, timeOfLowestCont,
             nSpikesBelow2, confMatrix, cont, rp, nACG,
             firingRate, secondsElapsed] = slidingRP(st, params)
     
         rpMetrics['cidx'].append(cids[cidx]) 
-        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
-        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
+        rpMetrics['maxConfidenceAtContaminationThresh'].append(maxConfidenceAtContaminationThresh)
+        rpMetrics['minContAtConfidenceThresh'].append(minContAtConfidenceThresh)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
         rpMetrics['firingRate'].append(firingRate)
@@ -122,19 +122,19 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
                 if rpMetrics['nSpikesBelow2'] == 0:
                     rpMetrics['value'].append(1)
                 else:
-                    if minContWith90Confidence <= 10:
+                    if minContAtConfidenceThresh <= params['contaminationThresh']:
                         rpMetrics['value'].append(1)
                     else:
                         rpMetrics['value'].append(0)
 
         else: #regular behavior of the metric, disregarding whether neurons have spikes below 2ms
-            if minContWith90Confidence<=10:
+            if minContAtConfidenceThresh<= params['contaminationThresh']:
                 rpMetrics['value'].append(1)
             else:
                 rpMetrics['value'].append(0)
             
         if verbose:
-            if minContWith90Confidence<=10:
+            if minContAtConfidenceThresh<=params['contaminationThresh']:
                 pfstring = 'PASS'
             else: 
                 pfstring = 'FAIL'
