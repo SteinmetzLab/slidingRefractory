@@ -189,23 +189,23 @@ def slidingRP(spikeTimes, params = None):
     testTimes = rp>0.0005 # (in seconds) 
     #only test for refractory period durations greater than 0.5 ms
     
-    maxConfidenceAt10Cont = max(confMatrix[cont==10,testTimes]) #TODO check behavior if no max
+    maxConfidenceAtContaminationThresh = max(confMatrix[cont==params['contaminationThresh'],testTimes]) #TODO check behavior if no max
     
     
-    indsConf90 = np.row_stack(np.where(confMatrix[:,testTimes]>90))
-    ii = indsConf90[0] #row inds
-    jj = indsConf90[1] #col inds
+    indsConf = np.row_stack(np.where(confMatrix[:,testTimes]>params['confidenceThresh']))
+    ii = indsConf[0] #row inds
+    jj = indsConf[1] #col inds
     
 
     try:
         minI = np.min(ii)
         idx = np.argmin(ii)
-        minContWith90Confidence = cont[minI]
+        minContAtConfidenceThresh = cont[minI]
         minRP = np.argmax(confMatrix[minI,testTimes])
 
 
     except:    
-        minContWith90Confidence = np.nan
+        minContAtConfidenceThresh = np.nan
     
         minRP = np.nan
 
@@ -218,7 +218,7 @@ def slidingRP(spikeTimes, params = None):
     nSpikesBelow2 = sum(nACG[0:np.where(rp>0.002)[0][0]+1])
 
     secondsElapsed = time.time()-seconds_start
-    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+    return maxConfidenceAtContaminationThresh, minContAtConfidenceThresh, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
     
     
     
