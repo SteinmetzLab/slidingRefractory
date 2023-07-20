@@ -86,7 +86,7 @@ params = {
     'RPs': np.array([0.001,0.002,0.003,0.004,0.005,0.006]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
-    'nSim': 10,
+    'nSim': 500,
     'threshold': 0.1,
     'binSize': 1 / sampleRate,
     'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
@@ -171,7 +171,10 @@ from slidingRP.simulations import *
 # savefile= r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_12_26.pickle'
 
 #old 500 iterations, but no 1.5
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+# savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_01_221.pickle'
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_06_291.pickle'
+
 
 file = open(savefile,'rb')
 results = pickle.load(file)
@@ -181,9 +184,10 @@ file.close()
 pc = results[0]
 pc2MsNoSpikes = results[1]
 pcHalfInactive = results[2]
-pcHill2 = results[3]
-pcHill3 = results[4]
-params = results[5]
+pcHill15 = results[3]
+pcHill2 = results[4]
+pcHill3 = results[5]
+params = results[6]
 
 #%%
 import datetime
@@ -193,18 +197,24 @@ date_now  = datetime.datetime.now().strftime('_%m_%d')
 nSim = 500
 figsavefile1 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now
 figsavefile2 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '2MsNoSpikes'
-figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
-figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
+figsavefile3 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill15'
+figsavefile4 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill2'
+figsavefile5 = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPC' + str(params['nSim']) + 'iter' + date_now + 'Hill3'
 
 plotSimulations(pc, params,figsavefile1)
 plotSimulations(pc2MsNoSpikes, params, figsavefile2)
-plotSimulations(pcHill2,params,figsavefile3)
-plotSimulations(pcHill3,params,figsavefile4)
+plotSimulations(pcHill15,params,figsavefile3)
+plotSimulations(pcHill2,params,figsavefile4)
+
+plotSimulations(pcHill3,params,figsavefile5)
 
 
 #%%
 #new fewer iterations, but has 1.5
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC10iter_06_061.pickle'
+# savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC10iter_06_061.pickle'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_06_291.pickle'
+
+
 file = open(savefile,'rb')
 results = pickle.load(file)
 
@@ -227,6 +237,63 @@ nSim = 500
 figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlay' + str(params['nSim']) + 'iter' + date_now
 
 plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,figsavefile, rpPlot=3)
+
+#%%
+for rpPlot in np.arange(1,7):
+    figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlay' + str(
+        params['nSim']) + 'iter' + date_now + str(rpPlot)
+    plotHillOverlay(pcSliding, pcHill15, pcHill2, pcHill3, params, figsavefile, rpPlot=rpPlot)
+
+#%%
+#plot overlay of different threshold?
+#confidence was labeled in "version", so set version to be confidence
+
+#to load old data:
+date_now='_06_07'
+confidence = '99'
+version = confidence #adjust if running more than once in the same day
+loadfile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(500) + 'iter' + date_now + version +  '.pickle'
+file = open(loadfile,'rb')
+results = pickle.load(file)
+file.close()
+
+pcSliding99 = results[0]
+# pc2MsNoSpikes = results[1]
+# pcHalfInactive = results[2]
+# pcHill15 = results[3]
+# pcHill2 = results[4]
+# pcHill3 = results[5]
+# params = results[6]
+#
+confidence = '80'
+version = confidence #adjust if running more than once in the same day
+loadfile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(500) + 'iter' + date_now + version +  '.pickle'
+file = open(loadfile,'rb')
+results = pickle.load(file)
+file.close()
+
+pcSliding80 = results[0]
+# pc2MsNoSpikes = results[1]
+# pcHalfInactive = results[2]
+# pcHill15 = results[3]
+# pcHill2 = results[4]
+# pcHill3 = results[5]
+# params = results[6]
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_02_091.pickle'
+file = open(savefile,'rb')
+results = pickle.load(file)
+
+file.close()
+
+pcSliding = results[0]
+pcHill2 = results[4]
+
+
+figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCConfidence' + str(params['nSim']) + 'iter' + date_now
+plotHillOverlay(pcSliding,pcSliding80,pcSliding99, pcHill2,params,figsavefile, rpPlot=3)
+
+
 
 
 
