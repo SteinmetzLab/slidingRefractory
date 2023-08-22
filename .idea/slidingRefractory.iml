@@ -8,6 +8,10 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="noiseCutoff" />
     <orderEntry type="module" module-name="qualityMetrics" />
+    <orderEntry type="module" module-name="paper-reproducible-ephys" />
+    <orderEntry type="module" module-name="ibllib" />
+    <orderEntry type="module" module-name="iblapps" />
+    <orderEntry type="module" module-name="orchard-hill" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="NUMPY" />

@@ -304,7 +304,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     # the number of violations (spikes) we expect to see under this contamination rate
     expectedViol = contaminationRate * refDur * 2 * spikeCount
 
-    # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
+    # the confidence th-at this neuron is contaminated at a level less than contaminationProp, given the number of true
     # observed violations and under the assumption of Poisson firing
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 

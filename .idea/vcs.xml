@@ -3,5 +3,9 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$USER_HOME$/Documents/GitHub/SteinmetzLab/qualityMetrics" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../iblapps" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../ibllib" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../orchard-hill" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../paper-reproducible-ephys" vcs="Git" />
   </component>
 </project>

@@ -66,11 +66,16 @@ def genST(rate, duration, params=None):
 def genChangingST(rate,duration,params,delta):
 
     # delta is in fractional increase e.g. 0.5
-    nchunk = 100  # parameter, how many chunks to split the data into
-    rate_end = rate * (1 + delta)
-    rate_diff = rate_end - rate
-    rateDiffChunk = rate_diff / (nchunk - 1)
-    rates = np.arange(rate, rate_end + rateDiffChunk, rateDiffChunk)
+    if delta ==0:
+        nchunk=1
+        rates = np.arange(rate)
+
+    else:
+        nchunk = 100  # parameter, how many chunks to split the data into
+        rate_end = rate * (1 + delta)
+        rate_diff = rate_end - rate
+        rateDiffChunk = rate_diff / (nchunk - 1)
+        rates = np.arange(rate, rate_end + rateDiffChunk, rateDiffChunk)
 
     chunkLength = duration / nchunk
     st = np.array([])
@@ -244,7 +249,7 @@ def simulateChangingContNeurons(params):
         print('recording Duration %d' % recDur)
         for i, rp in enumerate(params['RPs']):
             print('refractory period duration %.3f' % rp)
-            thresh = params['threshold']
+
 
             bidx = 0
             for baseRate in params['baseRates']:
@@ -937,84 +942,84 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
         fig.savefig(savefile + '_individual.svg', dpi=500)
 
 
-def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
-    spinesSetting = False
-    fig, axs = plt.subplots(1, 1, figsize=(4, 5))
-    ax = axs  # for the case of just one subplot
-    for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
-        count = []
-        count = pc / 100 * params['nSim']  # number of correct trials
-        print('computing CI')
-        print('hi')
-        CI_scaled = binofit(count, params['nSim'])
-        CI = [x * 100 for x in CI_scaled]
-        print(CI)
+# def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
+#     spinesSetting = False
+#     fig, axs = plt.subplots(1, 1, figsize=(4, 5))
+#     ax = axs  # for the case of just one subplot
+#     for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
+#         count = []
+#         count = pc / 100 * params['nSim']  # number of correct trials
+#         print('computing CI')
+#         print('hi')
+#         CI_scaled = binofit(count, params['nSim'])
+#         CI = [x * 100 for x in CI_scaled]
+#         print(CI)
+#
+#         # plot just contRates 0.08 to 0.12:
+#         cr = params['contRates'];
+#
+#         # plot just RP = rpPlot:
+#         rps = params['RPs']
+#         rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
+#         #plot just  recDur = 2:
+#         recDurs = params['recDurs']
+#         rdInd = np.where(recDurs == 2)[0]
+#
+#         # plot just fr = 5:
+#         frs = np.array(params['baseRates'])
+#         frInd = np.where(frs == 2)[0][0]
+#         print('Firing rate is 2')
+#
+#         # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
+#         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+#         c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
+#         if p==0:
+#             color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
+#         else:
+#             colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
+#             color = colors[p-1]
+#
+#
+#         pltcnt = 0
+#         linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
+#         for j, recDur in enumerate(recDurs[rdInd]):
+#             for i, rp in enumerate(rps[rpInd]):
+#
+#                 # different base rates get different colors
+#                 # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+#                 b = 0
+#                 baseRate = frs[frInd]# Todo change x axis
+#
+#
+#
+#                 lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
+#                 upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
+#                 x = cr * 100
+#                 y = pc[rdInd[0], rpInd[0], frInd, :]
+#
+#
+#
+#                 ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
+#
+#                 ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
+#                 ax.set_ylabel('Percent pass')
+#                 ax.set_xlabel('Contamination (%)')
+#                 # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
+#                 ax.set_ylim(-10, 110)
+#                 ax.spines.right.set_visible(spinesSetting)
+#                 ax.spines.top.set_visible(spinesSetting)
+#             # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
+#             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
+#     handles, xx = ax.get_legend_handles_labels()
+#     labels = ['sliding refractory metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
+#     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+#     fig.tight_layout()
+#     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
+#
+#     fig.savefig(savefile + '_RP.svg', dpi=500)
+#     fig.savefig(savefile + '_RP.png', dpi=500)
 
-        # plot just contRates 0.08 to 0.12:
-        cr = params['contRates'];
-
-        # plot just RP = rpPlot:
-        rps = params['RPs']
-        rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
-        #plot just  recDur = 2:
-        recDurs = params['recDurs']
-        rdInd = np.where(recDurs == 2)[0]
-
-        # plot just fr = 5:
-        frs = np.array(params['baseRates'])
-        frInd = np.where(frs == 2)[0][0]
-        print('Firing rate is 2')
-
-        # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
-        c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
-        c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
-        if p==0:
-            color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
-        else:
-            colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
-            color = colors[p-1]
-
-
-        pltcnt = 0
-        linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
-        for j, recDur in enumerate(recDurs[rdInd]):
-            for i, rp in enumerate(rps[rpInd]):
-
-                # different base rates get different colors
-                # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
-                b = 0
-                baseRate = frs[frInd]# Todo change x axis
-
-
-
-                lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
-                upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
-                x = cr * 100
-                y = pc[rdInd[0], rpInd[0], frInd, :]
-
-
-
-                ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
-
-                ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
-                ax.set_ylabel('Percent pass')
-                ax.set_xlabel('Contamination (%)')
-                # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
-                ax.set_ylim(-10, 110)
-                ax.spines.right.set_visible(spinesSetting)
-                ax.spines.top.set_visible(spinesSetting)
-            # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
-            # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
-    handles, xx = ax.get_legend_handles_labels()
-    labels = ['sliding refractory metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-    # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
-    fig.tight_layout()
-    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
-
-    fig.savefig(savefile + '_RP.svg', dpi=500)
-    fig.savefig(savefile + '_RP.png', dpi=500)
-
-def plotHillOverlay(pcSliding,pcHill15,pcHill2,params,savefile, rpPlot=2.5):
+def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
     # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
     spinesSetting = False
     fig, axs = plt.subplots(1, 1, figsize=(6, 8))
@@ -1022,14 +1027,16 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,params,savefile, rpPlot=2.5):
     ax.vlines(10,0,100,'k','dashed',alpha=0.5)
     ax.hlines([0,20,40,60,80,100],0,20,'k','solid',alpha = 0.2)
 
-    for p,pc in enumerate([pcSliding,pcHill15,pcHill2]):#,pcHill3]):
+    pcDict_keys = list(pcDict.keys())
+    z = [type(i) for i in pcDict_keys]
+    nConfs = len([i for i in z if i == int])
+    for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
+        pc = pcDict[pc_key]
         count = []
         count = pc / 100 * params['nSim']  # number of correct trials
-        print('computing CI')
-        print('hi')
+
         CI_scaled = binofit(count, params['nSim'])
         CI = [x * 100 for x in CI_scaled]
-        print(CI)
 
         # plot just contRates 0.08 to 0.12:
         cr = params['contRates'];
@@ -1049,11 +1056,16 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,params,savefile, rpPlot=2.5):
         # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
         c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
-        if p==0:
-            color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
-        else:
-            colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
-            color = colors[p-1]
+        # if p==0:
+        #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
+        # else:
+        if type(pc_key) is str: # Hill
+            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 3))
+            print(p)
+            color = colors[p-(len(z)-3)]
+        else: #not hill (conf)
+            colors = matplotlib.cm.Blues(np.linspace(0.3, 1, nConfs))
+            color = colors[p]
 
 
         pltcnt = 0
@@ -1091,15 +1103,17 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,params,savefile, rpPlot=2.5):
             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
     handles, xx = ax.get_legend_handles_labels()
 
-    # labels = ['sliding refractory metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-    labels = ['50%', '75%','90%']#,'99%']
+    labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
+    # labels = ['50%', '75%','90%']#,'99%']
     # labels = ['10%', '10%','10%','10%']
+    labels = pcDict_keys
 
     #tsting just one
     # labels=labels[0]
     # handles=handles[0]
-    title = 'Confidence threshold'
+    # title = 'Confidence threshold'
     # title = 'Refractory Period (ms)'
+    title = 'Contamination Metric'
 
     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
@@ -1108,6 +1122,143 @@ def plotHillOverlay(pcSliding,pcHill15,pcHill2,params,savefile, rpPlot=2.5):
     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title=title )
     fig.legend(handles,labels, bbox_to_anchor = (1.05, 1.0), loc = 'upper left',title=title)
     fig.suptitle('RP = {}'.format(rpPlot))
+    fig.savefig(savefile + '_RP.svg', dpi=500)
+    fig.savefig(savefile + '_RP.png', dpi=500)
+
+
+def plotDriftOverlay(pcDict,paramsDict,savefile, rpPlot=2.5,frPlotInput = 5,driftDir = 'Inc'):
+    # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
+    spinesSetting = False
+    fig, axs = plt.subplots(1, 1, figsize=(6, 8))
+    ax = axs  # for the case of just one subplot
+    ax.vlines(10,0,100,'k','dashed',alpha=0.5)
+    ax.hlines([0,20,40,60,80,100],0,20,'k','solid',alpha = 0.2)
+
+    if driftDir == 'Inc':
+        pcDict_keys = list(pcDict.keys())
+        pcDict_keys.pop(0) #get rid of dec
+    elif driftDir =='Dec':
+        pcDict_keys = list(pcDict.keys()) #get rid of inc
+        pcDict_keys.pop(2) #get rid of dec
+
+
+    for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
+        if pc_key == 0:
+            if driftDir == 'Inc':
+                frPlot = frPlotInput*(2+0.5)/2 #mean firing rate across session
+                frMean = frPlot
+            elif driftDir == 'Dec':
+                frPlot = frPlotInput*(2-0.5)/2 #mean firing rate across session
+                frMean = frPlot
+        else:
+            frPlot = frPlotInput
+
+        pc = pcDict[pc_key]
+        params = paramsDict[pc_key]
+        print(pc_key)
+        print(pc.shape)
+        count = []
+        print(params['nSim'])
+        count = pc / 100 * params['nSim']  # number of correct trials
+
+        CI_scaled = binofit(count, params['nSim'])
+        CI = [x * 100 for x in CI_scaled]
+
+        # plot just contRates 0.08 to 0.12:
+        cr = params['contRates'];
+
+        # plot just RP = rpPlot:
+        rps = params['RPs']
+        rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
+        #plot just  recDur = 2:
+        recDurs = params['recDurs']
+        rdInd = np.where(recDurs == 2)[0]
+
+        # plot just fr = 5:
+        frs = np.array(params['baseRates'])
+        print(frs)
+        print(frPlot)
+        frInd = np.where(frs == frPlot)[0][0]
+        print('Firing rate is 2')
+
+        # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
+        c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
+        c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
+        # if p==0:
+        #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
+        # else:
+        if pc_key !=0 and driftDir == 'Dec': # Hill
+            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 3))
+            color = colors[p-1]
+        elif pc_key !=0 and driftDir == 'Inc': # Hill
+            colors = matplotlib.cm.Greens(np.linspace(0.3, 1, 3))
+            color = colors[p-1]
+
+        else: #not hill (conf)
+            colors = matplotlib.cm.Blues(np.linspace(0.3, 1, 3))
+            color = colors[p-1]
+
+
+        pltcnt = 0
+        linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
+        for j, recDur in enumerate(recDurs[rdInd]):
+            for i, rp in enumerate(rps[rpInd]):
+
+                # different base rates get different colors
+                # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+                b = 0
+                baseRate = frs[frInd]# Todo change x axis
+
+
+                if pc.ndim == 3:
+                    print(CI[0].shape)
+                    lowerCI = CI[0][rpInd[0], frInd, :]
+                    upperCI = CI[1][rpInd[0], frInd, :]
+
+                    x = cr * 100
+                    y = pc[rpInd[0], frInd, :]
+                else:
+                    lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
+                    upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
+                    x = cr * 100
+                    y = pc[rdInd[0], rpInd[0], frInd, :]
+
+                ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
+
+                ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
+                ax.set_ylabel('Percent pass')
+                ax.set_xlabel('Contamination (%)')
+                # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
+                ax.set_ylim(-10, 110)
+                ax.spines.right.set_visible(spinesSetting)
+                ax.spines.top.set_visible(spinesSetting)
+            # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
+            # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
+    handles, xx = ax.get_legend_handles_labels()
+
+    labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
+    # labels = ['50%', '75%','90%']#,'99%']
+    # labels = ['10%', '10%','10%','10%']
+    labels = pcDict_keys
+    if driftDir == 'Inc':
+        labels = ['Stable FR', driftDir + ' FR 50%']
+    elif driftDir == 'Dec':
+        labels = [ driftDir + ' FR 50%', 'Stable FR']
+
+    #tsting just one
+    # labels=labels[0]
+    # handles=handles[0]
+    # title = 'Confidence threshold'
+    # title = 'Refractory Period (ms)'
+    title = 'Drift'
+
+    # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
+
+
+    fig.tight_layout()
+    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title=title )
+    fig.legend(handles,labels, bbox_to_anchor = (1.05, 1.0), loc = 'upper left',title=title)
+    fig.suptitle('Mean FR = {}'.format(frMean))
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
 

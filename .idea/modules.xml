@@ -2,7 +2,11 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/../iblapps/.idea/iblapps.iml" filepath="$PROJECT_DIR$/../iblapps/.idea/iblapps.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ibllib/.idea/ibllib.iml" filepath="$PROJECT_DIR$/../ibllib/.idea/ibllib.iml" />
       <module fileurl="file://$USER_HOME$/Documents/GitHub/SteinmetzLab/noiseCutoff/.idea/noiseCutoff.iml" filepath="$USER_HOME$/Documents/GitHub/SteinmetzLab/noiseCutoff/.idea/noiseCutoff.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../orchard-hill/.idea/orchard-hill.iml" filepath="$PROJECT_DIR$/../orchard-hill/.idea/orchard-hill.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../paper-reproducible-ephys/.idea/paper-reproducible-ephys.iml" filepath="$PROJECT_DIR$/../paper-reproducible-ephys/.idea/paper-reproducible-ephys.iml" />
       <module fileurl="file://$USER_HOME$/Documents/GitHub/SteinmetzLab/qualityMetrics/.idea/qualityMetrics.iml" filepath="$USER_HOME$/Documents/GitHub/SteinmetzLab/qualityMetrics/.idea/qualityMetrics.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/slidingRefractory.iml" filepath="$PROJECT_DIR$/.idea/slidingRefractory.iml" />
     </modules>

@@ -82,7 +82,7 @@ overall_struct['dynamic_threshold'] = []
 overall_struct['prev_RP']=[]
 overall_struct['label']=[]
 
-#define a closest function for finding the nearest recording duration and firing rate
+#%%define a closest function for finding the nearest recording duration and firing rate
 def closest(lst, K):
     return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
 #%%
@@ -341,7 +341,7 @@ results = pickle.load(file)
 file.close()
 
 params = results[-1] #the last in the results
-
+pc = results[0] #normal metric results (not 2ms cond)
 
 frThreshRecDur = []
 recDurVec = params['recDurs']
@@ -365,4 +365,77 @@ ax.spines.top.set_visible(False)
 plt.show()
 
 #todo: make spines go away, make dots instead of line, make yticks fewer
+
+#%% rerun to compute lowest FR for recDur
+
+#run simulations:
+sampleRate = 30000
+params = {
+    'recDurs': np.array([0.5 , 0.75, 1.  , 1.25, 1.5 , 1.75, 2.  , 2.25, 2.5 , 2.75, 3.  ]),  #recording durations (hours)
+    'RPs': np.array([0.002]),#np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'baseRates': [0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
+    'contRates': np.array([0]),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
+    'nSim': 200,
+    'contaminationThresh': 10,
+    'binSize': 1 / sampleRate,
+    'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
+    'confidenceThresh': 90,
+    'checkFR': False,
+    'binSizeCorr': 1 / sampleRate,
+    'returnMatrix': True,
+    'verbose': True,
+    'savePCfile': True
+
+}
+
+
+
+#%% run and save
+
+print('in simulations, minFR')
+[pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3] = simulateContNeurons(params)
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(
+    params['nSim']) + 'iterTestingMinFR.pickle'
+
+results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, params]
+if params['savePCfile']:
+    with open(savefile, 'wb') as handle:
+        pickle.dump(results, handle)
+
+#%% load and plot
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(
+    params['nSim']) + 'iterTestingMinFR.pickle'
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+pc = results[0]
+
+x = params['baseRates']
+y=[]
+for r, recDur in enumerate(params['recDurs']):
+    firstNonZero = np.nonzero(pc[r,0,:,0])
+    if len(firstNonZero[0]):
+        val = x[firstNonZero[0][0]]
+    else:
+        val = np.nan
+    y.append(val)
+
+
+
+rd = params['recDurs']
+
+
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+
+ax.set_xlabel('Recording Duration (hours)')
+ax.set_ylabel('First FR with nonzero PC ')
+ax.plot(rd,y,'k.-')
+ax.set_title('Minimum passing FR (uncontaminated)')
+
+spinesSetting = False
+ax.spines.right.set_visible(spinesSetting)
+ax.spines.top.set_visible(spinesSetting)
+fig.show()
+
 
