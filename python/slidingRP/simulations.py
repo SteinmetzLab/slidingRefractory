@@ -156,9 +156,9 @@ def simulateContNeurons(params):
                         if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
                             print(' ')
                         st = genST(baseRate, recDur, rp, params)  # generate a spike train with the current base rate
-
+                        print("In new version of simulations")
                         if c > 0:
-                            contST = genST(contRate, recDur, 0, params) #add contaminating neuron 
+                            contST = genST(contRate, recDur, 0, params) #add contaminating neuron
                         else:
                             contST = []
                         combST = np.sort(np.concatenate(
