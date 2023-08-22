@@ -18,14 +18,15 @@ from statsmodels.stats.proportion import proportion_confint as binofit
 
 
 
-def genST(rate, duration, params=None):
+def genST(rate, duration, rp, params=None):
+
     '''
     
 
     Parameters
     ----------
     rate : float
-        firing rate of simulated neuron (spks/s).
+        desired firing rate of simulated neuron (spks/s).
     duration: float
         length of recording of simulated neuron (s)
     params : dict, optional
@@ -38,9 +39,11 @@ def genST(rate, duration, params=None):
 
     '''
     # print('generating spike train...')
-    mu = 1 / rate
+
+    rSim = rate / (1-(rp*rate)) # rate for simulation, taking account the refractory period of the neuron
+    mu = 1 / rSim
     n = rate * duration
-    isi = np.random.exponential(mu, int(np.ceil(n * 2)))  # generate
+    isi = rp + np.random.exponential(mu, int(np.ceil(n * 2)))  # generate
 
     while sum(isi) < duration:
         isi = np.append(isi, np.random.exponential(mu))
@@ -152,14 +155,10 @@ def simulateContNeurons(params):
                             print('-', end="")
                         if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
                             print(' ')
-                        st = genST(baseRate, recDur, params)  # generate a spike train with the current base rate
-                        isi = np.diff(np.insert(st, 0, 0))
-                        isi = np.delete(isi, np.where(isi < rp)[
-                            0])  # get rid of already contaminating spikes (does this make sense??? why are there already contaminating spikes)
-                        st = np.cumsum(isi)
+                        st = genST(baseRate, recDur, rp, params)  # generate a spike train with the current base rate
 
                         if c > 0:
-                            contST = genST(contRate, recDur, params)
+                            contST = genST(contRate, recDur, 0, params) #add contaminating neuron 
                         else:
                             contST = []
                         combST = np.sort(np.concatenate(
