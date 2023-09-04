@@ -17,15 +17,15 @@ date_now = datetime.datetime.now().strftime('_%m_%d')
 #run simulations:
 sampleRate = 30000
 params = {
-    'recDurs': np.array([2]),  #recording durations (hours) np.array([0.5, 1 , 2 , 3 ])
-    'RPs': np.array([0.002]),# np.array([0.001,0.002,0.003,0.004,0.005,0.006]), np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'recDurs':np.array([0.5, 1 , 2 , 3 ]),  #recording durations (hours) np.array([0.5, 1 , 2 , 3 ])
+    'RPs': np.array([0.001,0.0015, 0.002,0.0025, 0.003,0.004,0.005,0.006]),# , np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
-    'contRates': np.arange(0.00,0.21, 0.02),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
-    'nSim': 10,
+    'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
+    'nSim': 2000,
     'contaminationThresh': 10,
     'binSize': 1 / sampleRate,
     'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
-    'confidenceThresh': 90,
+    'confidenceThresh': 70,
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
@@ -37,7 +37,7 @@ params = {
 
 
 #%% run and save
-confidence_values = [90]#[60,70,80,85]
+confidence_values = [70]#[60,70,80,85]
 for conf in confidence_values:
     params['confidenceThresh'] = conf
     print('in simulations, {0} conf'.format(conf))
@@ -55,7 +55,7 @@ for conf in confidence_values:
 #%% test plot just one
 date_now = datetime.datetime.now().strftime('_%m_%d')
 
-conf=75
+conf=90
 savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(10) + 'iter' + date_now + str(conf) + '.pickle'
 
 file = open(savefile,'rb')
@@ -70,8 +70,31 @@ for rp in np.arange(1,7):
 
 
 
+#%%plot just one
+pcDict = {}
+conf = 90
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_08_2290.pickle'
 
 
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+
+pcDict[0] = results[0]
+params = results[-1]
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_07_1990.pickle'
+
+
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+
+pcDict[1] = results[0]
+
+figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlayConfCompare'
+
+plotHillOverlay(pcDict, params, figsavefile, rpPlot=2)
 
 #%% plot
 pcDict = {}
@@ -81,7 +104,7 @@ dates = ['_07_19','_07_25', '_07_25', '_07_19','_07_25', '_07_25', '_07_19', '_0
 # confidence_values = [70,75,80]
 # dates = [ '_07_25', '_07_19','_07_25']
 
-
+confidence_values = [90]
 
 #plot just 90
 # confidence_values = [90]
@@ -98,6 +121,9 @@ for conf, date_now in zip(confidence_values,dates):
     file.close()
 
     pcDict[conf] = results[0]
+
+
+simulationsPC500iter_07_1990
 
 pcDict['Hill 1.5ms'] = results[3]
 pcDict['Hill 2ms'] = results[4]

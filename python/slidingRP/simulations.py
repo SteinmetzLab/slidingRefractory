@@ -156,7 +156,6 @@ def simulateContNeurons(params):
                         if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
                             print(' ')
                         st = genST(baseRate, recDur, rp, params)  # generate a spike train with the current base rate
-                        print("In new version of simulations")
                         if c > 0:
                             contST = genST(contRate, recDur, 0, params) #add contaminating neuron
                         else:
@@ -1049,8 +1048,9 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
 
         # plot just fr = 5:
         frs = np.array(params['baseRates'])
-        frInd = np.where(frs == 2)[0][0]
-        print('Firing rate is 2')
+        frPlot = 10
+        frInd = np.where(frs == frPlot)[0][0]
+        print('Firing rate is', str(frPlot))
 
         # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
