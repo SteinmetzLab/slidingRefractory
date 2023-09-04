@@ -264,6 +264,11 @@ def computeMatrix(spikeTimes, params):
         binSizeCorr = 1 / sampleRate
     else:
         binSizeCorr = 1 / 30000
+    if params and 'recordingDuration' in params:
+        recDur = params['recordingDuration']
+    else:
+        recDur = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
+        # based on the spike times of this neuron
 
     rpEdges = np.arange(0, 10/1000, binSizeCorr)  # in s
     rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2 # vector of refractory period durations to test
@@ -280,12 +285,12 @@ def computeMatrix(spikeTimes, params):
         
     nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'], sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
 
-    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + binSizeCorr / 2, cont[:, np.newaxis] / 100)
+    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + binSizeCorr / 2, cont[:, np.newaxis] / 100, recDur)
 
     return confMatrix, cont, rp, nACG, firingRate
 
 
-def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
+def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recDur):
     '''
     
 
