@@ -122,6 +122,7 @@ def simulateContNeurons(params):
     for j, recDurScalar in enumerate(params['recDurs']):
         recDur = recDurScalar * 3600
         print('recording Duration %d' % recDur)
+        params['recordingDuration'] = recDur
         for i, rp in enumerate(params['RPs']):
             print('refractory period duration %.3f' % rp)
 

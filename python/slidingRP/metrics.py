@@ -33,6 +33,7 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
         params.sampleRate : sample rate of the recording (Hz)
+        params.recordingDuration: length of the recording (s)
         params.2msNoSpikes : set to True to automatically accept neurons above FRthresh with no spikes below 2ms
         params.FRthresh : set a FR threshold to reject neurons below this number regardless of metric performance (spks/s)
 
@@ -74,6 +75,12 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
         params['sampleRate'] = 30000
         params['binSizeCorr'] = 1/30000
         params['2msNoSpikesCondition'] = False
+        params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
+        # based on the spike times
+
+    if 'recordingDuration' not in params:
+        params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
+        # based on the spike times
 
 
     cids = np.unique(spikeClusters)
@@ -156,6 +163,7 @@ def slidingRP(spikeTimes, params = None):
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
         params.sampleRate : sample rate of the recording (Hz)
+        params.recordingDuration: length of the recording (s) (if not supplied, this will be estimated based on spikeTimes)
 
     Returns
     -------
@@ -180,7 +188,12 @@ def slidingRP(spikeTimes, params = None):
         params['returnMatrix'] = True
         params['verbose'] = True
         params['cidx'] = [0]
+        params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
+        # based on the spike times of this neuron
 
+    if 'recordingDuration' not in params:
+        params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
+        # based on the spike times of this neuron
 
     seconds_start = time.time()
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
@@ -307,7 +320,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     N_b = firingRate * recDur
     N_c = contaminationRate * recDur
     expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2)
-
+    print('testing')
     # the confidence th-at this neuron is contaminated at a level less than contaminationProp, given the number of true
     # observed violations and under the assumption of Poisson firing
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
