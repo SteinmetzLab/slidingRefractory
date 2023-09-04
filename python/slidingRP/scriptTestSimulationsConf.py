@@ -21,11 +21,11 @@ params = {
     'RPs': np.array([0.001,0.0015, 0.002,0.0025, 0.003,0.004,0.005,0.006]),# , np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.01),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
-    'nSim': 2000,
+    'nSim': 2,
     'contaminationThresh': 10,
     'binSize': 1 / sampleRate,
     'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
-    'confidenceThresh': 70,
+    'confidenceThresh': 90,
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
@@ -37,7 +37,7 @@ params = {
 
 
 #%% run and save
-confidence_values = [70]#[60,70,80,85]
+confidence_values = [70,80,90]
 for conf in confidence_values:
     params['confidenceThresh'] = conf
     print('in simulations, {0} conf'.format(conf))
