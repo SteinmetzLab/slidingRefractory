@@ -258,12 +258,14 @@ def computeMatrix(spikeTimes, params):
         sampleRate = params['sampleRate']
     else:
         sampleRate = 30000
+
     if params and 'binSizeCorr' in params:
         binSizeCorr = params['binSizeCorr']
     elif params and 'sampleRate' in params:
         binSizeCorr = 1 / sampleRate
     else:
         binSizeCorr = 1 / 30000
+
     if params and 'recordingDuration' in params:
         recDur = params['recordingDuration']
     else:

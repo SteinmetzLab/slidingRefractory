@@ -117,6 +117,29 @@ def simulateContNeurons(params):
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPctHill3[:] = np.nan
 
+
+
+    if params and 'runLlobet' in params:
+        runLlobet = params['runLlobet']
+    else:
+        runLlobet = False #default is false to decrease runtime if not testing simulations for analysis purposes
+
+    #create empty passPct to output either way, if runLlobet False these will not get filled
+    passPctLlobet15 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet15[:] = np.nan
+
+    passPctLlobet2 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet2[:] = np.nan
+
+    passPctLlobet3 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet33[:] = np.nan
+
+
+
+
     # start time to time simulations
     start_time = time.time()
     for j, recDurScalar in enumerate(params['recDurs']):
@@ -150,6 +173,16 @@ def simulateContNeurons(params):
 
                     passVecHill3 = np.empty(params['nSim'])
                     passVecHill3[:] = np.nan
+
+                    if runLlobet:
+                        passVecLlobet15 = np.empty(params['nSim'])
+                        passVecLlobet15[:] = np.nan
+
+                        passVecLlobet2 = np.empty(params['nSim'])
+                        passVecLlobet2[:] = np.nan
+
+                        passVecLlobet3 = np.empty(params['nSim'])
+                        passVecLlobet3[:] = np.nan
 
                     for n in range(params['nSim']):
                         if n % 20 == 0:
@@ -190,33 +223,51 @@ def simulateContNeurons(params):
                             passVecHalfInactive[n] = 0
 
 
-                        # Compare with neurons that increase or decrease their firing
-
-
-
-
-
-                        # Hill comparison with 2ms or 3 ms
+                        # Hill comparison with 1.5ms, 2ms, or 3 ms
                         fpRate15 = HillMetric(firingRate, recDur, nACG, rpVec, refDur=0.0015, minISI=0)
                         fpRate2 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.002, minISI=0)
                         fpRate3 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.003, minISI=0)
 
                         # add these false positive rates to passVec with a threshold of 10% contamination
-                        if fpRate15 <= 0.10:
+                        if fpRate15 <= params['contaminationThresh']/100:
                             passVecHill15[n] = 1
                         else:
                             passVecHill15[n] = 0
 
 
-                        if fpRate2 <= 0.10:
+                        if fpRate2 <= params['contaminationThresh']/100:
                             passVecHill2[n] = 1
                         else:
                             passVecHill2[n] = 0
 
-                        if fpRate3 <= 0.10:
+                        if fpRate3 <= params['contaminationThresh']/100:
                             passVecHill3[n] = 1
                         else:
                             passVecHill3[n] = 0
+
+
+
+                        if runLlobet:
+                            # Llobet comparison with 1.5ms, 2ms, or 3 ms
+                            fpLlobet15 = LlobetMetric(firingRate, recDur, nACG, rpVec, refDur=0.0015, minISI=0)
+                            fpLlobet2 = LlobetMetric(firingRate, recDur, nACG, rpVec, refDur=0.002, minISI=0)
+                            fpLlobet3 = LlobetMetric(firingRate, recDur, nACG, rpVec, refDur=0.003, minISI=0)
+
+                            # add these false positive rates to passVec with a threshold of 10% contamination
+                            if fpLlobet15 <= params['contaminationThresh']/100:
+                                passVecLlobet15[n] = 1
+                            else:
+                                passVecLlobet15[n] = 0
+
+                            if fpLlobet22 <= params['contaminationThresh']/100:
+                                passVecHill2[n] = 1
+                            else:
+                                passVecHill2[n] = 0
+
+                            if fpRate3 <= params['contaminationThresh']/100:
+                                passVecHill3[n] = 1
+                            else:
+                                passVecHill3[n] = 0
 
                     passPct[j, i, bidx, cidx] = sum(passVec) / params['nSim'] * 100
                     passPct2MsNoSpikes[j, i, bidx, cidx] = sum(passVec2MsNoSpikes) / params['nSim'] * 100
@@ -224,6 +275,10 @@ def simulateContNeurons(params):
                     passPctHill15[j, i, bidx, cidx] = sum(passVecHill15) / params['nSim'] * 100
                     passPctHill2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
                     passPctHill3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
+                    if runLlobet:
+                        passPctLlobet15[j, i, bidx, cidx] = sum(passVecHill15) / params['nSim'] * 100
+                        passPctLlobet2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
+                        passPctLlobet3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
 
                     cidx += 1
 
@@ -232,7 +287,7 @@ def simulateContNeurons(params):
     current_time = time.time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))
-    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill15, passPctHill2, passPctHill3
+    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill15, passPctHill2, passPctHill3, passPctLlobet15, passPctLlobet2, passPctLlobet3
 
 
 def simulateChangingContNeurons(params):
@@ -308,19 +363,53 @@ def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
     nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0] : np.where(rpVec > refDur)[0][0] + 1])
 
     # time for violations to occur
-    violationTime = 2 * firingRate * recDur * (refDur - minISI)
+    N_t = firingRate * recDur #total number of spikes
+
+    violationTime = 2 * N_t * (refDur-minISI)
+    # this violationTime was previously written equivalently as  2 * firingRate * recDur * (refDur - minISI)
 
     # rate of violations
-    violationRate2 = nViol / violationTime
+    violationRate = nViol / violationTime
 
+    #original Hill metric fpRate
     # false positive rate (f_1^p in Hill paper)
-    fpRate = violationRate2 / firingRate
+    fpRate = violationRate / firingRate
+    #Note: this is also equivalent to :
+        # (nViol * recDur)  /  ( 2 * N_t^2 * (refDur-minISI))
+
     # For cases where this is greater than 1, set to 1
     if fpRate > 1:
         fpRate = 1
 
     return fpRate
 
+
+def LlobetMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
+    #recompute false positive rate as defined in Llobet et al.
+    #This is essentially the same as our (revised) metric, but only tested at one time point instead of all possible bins.
+
+    # number of violations between minISI and refDur
+    nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0]: np.where(rpVec > refDur)[0][0] + 1])
+
+    # time for violations to occur
+    N_t = firingRate * recDur  # total number of spikes
+
+    violationTime = 2 * N_t * (refDur - minISI)
+    # this violationTime was previously written equivalently as  2 * firingRate * recDur * (refDur - minISI)
+
+    # rate of violations
+    violationRate = nViol / violationTime
+
+    # original Hill metric fpRate
+    # false positive rate (f_1^p in Hill paper)
+    fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t^2 * (refDur - minISI))))
+
+
+    # For cases where this is greater than 1, set to 1
+    if fpRate > 1:
+        fpRate = 1
+
+    return fpRate
 
 def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
                     Fig1=False, Fig2=False, Fig3=True, Fig4=False,
