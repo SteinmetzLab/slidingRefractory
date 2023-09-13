@@ -303,11 +303,12 @@ def simulateChangingContNeurons(params):
 
 
 def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
+
     # number of violations between minISI and refDur
     nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0] : np.where(rpVec > refDur)[0][0] + 1])
 
     # time for violations to occur
-    violationTime = 2 * firingRate * recDur * (refDur - minISI)  # TODO: add other way of computing FR and compare
+    violationTime = 2 * firingRate * recDur * (refDur - minISI)
 
     # rate of violations
     violationRate2 = nViol / violationTime
@@ -1018,7 +1019,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 #     fig.savefig(savefile + '_RP.svg', dpi=500)
 #     fig.savefig(savefile + '_RP.png', dpi=500)
 
-def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
+def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,legendLabels = None):
     # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
     spinesSetting = False
     fig, axs = plt.subplots(1, 1, figsize=(6, 8))
@@ -1049,7 +1050,6 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
 
         # plot just fr = 5:
         frs = np.array(params['baseRates'])
-        frPlot = 10
         frInd = np.where(frs == frPlot)[0][0]
         print('Firing rate is', str(frPlot))
 
@@ -1103,17 +1103,23 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
     handles, xx = ax.get_legend_handles_labels()
 
-    labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-    # labels = ['50%', '75%','90%']#,'99%']
-    # labels = ['10%', '10%','10%','10%']
-    labels = pcDict_keys
+    if legendLabels is None:
+        labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
+        # labels = ['50%', '75%','90%']#,'99%']
+        # labels = ['10%', '10%','10%','10%']
+        labels = pcDict_keys
 
-    #tsting just one
-    # labels=labels[0]
-    # handles=handles[0]
-    # title = 'Confidence threshold'
-    # title = 'Refractory Period (ms)'
-    title = 'Contamination Metric'
+        # tsting just one
+        # labels=labels[0]
+        # handles=handles[0]
+        # title = 'Confidence threshold'
+        # title = 'Refractory Period (ms)'
+        title = 'Contamination Metric'
+    else:
+        labels = legendLabels[0:-1]
+        title = legendLabels[-1]
+
+
 
     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
@@ -1121,7 +1127,7 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
     fig.tight_layout()
     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title=title )
     fig.legend(handles,labels, bbox_to_anchor = (1.05, 1.0), loc = 'upper left',title=title)
-    fig.suptitle('RP = {}'.format(rpPlot))
+    fig.suptitle('RP = {}    FR = {}'.format(rpPlot,frPlot))
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
 
