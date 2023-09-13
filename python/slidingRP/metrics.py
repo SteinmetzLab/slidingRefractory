@@ -322,11 +322,13 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
     # the number of violations (spikes) we expect to see under this contamination rate
     #expectedViol = contaminationRate * refDur * 2 * spikeCount
     #as computed *not* in the same way as originally taken from Hill (see above commented out)
-    N_b = firingRate * recDur
-    N_c = contaminationRate * recDur
-    expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2)
+    N_t = firingRate * recDur #total number of spikes
+    N_c = contaminationRate * recDur  #total number of contaminating spikes you would expect under the inputted CR
+    N_b = N_t - N_c # the "base" number of spikes under the inputted CR
 
-    # the confidence th-at this neuron is contaminated at a level less than contaminationProp, given the number of true
+    expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2) #number of expected violations, as defined in Llobet et al.
+
+    # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
     # observed violations and under the assumption of Poisson firing
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 
