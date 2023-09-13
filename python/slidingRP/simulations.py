@@ -135,7 +135,7 @@ def simulateContNeurons(params):
 
     passPctLlobet3 = np.empty(
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
-    passPctLlobet33[:] = np.nan
+    passPctLlobet3[:] = np.nan
 
 
 
@@ -259,7 +259,7 @@ def simulateContNeurons(params):
                             else:
                                 passVecLlobet15[n] = 0
 
-                            if fpLlobet22 <= params['contaminationThresh']/100:
+                            if fpLlobet2 <= params['contaminationThresh']/100:
                                 passVecHill2[n] = 1
                             else:
                                 passVecHill2[n] = 0
@@ -402,7 +402,7 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
 
     # original Hill metric fpRate
     # false positive rate (f_1^p in Hill paper)
-    fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t^2 * (refDur - minISI))))
+    fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t**2 * (refDur - minISI))))
 
 
     # For cases where this is greater than 1, set to 1
@@ -1108,7 +1108,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 #     fig.savefig(savefile + '_RP.svg', dpi=500)
 #     fig.savefig(savefile + '_RP.png', dpi=500)
 
-def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,legendLabels = None):
+def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurPlot = 2,legendLabels = None):
     # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
     spinesSetting = False
     fig, axs = plt.subplots(1, 1, figsize=(6, 8))
@@ -1117,6 +1117,11 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,legendLabels =
     ax.hlines([0,20,40,60,80,100],0,20,'k','solid',alpha = 0.2)
 
     pcDict_keys = list(pcDict.keys())
+    varTypes = [type(pc_key) for pc_key in pcDict_keys]
+    numStrings = len([v for v in varTypes if v is str])
+
+
+
     z = [type(i) for i in pcDict_keys]
     nConfs = len([i for i in z if i == int])
     for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
@@ -1135,7 +1140,7 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,legendLabels =
         rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
         #plot just  recDur = 2:
         recDurs = params['recDurs']
-        rdInd = np.where(recDurs == 2)[0]
+        rdInd = np.where(recDurs == recDurPlot)[0]
 
         # plot just fr = 5:
         frs = np.array(params['baseRates'])
@@ -1149,7 +1154,7 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,legendLabels =
         #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
         # else:
         if type(pc_key) is str: # Hill
-            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 3))
+            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, numStrings))
             print(p)
             color = colors[p-(len(z)-3)]
         else: #not hill (conf)
