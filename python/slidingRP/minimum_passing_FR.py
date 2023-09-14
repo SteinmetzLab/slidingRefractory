@@ -20,30 +20,38 @@ for f, firingRate in enumerate(firingRates):
     for r, recDur in enumerate(recDurs):
         spikeCount = firingRate * recDur
 
-        conf = computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp)
+        conf = computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp,recDur)
 
         confMat[f,r] = conf
 
-
-print(confMat)
-confMat>.9
-minFR = []
-for i in range(len(recDurs)):
-    res = next(x for x, val in enumerate(confMat[:,i]) if val > confThresh)
-    print(firingRates[res])
-    minFR.append(firingRates[res])
-
+confVec = np.arange(0.5,0.99,0.05)#np.linspace(0.5,.99, retstep=.5)[0]
 fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+colors = matplotlib.cm.Blues(np.linspace(0.3, 1, len(confVec)))
+for c, confThresh in enumerate(confVec):
+    minFR = []
+    for i in range(len(recDurs)):
+        res = next(x for x, val in enumerate(confMat[:,i]) if val > confThresh)
+        minFR.append(firingRates[res])
+    ax.plot(recDursHours,minFR,color = colors[c],linestyle = '-',marker = 'o', label = str(int(round(confThresh,1)*100)))
 
 ax.set_xlabel('Recording Duration (hours)')
 ax.set_ylabel('Lowest passing firing rate (spk/s)')
-ax.plot(recDursHours,minFR,'k.-')
-ax.set_title('Minimum passing FR (uncontaminated)')
+
+# ax.set_title('Minimum passing FR (uncontaminated)')
 
 spinesSetting = False
 ax.spines.right.set_visible(spinesSetting)
 ax.spines.top.set_visible(spinesSetting)
+handles, labels = ax.get_legend_handles_labels()
+fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title = 'Confidence (%)')
+
 fig.show()
+# fig.tight_layout()
+# fig.legend(handles, labels, bbox_to_anchor=(1.05, 1.0), loc='upper left', title=title)
+# fig.suptitle('RP = {}    FR = {}'.format(rpPlot, frPlot))
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\Fig5_confidence\minimumPassingFR'
+fig.savefig(savefile + '.svg', dpi=500)
+fig.savefig(savefile + '.png', dpi=500)
 
 
 
