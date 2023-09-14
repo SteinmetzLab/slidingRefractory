@@ -6,6 +6,7 @@ from slidingRP.simulations import *
 from slidingRP.metrics import computeViol
 
 contaminationProp = 0.1
+confThresh = 0.9
 obsViol = 0 #looking at uncontaminated neurons only
 
 refDur = 0.002
@@ -19,38 +20,31 @@ for f, firingRate in enumerate(firingRates):
     for r, recDur in enumerate(recDurs):
         spikeCount = firingRate * recDur
 
-        conf = computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp,recDur)
+        conf = computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp)
 
         confMat[f,r] = conf
 
 
-confThreshVec = np.linspace(0.5,0.99,10)
+print(confMat)
+confMat>.9
+minFR = []
+for i in range(len(recDurs)):
+    res = next(x for x, val in enumerate(confMat[:,i]) if val > confThresh)
+    print(firingRates[res])
+    minFR.append(firingRates[res])
+
 fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-for confThresh in confThreshVec:
-    minFR = []
-    for i in range(len(recDurs)):
-        res = next(x for x, val in enumerate(confMat[:,i]) if val > confThresh)
-        print(firingRates[res])
-        minFR.append(firingRates[res])
-        ax.plot(recDursHours,minFR,'k.-')
-
-
 
 ax.set_xlabel('Recording Duration (hours)')
 ax.set_ylabel('Lowest passing firing rate (spk/s)')
-
+ax.plot(recDursHours,minFR,'k.-')
 ax.set_title('Minimum passing FR (uncontaminated)')
 
 spinesSetting = False
 ax.spines.right.set_visible(spinesSetting)
 ax.spines.top.set_visible(spinesSetting)
 fig.show()
-# fig.tight_layout()
-# fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title=title)
-# fig.legend(handles, labels, bbox_to_anchor=(1.05, 1.0), loc='upper left', title=title)
-# fig.suptitle('RP = {}    FR = {}'.format(rpPlot, frPlot))
-# fig.savefig(savefile + '_RP.svg', dpi=500)
-# fig.savefig(savefile + '_RP.png', dpi=500)
+
 
 
 #%%
