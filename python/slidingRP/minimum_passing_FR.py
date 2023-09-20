@@ -25,6 +25,7 @@ for f, firingRate in enumerate(firingRates):
         confMat[f,r] = conf
 
 confVec = np.arange(0.5,0.99,0.05)#np.linspace(0.5,.99, retstep=.5)[0]
+confVec = np.append(confVec,0.99)
 fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 colors = matplotlib.cm.Blues(np.linspace(0.3, 1, len(confVec)))
 for c, confThresh in enumerate(confVec):
@@ -32,7 +33,7 @@ for c, confThresh in enumerate(confVec):
     for i in range(len(recDurs)):
         res = next(x for x, val in enumerate(confMat[:,i]) if val > confThresh)
         minFR.append(firingRates[res])
-    ax.plot(recDursHours,minFR,color = colors[c],linestyle = '-',marker = 'o', label = str(int(round(confThresh,1)*100)))
+    ax.plot(recDursHours,minFR,color = colors[c],linestyle = '-',marker = 'o', label = str(int(round(confThresh*100,2))))
 
 ax.set_xlabel('Recording Duration (hours)')
 ax.set_ylabel('Lowest passing firing rate (spk/s)')
