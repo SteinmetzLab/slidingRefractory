@@ -32,10 +32,9 @@ params = {
 }
 
 
-
-#%% run and save
 drift_values = [-0.5,0, 0.5]
 drift_strings = ['Dec','Same','Inc']
+#%%run and save
 for drift,string in zip(drift_values,drift_strings):
     if drift ==0:
         params['baseRates']=[0.75, 1, 1.25, 1.5, 2, 2.5, 3.75, 5, 6.25, 7.5,10, 12.5]
