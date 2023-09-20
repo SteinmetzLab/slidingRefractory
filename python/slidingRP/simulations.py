@@ -260,14 +260,14 @@ def simulateContNeurons(params):
                                 passVecLlobet15[n] = 0
 
                             if fpLlobet2 <= params['contaminationThresh']/100:
-                                passVecHill2[n] = 1
+                                passVecLlobet2[n] = 1
                             else:
-                                passVecHill2[n] = 0
+                                passVecLlobet2[n] = 0
 
                             if fpRate3 <= params['contaminationThresh']/100:
-                                passVecHill3[n] = 1
+                                passVecLlobet3[n] = 1
                             else:
-                                passVecHill3[n] = 0
+                                passVecLlobet3[n] = 0
 
                     passPct[j, i, bidx, cidx] = sum(passVec) / params['nSim'] * 100
                     passPct2MsNoSpikes[j, i, bidx, cidx] = sum(passVec2MsNoSpikes) / params['nSim'] * 100
@@ -276,9 +276,9 @@ def simulateContNeurons(params):
                     passPctHill2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
                     passPctHill3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
                     if runLlobet:
-                        passPctLlobet15[j, i, bidx, cidx] = sum(passVecHill15) / params['nSim'] * 100
-                        passPctLlobet2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
-                        passPctLlobet3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
+                        passPctLlobet15[j, i, bidx, cidx] = sum(passVecLlobet15) / params['nSim'] * 100
+                        passPctLlobet2[j, i, bidx, cidx] = sum(passVecLlobet2) / params['nSim'] * 100
+                        passPctLlobet3[j, i, bidx, cidx] = sum(passVecLlobet3) / params['nSim'] * 100
 
                     cidx += 1
 
@@ -365,15 +365,10 @@ def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
     # time for violations to occur
     N_t = firingRate * recDur #total number of spikes
 
-    violationTime = 2 * N_t * (refDur-minISI)
-    # this violationTime was previously written equivalently as  2 * firingRate * recDur * (refDur - minISI)
-
-    # rate of violations
-    violationRate = nViol / violationTime
-
     #original Hill metric fpRate
     # false positive rate (f_1^p in Hill paper)
-    fpRate = violationRate / firingRate
+    #this is the case of one contaminating neuron, see Llobet et al.
+    fpRate = 1/2 *  (1- np.sqrt(1- ( (2*nViol*recDur) / (N_t**2 * (refDur - minISI)) ) ) )
     #Note: this is also equivalent to :
         # (nViol * recDur)  /  ( 2 * N_t^2 * (refDur-minISI))
 
@@ -1153,10 +1148,14 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurPlot = 2
         # if p==0:
         #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
         # else:
-        if type(pc_key) is str: # Hill
-            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, numStrings))
+        if type(pc_key) is str and pc_key[0]=='H': # Hill
+            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 3))
             print(p)
             color = colors[p-(len(z)-3)]
+        elif type(pc_key) is str and pc_key[0] == 'L':  # Llobet
+            colors = matplotlib.cm.Greens(np.linspace(0.3, 1, 3))
+            print(p)
+            color = colors[p - (len(z) - 3)]
         else: #not hill (conf)
             colors = matplotlib.cm.Blues(np.linspace(0.3, 1, nConfs))
             color = colors[p]
