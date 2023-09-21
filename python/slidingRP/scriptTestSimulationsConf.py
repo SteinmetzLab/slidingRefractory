@@ -31,8 +31,8 @@ params = {
     'returnMatrix': True,
     'verbose': True,
     'savePCfile': True,
-    'runLlobet': True
-
+    'runLlobet': True,
+    'runLlobetPoiss': True
 }
 
 
@@ -42,12 +42,14 @@ confidence_values = [70,80,90]
 for conf in confidence_values:
     params['confidenceThresh'] = conf
     print('in simulations, {0} conf'.format(conf))
-    [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3] = simulateContNeurons(params)
+    [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+     pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3] = simulateContNeurons(params)
 
     savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(
         params['nSim']) + 'iter' + date_now + str(conf) + '.pickle'
 
-    results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3, params]
+    results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+               pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3, params]
     if params['savePCfile']:
         with open(savefile, 'wb') as handle:
             pickle.dump(results, handle)
@@ -75,8 +77,9 @@ for rp in np.arange(1,7):
 
 #%%plot just one
 pcDict = {}
-date_now = '_09_14'
-nIter = 500
+# date_now = '_09_14'
+# nIter = 500
+nIter = params['nSim']
 
 frPlot = 2
 rpPlot = 2
@@ -120,9 +123,15 @@ pcDict['Llobet 1.5ms'] = results[6]
 pcDict['Llobet 2ms'] = results[7]
 pcDict['Llobet 3ms'] = results[8]
 
+pcDict['Llobet Poiss 1.5ms'] = results[6]
+pcDict['Llobet Pioss 2ms'] = results[7]
+pcDict['Llobet Poiss 3ms'] = results[8]
+
 figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlayConf7080_newcalcCompare' + date_now
 
-plotHillOverlay(pcDict, params, figsavefile, rpPlot=rpPlot, frPlot = frPlot, legendLabels=['70','80','90','Hill3', 'Hill 2', 'Hill 1.5', 'Llobet 3','Llobet 2','Llobet 1.5','Confidence'])
+plotHillOverlay(pcDict, params, figsavefile, rpPlot=rpPlot, frPlot = frPlot, legendLabels=['70','80','90','Hill3', 'Hill 2', 'Hill 1.5',
+                                                                                           'Llobet 3','Llobet 2','Llobet 1.5',
+                                                                                           'LlobetP 3','LlobetP 2','LlobetP 1.5','Confidence'])
 
 
 #%% plot
