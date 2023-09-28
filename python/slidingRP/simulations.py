@@ -55,7 +55,9 @@ def genST(rate, duration, rp, params=None):
     else:
         st = []
 
-    if params['checkFR']:
+    if params is None:
+        print('No firing rate plot')
+    elif params['checkFR']:
         print('plotting FR...')
         fig, ax = plt.subplots(1, 1)
         histWin = 0.5  # seconds
