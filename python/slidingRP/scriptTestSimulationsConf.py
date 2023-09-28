@@ -7,7 +7,7 @@ import numpy as np
 from phylib.stats import correlograms
 
 from scipy import stats
-from slidingRP.simulations import *
+
 import datetime
 from statsmodels.stats.proportion import proportion_confint as binofit
 
