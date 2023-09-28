@@ -339,7 +339,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
     return confidenceScore
 
 
-def plotSlidingRP(spikeTimes, params = None):
+def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     '''
     
 
@@ -348,9 +348,10 @@ def plotSlidingRP(spikeTimes, params = None):
     spikeTimes : numpy.ndarray
         array of spike times (ms)
     params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize? 
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)
         params.sampleRate : sample rate of the recording (Hz)
 
+    plotXs: an optional parameter for plotting (for the paper)
     Returns
     -------
     None.
@@ -360,12 +361,18 @@ def plotSlidingRP(spikeTimes, params = None):
         clusterlabel = False
     else:
         clusterlabel = params['clusterLabel']
+    if plotXs is None:
+        XsToPlot = []
+        XColors = []
+    else:
+        XsToPlot = plotXs[0]
+        XColors = plotXs[1]
 
     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
         nSpikesBelow2, confMatrix, cont, rp, nACG, 
         firingRate,xx]  = slidingRP(spikeTimes, params)
     
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (12,4))
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (10,4))
     
     ax = axs[0]
 
@@ -375,6 +382,8 @@ def plotSlidingRP(spikeTimes, params = None):
     ax.set_ylabel('ACG count (spks)')
     if clusterlabel:
         t1 = ('Cluster #%d: FR=%.2f' %(params['cidx'][0], firingRate))
+    else:
+        t1 = ('Cluster FR = %.2f' %firingRate)
     ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -391,6 +400,9 @@ def plotSlidingRP(spikeTimes, params = None):
     cbar.set_label('Confidence (%)')
     ax.invert_yaxis()
     ax.plot([rp[0]*1000, rp[-1]*1000], [10, 10], 'r', linewidth = 1)
+    # ax.plot(XsToPlot[0],10, color = XColors[0],marker = 'x',linewidth=3)
+    # ax.plot(XsToPlot[1],10, color = XColors[1],marker = 'x',linewidth=3)
+    # ax.plot(XsToPlot[2],10, color = XColors[2],marker = 'x',linewidth=3)
     
     if ~np.isnan(timeOfLowestCont):
         ax.plot(timeOfLowestCont*1000*np.array([1, 1]), [cont[0], cont[-1]],'r', linewidth = 1)
@@ -433,6 +445,18 @@ def plotSlidingRP(spikeTimes, params = None):
     
     ax = axs[2]
     ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'k', linewidth = 2.0)
+
+    #add in the xs for figure2
+    yVals = np.empty(len(XsToPlot))
+    for x,xVal in enumerate(XsToPlot):
+        rpInd = np.argmin(abs(rp-xVal/1000))
+        if rpInd == len(rp)-1 : #edge case: last rp tested
+            rpInd = rpInd-1
+        ax.plot(xVal,confMatrix[cont==10,rpInd],color = XColors[x],marker='x',linewidth=3)
+
+
+
+
     ax.set_xlabel('Time from spike (ms)')
     ax.set_ylabel('Confidence of ≤10% contamination (%)')
     ax.spines['right'].set_visible(False)
@@ -444,9 +468,10 @@ def plotSlidingRP(spikeTimes, params = None):
     ax.set_ylim([0, 100]); 
     
     fig.tight_layout()
+    fig.show()
     
     if params['savefig']:
-        plt.savefig(params['figpath'], dpi=300)
+        fig.savefig(params['figpath'], dpi=300)
 
 def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
 
@@ -522,6 +547,8 @@ def fitSigmoidACG(st, timeBins, fr, amp, minFR = 1, minAmp = 50, params = None):
         sampleRate = 30000
     if params and 'binSizeCorr' in params:
         binSizeCorr = params['binSizeCorr']
+    elif params and 'sampleRate' in params:
+        binSizeCorr = 1/params['sampleRate']
     else:
         binSizeCorr = 1/30000
     
