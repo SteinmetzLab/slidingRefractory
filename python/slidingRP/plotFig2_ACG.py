@@ -14,7 +14,7 @@ rp = 2.5 /1000 #seconds, i.e. a 2.5 ms refractory period
 st = genST(firingRate, recDur, rp, params=None)
 
 #now add contamination
-contaminationProp = .05 #fractional contamination, i.e. 10% contamination
+contaminationProp = .1 #fractional contamination, i.e. 10% contamination
 contRate = firingRate * contaminationProp #rate of the contaminating source
 contST = genST(contRate, recDur, 0, params=None)  # add contaminating source, has 0 rp because may come from multiple neurons
 combST = np.sort(np.concatenate((st, contST)))  # put spike times from both spike trains together (and sort chronologically)
@@ -30,14 +30,15 @@ params = { 'contaminationThresh': 10,
            }
 plotSlidingRP(combST,params)
 
-fig,axs = plt.subplots(1,1)
-
-tauR = 1.5 #ms
-
-plotFig2(combST,tauR,params)
+# fig,axs = plt.subplots(1,1)
+#
+# tauR = 1.5 #ms
+#
+# plotFig2(combST,tauR,params)
 #%%
-def plotFig2(spikeTimes, tauR,params):
+def plotFig2(spikeTimes, tauR,axs,params,columnValue=0,color = 'b',color2 = 'darkblue',verbose=False):
     refDur = tauR / 1000
+    xparam = 100
     n_spikes = len(spikeTimes)
     clustersIds = [0]
 
@@ -82,25 +83,57 @@ def plotFig2(spikeTimes, tauR,params):
 
 
 
-    fig, axs = plt.subplots(2,1)
 
-    ax = axs[0]
+
+    ax = axs[0,columnValue]
+    print(columnValue*2)
+    print(ax)
 
     ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0))
     ax.set_xlim([0, 5])
     ax.set_xlabel('Time from spike (ms)')
     ax.set_ylabel('ACG count (spks)')
     ylim = ax.get_ylim()
-    ax.axvline(x=rp[rpInd]*1000,ymin=0,ymax=1,color='b')
+    ax.axvline(x=rp[rpInd]*1000,ymin=0,ymax=1,color=color2)
     t1 = ('Cluster FR = %.2f' %firingRate)
-    ax.set_title('Observed Violations for tauR = {0}: {1}'.format(tauR,obsViol) +
-                 '\n Expected Violations for this neuron: {0:.{1}f} '.format(expectedViol,2))
+    if verbose:
+        ax.set_title('Observed Violations for tauR = {0}: {1}'.format(tauR,obsViol) +
+                 '\n Expected Violations for this neuron if it had 10% contamination: {0:.{1}f} '.format(expectedViol,2))
+    else:
+        ax.text(0.25,32,'{}'.format(obsViol),color = color)
+        ax.text(tauR,35,str(tauR),color=color2)
+        ax.text(3.5, 30, ' {0:.{1}f} '.format(expectedViol,2), wrap=True, horizontalalignment='center', fontsize=12,color=color2)
 
-
-    ax.fill(np.array([0, 1, 1, 0])*tauR, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'b',alpha= 0.2)
+    ax.fill(np.array([0, 1, 1, 0])*tauR, np.array([0, 0, 1, 1])*ax.get_ylim()[1], color=color,alpha= 0.2)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    fig.show()
+
+
+    ax = axs[1,columnValue]
+    xvalues = np.arange(0,3*obsViol)
+    #version 1
+        # ax.plot( xvalues, 1 - stats.poisson.cdf(xvalues, expectedViol),color = color2)
+        # ax.axvline(x=obsViol,ymin=0,ymax=1,color=color,alpha=0.5)
+    computedConf = 1 - stats.poisson.cdf(obsViol, expectedViol)
+        # ax.plot(obsViol,computedConf,color=color,alpha = 0.5,marker='x')
+        # ax.set_xlim(50,200)
+    #version 2
+    ax.plot(xvalues,stats.poisson.pmf(xvalues,expectedViol),color=color2)
+    # ax.axvline(x=obsViol,ymin=0,ymax=stats.poisson.pmf(obsViol,expectedViol),color=color,alpha=0.5)
+    ax.fill_between(xvalues[0:obsViol],np.zeros(len(xvalues[0:obsViol])),stats.poisson.pmf(xvalues[0:obsViol],expectedViol),color=color,alpha=0.2)
+    ax.set_xlim(50,250)
+    ax.set_ylim(0,.05)
+    if verbose:
+        ax.set_title('Probability of observing x spikes before tauR ms: {0:.{1}}'.format(computedConf,2))
+    else:
+        ax.set_title('{0:.{1}}'.format(computedConf,2))
+    ax.set_xlabel('Number of spikes')
+    ax.set_ylabel('Probability')
+    plt.tight_layout()
+
+
+
+
 
 
 
@@ -116,4 +149,20 @@ def plotFig2(spikeTimes, tauR,params):
 # observed violations and under the assumption of Poisson firing
 # confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 
-nACG = plotFig2(combST,1.5,params)
+
+nColumns = 3
+fig, axs = plt.subplots(2,nColumns)
+nACG = plotFig2(combST,1,axs,params,columnValue=0,color = 'steelblue',color2='navy')
+nACG = plotFig2(combST,1.5,axs,params,columnValue=1,color='forestgreen',color2 = 'darkgreen')
+nACG = plotFig2(combST,2.2,axs,params,columnValue=2,color='orchid',color2='darkorchid')
+fig.show()
+fig.savefig(r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\Fig2_metricandexamples\exampleNsShift\shifts.svg', dpi=300)
+
+# XsToPlot = [1,1.5,2.2]
+# Xcolors = ['steelblue','forestgreen','orchid']
+# plotXs = [XsToPlot,Xcolors]
+# params['savefig']=True
+# params['figpath'] = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\Fig2_metricandexamples\exampleNsShift\confSlice.svg'
+# plotSlidingRP(combST,params,plotXs = plotXs)
+
+
