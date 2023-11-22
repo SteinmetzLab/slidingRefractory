@@ -6,6 +6,11 @@ if nargin>1 && isfield(params, 'cont')
 else
     cont = 0.5:0.5:35; % contamination levels at which to assess confidence
 end
+if nargin>1 && isfield(params, 'recDur')
+    recDur = params.recDur;
+else
+    recDur = max(spikeTimes); 
+end
 % rpEdges = (0:10*30)/30000; % 10 ms at 30kHz
 rpBinSize = 1/30000;
 rpEdges = 0:rpBinSize:10/1000;
@@ -26,6 +31,6 @@ for rpIdx = 1:numel(rp)
     for cidx = 1:numel(cont)
         
         confMatrix(cidx, rpIdx) = 100*computeViol(...
-            obsViol, firingRate, spikeCount, rp(rpIdx)+rpBinSize/2, cont(cidx)/100);
+            obsViol, firingRate, spikeCount, rp(rpIdx)+rpBinSize/2, cont(cidx)/100, recDur);
     end
 end
