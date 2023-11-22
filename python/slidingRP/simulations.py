@@ -11,6 +11,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import datetime
 from slidingRP.metrics import slidingRP
+from scipy import stats
 import time
 import colorcet as cc
 from statsmodels.stats.proportion import proportion_confint as binofit
@@ -54,7 +55,9 @@ def genST(rate, duration, rp, params=None):
     else:
         st = []
 
-    if params['checkFR']:
+    if params is None:
+        print('No firing rate plot')
+    elif params['checkFR']:
         print('plotting FR...')
         fig, ax = plt.subplots(1, 1)
         histWin = 0.5  # seconds
@@ -117,11 +120,53 @@ def simulateContNeurons(params):
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPctHill3[:] = np.nan
 
+
+
+    if params and 'runLlobet' in params:
+        runLlobet = params['runLlobet']
+    else:
+        runLlobet = False #default is false to decrease runtime if not testing simulations for analysis purposes
+
+    if params and 'runLlobetPoiss' in params:
+        runLlobetPoiss = params['runLlobetPoiss']
+    else:
+        runLlobetPoiss = False #default is false to decrease runtime if not testing simulations for analysis purposes
+
+    #create empty passPct to output either way, if runLlobet False these will not get filled
+    passPctLlobet15 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet15[:] = np.nan
+
+    passPctLlobet2 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet2[:] = np.nan
+
+    passPctLlobet3 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobet3[:] = np.nan
+
+    #create empty passPct to output either way, if runLlobetPoiss False these will not get filled
+    passPctLlobetPoiss15 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobetPoiss15[:] = np.nan
+
+    passPctLlobetPoiss2 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobetPoiss2[:] = np.nan
+
+    passPctLlobetPoiss3 = np.empty(
+        [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
+    passPctLlobetPoiss3[:] = np.nan
+
+
+
+
     # start time to time simulations
     start_time = time.time()
     for j, recDurScalar in enumerate(params['recDurs']):
         recDur = recDurScalar * 3600
         print('recording Duration %d' % recDur)
+        params['recordingDuration'] = recDur
         for i, rp in enumerate(params['RPs']):
             print('refractory period duration %.3f' % rp)
 
@@ -150,13 +195,32 @@ def simulateContNeurons(params):
                     passVecHill3 = np.empty(params['nSim'])
                     passVecHill3[:] = np.nan
 
+                    if runLlobet:
+                        passVecLlobet15 = np.empty(params['nSim'])
+                        passVecLlobet15[:] = np.nan
+
+                        passVecLlobet2 = np.empty(params['nSim'])
+                        passVecLlobet2[:] = np.nan
+
+                        passVecLlobet3 = np.empty(params['nSim'])
+                        passVecLlobet3[:] = np.nan
+
+                    if runLlobetPoiss:
+                        passVecLlobetPoiss15 = np.empty(params['nSim'])
+                        passVecLlobetPoiss15[:] = np.nan
+
+                        passVecLlobetPoiss2 = np.empty(params['nSim'])
+                        passVecLlobetPoiss2[:] = np.nan
+
+                        passVecLlobetPoiss3 = np.empty(params['nSim'])
+                        passVecLlobetPoiss3[:] = np.nan
+
                     for n in range(params['nSim']):
                         if n % 20 == 0:
                             print('-', end="")
                         if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
                             print(' ')
                         st = genST(baseRate, recDur, rp, params)  # generate a spike train with the current base rate
-                        print("In new version of simulations")
                         if c > 0:
                             contST = genST(contRate, recDur, 0, params) #add contaminating neuron
                         else:
@@ -190,40 +254,86 @@ def simulateContNeurons(params):
                             passVecHalfInactive[n] = 0
 
 
-                        # Compare with neurons that increase or decrease their firing
-
-
-
-
-
-                        # Hill comparison with 2ms or 3 ms
+                        # Hill comparison with 1.5ms, 2ms, or 3 ms
                         fpRate15 = HillMetric(firingRate, recDur, nACG, rpVec, refDur=0.0015, minISI=0)
                         fpRate2 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.002, minISI=0)
                         fpRate3 = HillMetric(firingRate, recDur, nACG, rpVec, refDur = 0.003, minISI=0)
 
                         # add these false positive rates to passVec with a threshold of 10% contamination
-                        if fpRate15 <= 0.10:
+                        if fpRate15 <= params['contaminationThresh']/100:
                             passVecHill15[n] = 1
                         else:
                             passVecHill15[n] = 0
 
 
-                        if fpRate2 <= 0.10:
+                        if fpRate2 <= params['contaminationThresh']/100:
                             passVecHill2[n] = 1
                         else:
                             passVecHill2[n] = 0
 
-                        if fpRate3 <= 0.10:
+                        if fpRate3 <= params['contaminationThresh']/100:
                             passVecHill3[n] = 1
                         else:
                             passVecHill3[n] = 0
 
+
+
+                        if runLlobet:
+                            testedCont = params['contaminationThresh']/100
+                            # Llobet comparison with 1.5ms, 2ms, or 3 ms
+                            fpLlobet15, confLlobet15 = LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur=0.0015, minISI=0)
+                            fpLlobet2, confLlobet2 = LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur=0.002, minISI=0)
+                            fpLlobet3, confLlobet3 = LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont,  refDur=0.003, minISI=0)
+
+                            # add these false positive rates to passVec with a threshold of 10% contamination
+                            if fpLlobet15 <= params['contaminationThresh']/100:
+                                passVecLlobet15[n] = 1
+                            else:
+                                passVecLlobet15[n] = 0
+
+                            if fpLlobet2 <= params['contaminationThresh']/100:
+                                passVecLlobet2[n] = 1
+                            else:
+                                passVecLlobet2[n] = 0
+
+                            if fpLlobet3 <= params['contaminationThresh']/100:
+                                passVecLlobet3[n] = 1
+                            else:
+                                passVecLlobet3[n] = 0
+                        # add these false positive rates to passVec with a threshold of 10% contamination
+                        if confLlobet15 <= params['contaminationThresh'] / 100:
+                            passVecLlobetPoiss15[n] = 1
+                        else:
+                            passVecLlobetPoiss15[n] = 0
+
+                        if confLlobet2 <= params['contaminationThresh'] / 100:
+                            passVecLlobetPoiss2[n] = 1
+                        else:
+                            passVecLlobetPoiss2[n] = 0
+
+                        if confLlobet3 <= params['contaminationThresh'] / 100:
+                            passVecLlobetPoiss3[n] = 1
+                        else:
+                            passVecLlobetPoiss3[n] = 0
+
                     passPct[j, i, bidx, cidx] = sum(passVec) / params['nSim'] * 100
+
                     passPct2MsNoSpikes[j, i, bidx, cidx] = sum(passVec2MsNoSpikes) / params['nSim'] * 100
+
                     passPctHalfInactive[j, i, bidx, cidx] = sum(passVecHalfInactive) / params['nSim'] * 100
+
                     passPctHill15[j, i, bidx, cidx] = sum(passVecHill15) / params['nSim'] * 100
                     passPctHill2[j, i, bidx, cidx] = sum(passVecHill2) / params['nSim'] * 100
                     passPctHill3[j, i, bidx, cidx] = sum(passVecHill3) / params['nSim'] * 100
+
+                    if runLlobet:
+                        passPctLlobet15[j, i, bidx, cidx] = sum(passVecLlobet15) / params['nSim'] * 100
+                        passPctLlobet2[j, i, bidx, cidx] = sum(passVecLlobet2) / params['nSim'] * 100
+                        passPctLlobet3[j, i, bidx, cidx] = sum(passVecLlobet3) / params['nSim'] * 100
+                    if runLlobetPoiss:
+                        passPctLlobetPoiss15[j, i, bidx, cidx] = sum(passVecLlobetPoiss15) / params['nSim'] * 100
+                        passPctLlobetPoiss2[j, i, bidx, cidx] = sum(passVecLlobetPoiss2) / params['nSim'] * 100
+                        passPctLlobetPoiss3[j, i, bidx, cidx] = sum(passVecLlobetPoiss3) / params['nSim'] * 100
 
                     cidx += 1
 
@@ -232,7 +342,7 @@ def simulateContNeurons(params):
     current_time = time.time()
     elapsed_time = current_time - start_time
     print('Loop with %f iterations takes %f seconds' % (params['nSim'], elapsed_time))
-    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill15, passPctHill2, passPctHill3
+    return passPct, passPct2MsNoSpikes, passPctHalfInactive, passPctHill15, passPctHill2, passPctHill3, passPctLlobet15, passPctLlobet2, passPctLlobet3, passPctLlobetPoiss15, passPctLlobetPoiss2, passPctLlobetPoiss3
 
 
 def simulateChangingContNeurons(params):
@@ -303,23 +413,60 @@ def simulateChangingContNeurons(params):
 
 
 def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
+
     # number of violations between minISI and refDur
     nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0] : np.where(rpVec > refDur)[0][0] + 1])
 
     # time for violations to occur
-    violationTime = 2 * firingRate * recDur * (refDur - minISI)  # TODO: add other way of computing FR and compare
+    N_t = firingRate * recDur #total number of spikes
 
-    # rate of violations
-    violationRate2 = nViol / violationTime
-
+    #original Hill metric fpRate
     # false positive rate (f_1^p in Hill paper)
-    fpRate = violationRate2 / firingRate
+    #this is the case of one contaminating neuron, see Llobet et al.
+    fpRate = 1/2 *  (1- np.sqrt(1- ( (2*nViol*recDur) / (N_t**2 * (refDur - minISI)) ) ) )
+
     # For cases where this is greater than 1, set to 1
     if fpRate > 1:
         fpRate = 1
 
     return fpRate
 
+
+def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
+    #recompute false positive rate as defined in Llobet et al.
+    #This is essentially the same as our (revised) metric, but only tested at one time point instead of all possible bins.
+
+    # number of violations between minISI and refDur
+    nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0]: np.where(rpVec > refDur)[0][0] + 1])
+
+    # time for violations to occur
+    N_t = firingRate * recDur  # total number of spikes
+    N_c = testedCont * recDur  #total number of contaminating spikes you would expect under the tested contamination value
+    N_b = N_t - N_c # the "base" number of spikes under the inputted (tested) contamination value
+
+
+    violationTime = 2 * N_t * (refDur - minISI)
+    # this violationTime was previously written equivalently as  2 * firingRate * recDur * (refDur - minISI)
+
+    # rate of violations
+    violationRate = nViol / violationTime
+
+    # original Hill metric fpRate
+    # false positive rate (f_1^p in Hill paper)
+    fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t**2 * (refDur - minISI))))
+
+    # expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2) #number of expected violations, as defined in Llobet et al.
+    expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + N_c/2) #number of expected violations, as defined in Llobet et al., this gets rid of the minus 1, not sure what this difference is about
+
+    # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
+    # observed violations and under the assumption of Poisson firing
+    confidenceScore = 1 - stats.poisson.cdf(nViol, expectedViol)
+
+    # For cases where this is greater than 1, set to 1
+    if fpRate > 1:
+        fpRate = 1
+
+    return fpRate, confidenceScore
 
 def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
                     Fig1=False, Fig2=False, Fig3=True, Fig4=False,
@@ -1018,7 +1165,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 #     fig.savefig(savefile + '_RP.svg', dpi=500)
 #     fig.savefig(savefile + '_RP.png', dpi=500)
 
-def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
+def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurPlot = 2,legendLabels = None):
     # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
     spinesSetting = False
     fig, axs = plt.subplots(1, 1, figsize=(6, 8))
@@ -1027,6 +1174,11 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
     ax.hlines([0,20,40,60,80,100],0,20,'k','solid',alpha = 0.2)
 
     pcDict_keys = list(pcDict.keys())
+    varTypes = [type(pc_key) for pc_key in pcDict_keys]
+    numStrings = len([v for v in varTypes if v is str])
+
+
+
     z = [type(i) for i in pcDict_keys]
     nConfs = len([i for i in z if i == int])
     for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
@@ -1045,12 +1197,12 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
         rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
         #plot just  recDur = 2:
         recDurs = params['recDurs']
-        rdInd = np.where(recDurs == 2)[0]
+        rdInd = np.where(recDurs == recDurPlot)[0]
 
         # plot just fr = 5:
         frs = np.array(params['baseRates'])
-        frInd = np.where(frs == 2)[0][0]
-        print('Firing rate is 2')
+        frInd = np.where(frs == frPlot)[0][0]
+        print('Firing rate is', str(frPlot))
 
         # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
@@ -1058,10 +1210,14 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
         # if p==0:
         #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
         # else:
-        if type(pc_key) is str: # Hill
-            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 3))
+        if type(pc_key) is str and pc_key[0]=='H': # Hill
+            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 6))
             print(p)
-            color = colors[p-(len(z)-3)]
+            color = colors[p]
+        elif type(pc_key) is str and pc_key[0] == 'L':  # Llobet
+            colors = matplotlib.cm.Greens(np.linspace(0.3, 1, 7))
+            print(p)
+            color = colors[p-6]
         else: #not hill (conf)
             colors = matplotlib.cm.Blues(np.linspace(0.3, 1, nConfs))
             color = colors[p]
@@ -1102,17 +1258,23 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
     handles, xx = ax.get_legend_handles_labels()
 
-    labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-    # labels = ['50%', '75%','90%']#,'99%']
-    # labels = ['10%', '10%','10%','10%']
-    labels = pcDict_keys
+    if legendLabels is None:
+        labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
+        # labels = ['50%', '75%','90%']#,'99%']
+        # labels = ['10%', '10%','10%','10%']
+        labels = pcDict_keys
 
-    #tsting just one
-    # labels=labels[0]
-    # handles=handles[0]
-    # title = 'Confidence threshold'
-    # title = 'Refractory Period (ms)'
-    title = 'Contamination Metric'
+        # tsting just one
+        # labels=labels[0]
+        # handles=handles[0]
+        # title = 'Confidence threshold'
+        # title = 'Refractory Period (ms)'
+        title = 'Contamination Metric'
+    else:
+        labels = legendLabels[0:-1]
+        title = legendLabels[-1]
+
+
 
     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
 
@@ -1120,7 +1282,7 @@ def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5):
     fig.tight_layout()
     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title=title )
     fig.legend(handles,labels, bbox_to_anchor = (1.05, 1.0), loc = 'upper left',title=title)
-    fig.suptitle('RP = {}'.format(rpPlot))
+    fig.suptitle('RP = {}    FR = {}'.format(rpPlot,frPlot))
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
 

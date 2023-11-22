@@ -7,7 +7,7 @@ import numpy as np
 from phylib.stats import correlograms
 
 from scipy import stats
-from slidingRP.simulations import *
+
 import datetime
 from statsmodels.stats.proportion import proportion_confint as binofit
 
@@ -17,36 +17,39 @@ date_now = datetime.datetime.now().strftime('_%m_%d')
 #run simulations:
 sampleRate = 30000
 params = {
-    'recDurs': np.array([2]),  #recording durations (hours) np.array([0.5, 1 , 2 , 3 ])
-    'RPs': np.array([0.002]),# np.array([0.001,0.002,0.003,0.004,0.005,0.006]), np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
+    'recDurs':np.array([2]),  #recording durations (hours) np.array([0.5, 1 , 2 , 3 ])
+    'RPs': np.array([0.0015,0.002,0.006]),#np.array([0.001,0.0015, 0.002,0.0025, 0.003,0.004,0.005,0.006]),# , np.array([0.0015,0.002,0.003,0.004]),#np.array([0.001,0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005]), #true RP (s)
     'baseRates': [0.5,1,2,5,10],#np.arange(0.05, 1, 0.05) ,#   [0.05, np.arange(0.05, 1.4, 0.1)[:],2,4,5,10,20] #np.array([0.75,2,3,4,7.5]), #F1, 2, 5, 10 , 20 R (spk/s)
     'contRates': np.arange(0.00,0.21, 0.02),#np.array([.2, .5]),#%np.array([0.09,0.095,0.1,0.105,0.11]),#np.arange(0.00,0.21, 0.01), #contamination levels (proportion) #.025
-    'nSim': 10,
+    'nSim': 500,
     'contaminationThresh': 10,
     'binSize': 1 / sampleRate,
-    'sampleRate': 30000,  #TODO figure out a way to refer to this in binsize?
+    'sampleRate': 30000,
     'confidenceThresh': 90,
     'checkFR': False,
     'binSizeCorr': 1 / sampleRate,
     'returnMatrix': True,
     'verbose': True,
-    'savePCfile': True
-
+    'savePCfile': True,
+    'runLlobet': True,
+    'runLlobetPoiss': True
 }
 
 
 
 #%% run and save
-confidence_values = [90]#[60,70,80,85]
+confidence_values = [70,80,90]
 for conf in confidence_values:
     params['confidenceThresh'] = conf
     print('in simulations, {0} conf'.format(conf))
-    [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3] = simulateContNeurons(params)
+    [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+     pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3] = simulateContNeurons(params)
 
     savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(
         params['nSim']) + 'iter' + date_now + str(conf) + '.pickle'
 
-    results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, params]
+    results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+               pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3, params]
     if params['savePCfile']:
         with open(savefile, 'wb') as handle:
             pickle.dump(results, handle)
@@ -54,33 +57,90 @@ for conf in confidence_values:
 
 #%% test plot just one
 date_now = datetime.datetime.now().strftime('_%m_%d')
-
-conf=75
-savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(10) + 'iter' + date_now + str(conf) + '.pickle'
-
+date_now = '_09_04'
+nIter = 1000
+conf=80
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(nIter) + 'iter' + date_now + str(conf) + '.pickle'
+         #%%
 file = open(savefile,'rb')
 results = pickle.load(file)
+params = results[-1]
 file.close()
 
 
 for rp in np.arange(1,7):
-    figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlayConf' + str(rp) + str(conf)
+    figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlayConf' + str(rp) + str(conf) + date_now
 
     plotHillOverlay(results[0],results[0],results[0],results[0],params,figsavefile, rpPlot=rp)
 
 
 
+#%%plot just one
+pcDict = {}
+# date_now = '_09_14'
+# nIter = 500
+nIter = params['nSim']
 
+frPlot = 2
+rpPlot = 2
+
+#load each conf
+
+conf=70
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_08_2290.pickle'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(nIter) + 'iter' + date_now + str(conf) + '.pickle'
+
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+pcDict[0] = results[0]
+params = results[-1]
+
+conf=80
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_08_2290.pickle'
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(nIter) + 'iter' + date_now + str(conf) + '.pickle'
+
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+pcDict[1] = results[0]
+
+
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC500iter_07_1990.pickle'
+conf = 90
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(nIter) + 'iter' + date_now + str(conf) + '.pickle'
+
+file = open(savefile,'rb')
+results = pickle.load(file)
+file.close()
+pcDict[2] = results[0]
+
+pcDict['Hill 1.5ms'] = results[3]
+pcDict['Hill 2ms'] = results[4]
+pcDict['Hill 3ms'] = results[5]
+
+pcDict['Llobet 1.5ms'] = results[6]
+pcDict['Llobet 2ms'] = results[7]
+pcDict['Llobet 3ms'] = results[8]
+
+pcDict['Llobet Poiss 1.5ms'] = results[6]
+pcDict['Llobet Pioss 2ms'] = results[7]
+pcDict['Llobet Poiss 3ms'] = results[8]
+
+figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlayConf7080_newcalcCompare' + date_now
+
+plotHillOverlay(pcDict, params, figsavefile, rpPlot=rpPlot, frPlot = frPlot, legendLabels=['70','80','90','Hill3', 'Hill 2', 'Hill 1.5',
+                                                                                           'Llobet 3','Llobet 2','Llobet 1.5',
+                                                                                           'LlobetP 3','LlobetP 2','LlobetP 1.5','Confidence'])
 
 
 #%% plot
-pcDict = {}
+pcDictAllConf = {}
 confidence_values = [50,60,70,75,80,85,90,99]
 dates = ['_07_19','_07_25', '_07_25', '_07_19','_07_25', '_07_25', '_07_19', '_07_19']
-#
+
 # confidence_values = [70,75,80]
 # dates = [ '_07_25', '_07_19','_07_25']
-
 
 
 #plot just 90
@@ -97,11 +157,12 @@ for conf, date_now in zip(confidence_values,dates):
     results = pickle.load(file)
     file.close()
 
-    pcDict[conf] = results[0]
+    pcDictAllConf[conf] = results[0]
 
-pcDict['Hill 1.5ms'] = results[3]
-pcDict['Hill 2ms'] = results[4]
-pcDict['Hill 3ms'] = results[5]
+
+pcDictAllConf['Hill 1.5ms'] = results[3]
+pcDictAllConf['Hill 2ms'] = results[4]
+pcDictAllConf['Hill 3ms'] = results[5]
 
 #now also add hill
 # HillRPs = [15,2,3]
@@ -117,27 +178,27 @@ pcDict['Hill 3ms'] = results[5]
 #%%
 date_now = datetime.datetime.now().strftime('_%m_%d')
 # date_now = '_07_25'
-for rp in np.arange(1,7):
+for rp in [2]:#np.arange(1,7):
     figsavefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\RPmagenta\simulationsPCHillOverlay' + date_now + 'Conf' + str(rp) + '500iter'
 
     # plotHillOverlay(pcDict[confidence_values[0]],pcDict[confidence_values[1]],pcDict[confidence_values[2]],pcDict[confidence_values[3]],params,figsavefile, rpPlot=rp)
     # plotHillOverlay(pcDict[confidence_values[0]],pcDict[confidence_values[1]],pcDict[confidence_values[2]],params,figsavefile, rpPlot=rp)
 
-    plotHillOverlay(pcDict,params,figsavefile, rpPlot=rp)
+    plotHillOverlay(pcDictAllConf,params,figsavefile, rpPlot=rp)
 
 
 
 #%%
 
 #determine AUC
-
+frPlot = 2
 contAvg = False #use the average across all contaminations on each side of contThresh (uncontaminated, or contaminated)
     #otherwise, use a fixed point
 if contAvg ==False :
     threshDist = 0.02 #2%
 
 rpPlot = 2
-pcDict_keys = list(pcDict.keys())
+pcDict_keys = list(pcDictAllConf.keys())
 
 pcDict_keys = pcDict_keys[0:-2]
 
@@ -146,7 +207,7 @@ threshDists = np.arange(0.02,0.1,0.02)
 from matplotlib.pyplot import cm
 color = iter(cm.rainbow(np.linspace(0, 1, len(threshDists))))
 
-fig, axs = plt.subplots(1, 1, figsize=(6, 6))
+fig, axs = plt.subplots(1, 1, figsize=(4, 4))
 ax = axs  # for the case of just one subplot
 for threshDist in np.arange(0.02,0.1,0.02):
     c = next(color)
@@ -154,7 +215,7 @@ for threshDist in np.arange(0.02,0.1,0.02):
     TPR = []
     FPR = []
     for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
-        pc = pcDict[pc_key]
+        pc = pcDictAllConf[pc_key]
         count = []
         count = pc / 100 * params['nSim']  # number of correct trials
 
@@ -173,7 +234,7 @@ for threshDist in np.arange(0.02,0.1,0.02):
 
         # plot just fr = 5:
         frs = np.array(params['baseRates'])
-        frInd = np.where(frs == 2)[0][0]
+        frInd = np.where(frs == frPlot)[0][0]
         print('Firing rate is 2')
 
 
@@ -201,23 +262,28 @@ for threshDist in np.arange(0.02,0.1,0.02):
 ax.set_ylabel('True Positive Rate')
 ax.set_xlabel('False Positive Rate')
 ax.set_title('ROC')
-ax.set_ylim(0,100)
-ax.set_xlim(0,100)
+ax.set_ylim(0,102)
+ax.set_xlim(0,102)
 
 
 handles, labels = ax.get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(.7, .4), title = 'distance from contThresh')
+fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(.7, .4), title = 'Distance from threshold')
 
 
-ax.plot(0, 0, '.', color='k', label='slidingRP')
-ax.plot(0,0, 'x', color='k', label='Hill')
+ax.plot(-1, -1, '.', color='k', label='slidingRP')
+ax.plot(-1,-1, 'x', color='k', label='Hill')
 handles, labels = ax.get_legend_handles_labels()
 handles = handles[-2:]
 labels = labels[-2:]
-fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(.9, .4), title = 'metric')
-
+fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(.9, .4), title = 'Metric')
+spinesSetting = False
+# ax.spines.right.set_visible(spinesSetting)
+# ax.spines.top.set_visible(spinesSetting)
 
 fig.show()
+savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\Fig5_confidence\ROC_FR' + str(frPlot)
+fig.savefig(savefile + '.svg', dpi=500)
+fig.savefig(savefile + '.png', dpi=500)
 
 
 #%%
