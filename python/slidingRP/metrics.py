@@ -170,8 +170,8 @@ def slidingRP(spikeTimes, params = None):
 
 
     
-    maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
-    minContWith90Confidence: Minimum contamination for which you have >=90% confidence
+    maxConfidenceAtContaminationThresh:   Max confidence that you have <= (contThresh)% contamination
+    minContAtConfidenceThresh: Minimum contamination for which you have >=(confThresh% confidence
     timeOfLowestCont:        Time at which best score happens
     nSpikesBelow2:           Number of observed spikes that occur before 2 ms
     confMatrix:              Full confidence matrix of size nCont x nRP
@@ -199,10 +199,10 @@ def slidingRP(spikeTimes, params = None):
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
     # matrix is [nCont x nRP]
     
-    testTimes = rp>0.0005 # (in seconds) 
+    testTimes = rp>0.0005 # (in seconds)
     #only test for refractory period durations greater than 0.5 ms
     
-    maxConfidenceAtContaminationThresh = max(confMatrix[cont==params['contaminationThresh'],testTimes]) #TODO check behavior if no max
+    maxConfidenceAtContaminationThresh = max(confMatrix[cont==(params['contaminationThresh']),testTimes]) #TODO check behavior if no max
     
     
     indsConf = np.row_stack(np.where(confMatrix[:,testTimes]>params['confidenceThresh']))
@@ -257,14 +257,19 @@ def computeMatrix(spikeTimes, params):
     if params and 'sampleRate' in params:
         sampleRate = params['sampleRate']
     else:
-        sampleRate = 30000
+        params['sampleRate'] = 30000
+        sampleRate = params['sampleRate']
+
+
 
     if params and 'binSizeCorr' in params:
         binSizeCorr = params['binSizeCorr']
     elif params and 'sampleRate' in params:
-        binSizeCorr = 1 / sampleRate
+        params['binSizeCorr'] = 1/params['sampleRate']
+        binSizeCorr = params['binSizeCorr']
     else:
-        binSizeCorr = 1 / 30000
+        params['binSizeCorr'] = 1 / 30000
+        binSizeCorr =params['binSizeCorr']
 
     if params and 'recordingDuration' in params:
         recDur = params['recordingDuration']
@@ -282,12 +287,15 @@ def computeMatrix(spikeTimes, params):
     spikeClustersACG = np.zeros(n_spikes, dtype=np.int8)  # each spike time gets cluster id 0
 
     # compute an acg in 1s bins to compute the firing rate  
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = 1, sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
+    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids = clustersIds, bin_size = 1,
+                        sample_rate = params['sampleRate'], window_size=2,symmetrize=False)[0][0] #compute acg
     firingRate = nACG[1] / n_spikes
         
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'], sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
+    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'],
+                        sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
 
-    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :] + binSizeCorr / 2, cont[:, np.newaxis] / 100, recDur)
+    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes, rp[np.newaxis, :]
+                                   + binSizeCorr / 2, cont[:, np.newaxis] / 100, recDur)
 
     return confMatrix, cont, rp, nACG, firingRate
 
@@ -474,9 +482,34 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
         fig.savefig(params['figpath'], dpi=300)
 
 def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
+    '''
 
+
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (ms)
+    spikeClusters: numpy.ndarray
+        array of spike cluster ids, corresponding to each spike time in spikeTimes
+    brainRegions: numpy.ndarray
+        array of brain regions, corresponding to the location of each cluster id in spikeClusters
+    spikeAmps: numpy.ndarray
+        array of amplitudes, in V
+
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)
+        params.sampleRate : sample rate of the recording (Hz)
+
+    plotXs: an optional parameter for plotting (for the paper)
+    Returns
+    -------
+    None.
+
+    '''
+
+    print('in metrics')
     cids = np.unique(spikeClusters)
-    
+    print(len(cids))
     #initialize rpMetrics as dict
     rpFit = {}
     rpFit['cidx'] = []
@@ -496,7 +529,8 @@ def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, pa
         #estimate rp
         minFR = 1 #spks/s
         minAmp = 50 #uV
-        
+        print('Firing rate is',fr)
+        estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
         try:
             estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
 
@@ -505,10 +539,11 @@ def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, pa
             rpFit['brainRegion'].append(brainRegion)
             rpFit['fr'].append(fr)
             rpFit['amp'].append(amp)
-            if verbose:
+            if params['verbose']:
 
                 print('Estimated RP for cluster %d is %.2f ms'%(cids[cidx],estimatedRP))
         except:
+            print('Error estimating RP')
             continue
 
     return rpFit
