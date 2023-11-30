@@ -327,14 +327,18 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
     '''
 
     # the rate (spk/s) of the contamination level we are testing (contaminationProp)
-    contaminationRate = firingRate * contaminationProp
+
+    # contaminationRate = firingRate * contaminationProp
 
     # the number of violations (spikes) we expect to see under this contamination rate
     #expectedViol = contaminationRate * refDur * 2 * spikeCount
     #as computed *not* in the same way as originally taken from Hill (see above commented out)
-    N_t = firingRate * recDur #total number of spikes
-    N_c = contaminationRate * recDur  #total number of contaminating spikes you would expect under the inputted CR
-    N_b = N_t - N_c # the "base" number of spikes under the inputted CR
+    # N_t = firingRate * recDur #total number of spikes
+    # N_c = contaminationRate * recDur  #total number of contaminating spikes you would expect under the inputted CR
+    # N_b = N_t - N_c # the "base" number of spikes under the inputted CR
+    N_c = spikeCount * contaminationProp
+    N_b = spikeCount * (1-contaminationProp)
+
 
     # expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2) #number of expected violations, as defined in Llobet et al.
     expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + N_c/2) #number of expected violations, as defined in Llobet et al.
