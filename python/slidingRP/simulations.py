@@ -1236,7 +1236,7 @@ def plotSimulationsOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurP
     #save and display figure
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
-    plt.show()
+    fig.show()
 
 
 def plotDriftOverlay(pcDict,paramsDict,savefile, rpPlot=2.5,frPlotInput = 5,driftDir = 'Inc'):
