@@ -4,11 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
-def runSaveFig5_ROC(figSavePath):
-
-    #path to load results
-    resultsBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC'
-    # figSavePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs\Fig5_confidence\ROC_FR' + str(frPlot)
+def runSaveFig5_ROC(figSavePath,resultsBasePath):
 
 
     #load datasets (each set is a different confidence level and concatenate them into a dictionary
@@ -19,7 +15,7 @@ def runSaveFig5_ROC(figSavePath):
 
     for conf, date in zip(confidence_values, dates):
         print('loading sim results {0} conf'.format(conf))
-        resultsPath = resultsBasePath + str(nIter) + 'iter' + date + str(conf) + '.pickle'
+        resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date + str(conf) + '.pickle'
 
         file = open(resultsPath, 'rb')
         results = pickle.load(file)
