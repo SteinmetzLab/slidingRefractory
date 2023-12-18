@@ -31,11 +31,6 @@ def runSaveFig5_ROC(figSavePath,resultsBasePath):
     pcDictAllConf['Hill 2ms'] = results[4]
     pcDictAllConf['Hill 3ms'] = results[5]
 
-
-
-
-
-
     #set data parameters for plotting:
     frPlot = 2 # spks/s, base firing rate of the simulated neurons, parameter picked for plot
     rpPlot = 2 #ms, refractory period of the simulated neurons, parameter picked for plot
