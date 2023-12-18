@@ -1,11 +1,11 @@
 # A script to run and save figures to file (pdf) for sliding refractory paper
 
-#establish paths:
-figSaveBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs_Nick'
-resultsBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationResults'
-
 import os #import to create folders for each figure
 
+#establish paths:
+figSaveBasePath = os.getcwd()+'\\paper_figs'
+resultsBasePath = os.getcwd()+'\\simulationResults'
+print(figSaveBasePath)
 #%% Figure 1: #TODO
 
 #%% Figure 2: Metric algorithm
