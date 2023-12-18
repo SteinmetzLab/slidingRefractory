@@ -2,10 +2,7 @@ import pickle
 
 from slidingRP.simulations import *
 
-def runSaveFig4(figsavepath):
-
-    #path to load results
-    resultsBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC'
+def runSaveFig4(figsavepath, resultsBasePath):
 
     #initialize dictionary to load simulation results
     pcDict = {}
@@ -22,7 +19,7 @@ def runSaveFig4(figsavepath):
     for c, conf in enumerate([70, 80, 90]):
 
         #path to load results based on the confidence level:
-        resultsPath = resultsBasePath + str(nIter) + 'iter' + date_load + str(conf) + '.pickle'
+        resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date_load + str(conf) + '.pickle'
 
         file = open(resultsPath, 'rb')
         results = pickle.load(file)

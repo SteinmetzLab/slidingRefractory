@@ -68,12 +68,6 @@ def runSaveFig5_ROC(figSavePath):
         for p, pc_key in enumerate(pcDict_keys): #loop through different levels of confidence
             pc = pcDictAllConf[pc_key]
 
-            # count = []
-            # count = pc / 100 * params['nSim']  # number of correct trials
-            #
-            # CI_scaled = binofit(count, params['nSim'])
-            # CI = [x * 100 for x in CI_scaled]
-
             # all possible contamination rates
             cr = params['contRates'];
 

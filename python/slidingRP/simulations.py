@@ -1141,7 +1141,7 @@ def plotSimulationsOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurP
     #   to assign diferent colors for string names (e.g. Llobet, Hill) vs. confidence values (e.g. '70')
     varTypes = [type(pc_key) for pc_key in pcDict_keys]
     numStrings = len([v for v in varTypes if v is str])
-    nConfs = len([v for v in varTypes if i == int])
+    nConfs = len([v for v in varTypes if v == int])
 
 
     for p,pc_key in enumerate(pcDict_keys): #loop through the different simulation matrices
