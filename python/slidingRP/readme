@@ -1,0 +1,9 @@
+To run and save figures:
+
+In an anaconda window, type 'conda activate iblenv'
+
+Navigate to this folder (slidingRP) (e.g. 'cd int-brain-lab\slidingRefractory\python\slidingRP')
+
+run script: 'python scriptSavePaperFigs.py'
+
+
