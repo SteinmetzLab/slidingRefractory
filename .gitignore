@@ -3,7 +3,6 @@
 *.DS_Store
 *.m~
 plotSlidingRP.m
-*.pickle
 *.pdf
 *.pyc
 python/__pycache__/simulations.cpython-38.pyc
