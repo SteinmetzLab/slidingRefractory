@@ -124,11 +124,13 @@ def simulateContNeurons(params):
 
     if params and 'runLlobet' in params:
         runLlobet = params['runLlobet']
+        print('running Llobet regular')
     else:
         runLlobet = False #default is false to decrease runtime if not testing simulations for analysis purposes
 
     if params and 'runLlobetPoiss' in params:
         runLlobetPoiss = params['runLlobetPoiss']
+        print('running Llobet Poiss')
     else:
         runLlobetPoiss = False #default is false to decrease runtime if not testing simulations for analysis purposes
 
@@ -160,7 +162,6 @@ def simulateContNeurons(params):
 
 
 
-
     # start time to time simulations
     start_time = time.time()
     for j, recDurScalar in enumerate(params['recDurs']):
@@ -175,8 +176,10 @@ def simulateContNeurons(params):
                 print('baseRate %.2f' % baseRate)
                 cidx = 0
                 for c in params['contRates']:
-                    contRate = baseRate * c
+                    contRate = baseRate * c   #contamination rate is the base firing rate times the fraction contamination
 
+
+                    #initialize vectors to save passing neurons
                     passVec = np.empty(params['nSim'])
                     passVec[:] = np.nan
 
@@ -195,6 +198,7 @@ def simulateContNeurons(params):
                     passVecHill3 = np.empty(params['nSim'])
                     passVecHill3[:] = np.nan
 
+                    # set runLlobet to True to also run the standard Llobet metric for comparison
                     if runLlobet:
                         passVecLlobet15 = np.empty(params['nSim'])
                         passVecLlobet15[:] = np.nan
@@ -205,6 +209,7 @@ def simulateContNeurons(params):
                         passVecLlobet3 = np.empty(params['nSim'])
                         passVecLlobet3[:] = np.nan
 
+                    # set runLlobetPoiss to True to also run a Poisson version of the Llobet metric for comparison
                     if runLlobetPoiss:
                         passVecLlobetPoiss15 = np.empty(params['nSim'])
                         passVecLlobetPoiss15[:] = np.nan
@@ -225,27 +230,34 @@ def simulateContNeurons(params):
                             contST = genST(contRate, recDur, 0, params) #add contaminating neuron
                         else:
                             contST = []
+
                         combST = np.sort(np.concatenate(
                             (st, contST)))  # put spike times from both spike trains together (and sort chronologically)
 
-                        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+
+                        #run the slidingRP metric on combST - the contaminated neuron spike train.
+                        [maxConfidenceAtContThresh, minContWithConfidenceThresh, timeOfLowestCont,
                          nSpikesBelow2, confMatrix, cont, rpVec, nACG,
                          firingRate, secondsElapsed] = slidingRP(combST, params)
 
-                        if minContWith90Confidence <= 10:
+                        #the neuron passes if the minimum contamination (at our confidence threshold) is smaller than
+                        # our contamination threshold (in percent)
+                        if minContWithConfidenceThresh <= params['contaminationThresh']:
                             passVec[n] = 1
                         else:
                             passVec[n] = 0
 
+                        # to evaluate the 2ms no spikes condition, check whether there are no spikes below 2ms.
                         passVec2MsNoSpikes[n] = passVec[n]
                         if nSpikesBelow2 == 0:
                             passVec2MsNoSpikes[n] = 1
 
-                        # Compare with neurons that stop firing halway through the recording duration
+                        # To compare the performance of our metric on neurons that stop firing halfway through the
+                        # recording duration, take combST (our contaminated neuron's spike train) and stop it halfway
                         frHalfInactive = combST[0:np.where(combST > recDur / 2)[0][0]]
                              # remove spikes from second half of the recording
 
-                        # Here only save minCont to determine pass/fail
+                        # Here we only need to save minCont to determine pass/fail
                         minContWith90ConfidenceHalfInactive = slidingRP(frHalfInactive, params)[1]
 
                         if minContWith90ConfidenceHalfInactive <= 10:
@@ -392,7 +404,7 @@ def simulateChangingContNeurons(params):
                          nSpikesBelow2, confMatrix, cont, rpVec, nACG,
                          firingRate, secondsElapsed] = slidingRP(combST, params)
 
-                        if minContWith90Confidence <= 10:
+                        if minContWith90Confidence <= params['contaminationThresh']:
                             passVec[n] = 1
                         else:
                             passVec[n] = 0
@@ -438,10 +450,11 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
 
     # number of violations between minISI and refDur
     nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0]: np.where(rpVec > refDur)[0][0] + 1])
+    contaminationRate = firingRate * testedCont
 
     # time for violations to occur
     N_t = firingRate * recDur  # total number of spikes
-    N_c = testedCont * recDur  #total number of contaminating spikes you would expect under the tested contamination value
+    N_c = contaminationRate * recDur  #total number of contaminating spikes you would expect under the tested contamination value
     N_b = N_t - N_c # the "base" number of spikes under the inputted (tested) contamination value
 
 
@@ -456,6 +469,7 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
     fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t**2 * (refDur - minISI))))
 
     # expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2) #number of expected violations, as defined in Llobet et al.
+
     expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + N_c/2) #number of expected violations, as defined in Llobet et al., this gets rid of the minus 1, not sure what this difference is about
 
     # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
@@ -469,7 +483,7 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
     return fpRate, confidenceScore
 
 def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
-                    Fig1=False, Fig2=False, Fig3=True, Fig4=False,
+                    subplot1 = False, subplot2 = False, subplot3 = False, subplot4 = False,
                     sensSpecPlot=False, plotType='paper', zoomCont = False, addPCflag = 0, highCont=False):
     # plot type = 'full' or plot type = 'paper'
     # compute confidence intervals
@@ -499,7 +513,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
     CI = [x * 100 for x in CI_scaled]
     colors = matplotlib.cm.Blues(np.linspace(0.2, 1, len(params['baseRates'])))  # never go below .2, hard to see
 
-    if Fig1:
+    if subplot1:
         if plotType == 'paper':
             print('in plot type paper figure 1')
             # for this figure, plotType = 'full' or plotType = 'paper' are the same.
@@ -771,7 +785,8 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
 
             fig.savefig(savefile + '_Main.png', dpi=500)
             # fig.savefig(savefile + '_Main.svg', dpi=500)
-    if Fig2:
+
+    if subplot2:
         if plotType == 'full':
             numrows = len(params['contRates'][::2])
             numcols = len(params['RPs'])
@@ -931,7 +946,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
             fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Recording duration (hrs)')
             fig.savefig(savefile + '_recDur_paperfull.svg', dpi=500)
 
-    if Fig3:
+    if subplot3:
         if plotType == 'full':
             numrows = len(params['recDurs'])
             numcols = len(params['contRates'][::2])
@@ -1050,12 +1065,13 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
             fig.savefig(savefile + '_RP.svg', dpi=500)
             fig.savefig(savefile + '_RP.png', dpi=500)
 
-    if Fig4:
+    if subplot4: #zoom
         fig, axs = plt.subplots(1, 1, figsize=(3, 5))
         ax = axs  # for the case of just one subplot
         # plot just contRates 0.08 to 0.12:
         cr = params['contRates'];
         crInds = np.where((cr >= 0.07) & (cr <= 0.13))[0]
+        print(crInds)
         # plot just recDur = 1
         rd = params['recDurs']
         rdInd = np.where(rd == 2)[0]
@@ -1085,206 +1101,142 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
         handles, labels = ax.get_legend_handles_labels()
         plt.subplots_adjust(hspace=0.3)
 
-        fig.savefig(savefile + '_individual.svg', dpi=500)
+        fig.savefig(savefile + '_zoom.svg', dpi=500)
+        fig.savefig(savefile + '_zoom.pdf', dpi=500)
 
 
-# def plotHillOverlay(pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
-#     spinesSetting = False
-#     fig, axs = plt.subplots(1, 1, figsize=(4, 5))
-#     ax = axs  # for the case of just one subplot
-#     for p,pc in enumerate([pcSliding,pcHill15,pcHill2,pcHill3]):
-#         count = []
-#         count = pc / 100 * params['nSim']  # number of correct trials
-#         print('computing CI')
-#         print('hi')
-#         CI_scaled = binofit(count, params['nSim'])
-#         CI = [x * 100 for x in CI_scaled]
-#         print(CI)
-#
-#         # plot just contRates 0.08 to 0.12:
-#         cr = params['contRates'];
-#
-#         # plot just RP = rpPlot:
-#         rps = params['RPs']
-#         rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
-#         #plot just  recDur = 2:
-#         recDurs = params['recDurs']
-#         rdInd = np.where(recDurs == 2)[0]
-#
-#         # plot just fr = 5:
-#         frs = np.array(params['baseRates'])
-#         frInd = np.where(frs == 2)[0][0]
-#         print('Firing rate is 2')
-#
-#         # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
-#         c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
-#         c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
-#         if p==0:
-#             color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
-#         else:
-#             colors = matplotlib.cm.Reds(np.linspace(0.2, 1, 3))
-#             color = colors[p-1]
-#
-#
-#         pltcnt = 0
-#         linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
-#         for j, recDur in enumerate(recDurs[rdInd]):
-#             for i, rp in enumerate(rps[rpInd]):
-#
-#                 # different base rates get different colors
-#                 # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
-#                 b = 0
-#                 baseRate = frs[frInd]# Todo change x axis
-#
-#
-#
-#                 lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
-#                 upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
-#                 x = cr * 100
-#                 y = pc[rdInd[0], rpInd[0], frInd, :]
-#
-#
-#
-#                 ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
-#
-#                 ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
-#                 ax.set_ylabel('Percent pass')
-#                 ax.set_xlabel('Contamination (%)')
-#                 # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
-#                 ax.set_ylim(-10, 110)
-#                 ax.spines.right.set_visible(spinesSetting)
-#                 ax.spines.top.set_visible(spinesSetting)
-#             # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
-#             # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
-#     handles, xx = ax.get_legend_handles_labels()
-#     labels = ['sliding refractory metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-#     # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
-#     fig.tight_layout()
-#     fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1), title='Refractory Period (ms)')
-#
-#     fig.savefig(savefile + '_RP.svg', dpi=500)
-#     fig.savefig(savefile + '_RP.png', dpi=500)
+def plotSimulationsOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurPlot = 2,legendLabels = None,colorflag = False):
+    '''
 
-def plotHillOverlay(pcDict,params,savefile, rpPlot=2.5,frPlot = 5,recDurPlot = 2,legendLabels = None):
-    # (pcSliding,pcHill15,pcHill2,pcHill3,params,savefile, rpPlot=2.5):
+
+    Parameters
+    ----------
+    pcDict - a dictionary where each value is a matrix of percent correct for the simulations across all parameters
+    params - the parameters used for running the simulations
+    savefile - path to save the figures
+    rpPlot - RP to use for plot, default is 2.5 ms.
+    frPlot - FR to use for plot, default is 5 spks/s.
+    recDurPlot - recording duration to use for plot, default is 2 hours.
+    legendLabels - optional, np.array containing labels (str) for each set of simulations. e.g. different confidence
+        levels or metrics run. Title of the plot is the last element of this array.
+        default values here are the keys of pcDict.
+    colorflag - optional, only set to True if needed for an error in the number of colors (per runs of the simulation)
+
+    Returns
+    saves the plot in 'savefile'
+
+    '''
+
+    #set up figure and plotting parameters
+    h=0;l=0;po=0;k=0
     spinesSetting = False
-    fig, axs = plt.subplots(1, 1, figsize=(6, 8))
+    fig, axs = plt.subplots(1, 1, figsize=(4, 5))
     ax = axs  # for the case of just one subplot
     ax.vlines(10,0,100,'k','dashed',alpha=0.5)
     ax.hlines([0,20,40,60,80,100],0,20,'k','solid',alpha = 0.2)
 
+    #each key of pcDict is the name of the run of the simulation (e.g. 'slidingRP', 'Llobet', 'slidingRP 70% conf')
     pcDict_keys = list(pcDict.keys())
+    #this checks the type of variable in the keys
+    #   to assign diferent colors for string names (e.g. Llobet, Hill) vs. confidence values (e.g. '70')
     varTypes = [type(pc_key) for pc_key in pcDict_keys]
     numStrings = len([v for v in varTypes if v is str])
+    nConfs = len([v for v in varTypes if i == int])
 
 
+    for p,pc_key in enumerate(pcDict_keys): #loop through the different simulation matrices
 
-    z = [type(i) for i in pcDict_keys]
-    nConfs = len([i for i in z if i == int])
-    for p,pc_key in enumerate(pcDict_keys):#,pcHill3]):
+        # pc matrix to use for plotting simulations:
         pc = pcDict[pc_key]
-        count = []
-        count = pc / 100 * params['nSim']  # number of correct trials
 
+        #compute error bars
+        count = []
+        count = pc / 100 * params['nSim']
         CI_scaled = binofit(count, params['nSim'])
         CI = [x * 100 for x in CI_scaled]
 
-        # plot just contRates 0.08 to 0.12:
+        # contamination rates to plot:
         cr = params['contRates'];
 
         # plot just RP = rpPlot:
         rps = params['RPs']
         rpInd = np.where(rps == rpPlot/1000)[0] #rpPlot in ms, convert to s here
-        #plot just  recDur = 2:
+
+        #plot just  recDur = recDurPlot:
         recDurs = params['recDurs']
         rdInd = np.where(recDurs == recDurPlot)[0]
 
-        # plot just fr = 5:
+        # plot just fr = frPlot:
         frs = np.array(params['baseRates'])
         frInd = np.where(frs == frPlot)[0][0]
         print('Firing rate is', str(frPlot))
 
-        # colors = matplotlib.cm.Set1(np.linspace(0, 1, 10))
-        c = cc.linear_bmw_5_95_c89#input_color  # cc.linear_protanopic_deuteranopic_kbw_5_95_c34
-        c = c[::-1]  # if using linear_blue37 or protanopic, flip the order
-        # if p==0:
-        #     color = [c[x] for x in np.round(np.linspace(0.2, 0.75, len(params['RPs'])) * 255).astype(int)][5]
-        # else:
-        if type(pc_key) is str and pc_key[0]=='H': # Hill
-            colors = matplotlib.cm.Reds(np.linspace(0.3, 1, 6))
-            print(p)
-            color = colors[p]
-        elif type(pc_key) is str and pc_key[0] == 'L':  # Llobet
-            colors = matplotlib.cm.Greens(np.linspace(0.3, 1, 7))
-            print(p)
-            color = colors[p-6]
-        else: #not hill (conf)
-            colors = matplotlib.cm.Blues(np.linspace(0.3, 1, nConfs))
-            color = colors[p]
 
+
+        if type(pc_key) is str and pc_key[0]=='H': # Hill
+            colors = np.flip(matplotlib.cm.Reds(np.linspace(0.3, 1, 3)),0)  #red for Hill
+            color = colors[h]
+            h+=1
+        elif type(pc_key) is str and len(pc_key)>7 and pc_key[7] == 'P':  # purple for Llobet Poiss
+            colors = np.flip(matplotlib.cm.Purples(np.linspace(0.3, 1, 3)),0)
+            color = colors[po]
+            po += 1
+        elif type(pc_key) is str and pc_key[0] == 'L':  # green for Llobet
+            colors = np.flip(matplotlib.cm.Greens(np.linspace(0.3, 1, 3)),0)
+            color = colors[l]
+            l+=1
+
+        else: #not hill (conf)
+            colors = np.flip(matplotlib.cm.Blues(np.linspace(0.3, 1, 3)),0) #blue for regular version of metric
+            k+=1
+            if colorflag:
+                color = colors[p+2]
+            else:
+                color = colors[p]
 
         pltcnt = 0
-        linewidths = [1,1,1,1,1,1]#[0.5, 1, 2, 3]
+        linewidths = [1,1,1,1,1,1]
         for j, recDur in enumerate(recDurs[rdInd]):
             for i, rp in enumerate(rps[rpInd]):
 
-                # different base rates get different colors
-                # fix baseRate at frs[frInd]: previously did for b, baseRate in enumerate(frs[frInd]):
+                # fix baseRate at frs[frInd]
                 b = 0
                 baseRate = frs[frInd]# Todo change x axis
 
-
-
+                #confidence interval for this recDur, RP, FR
                 lowerCI = CI[0][rdInd[0], rpInd[0], frInd, :]
                 upperCI = CI[1][rdInd[0], rpInd[0], frInd, :]
 
-                x = cr * 100
-                y = pc[rdInd[0], rpInd[0], frInd, :]
-                print(np.shape(x))
-                print(np.shape(y))
+                x = cr * 100 #convert contamination rate to percent (from fractional)
+                y = pc[rdInd[0], rpInd[0], frInd, :] #percent correct values for this recDur, RP, FR
 
-
-
+                #plot simulations, set labels and spines
                 ax.plot(x, y, '.-', color=color, linewidth=linewidths[i], label=rp*1000)
-
                 ax.fill_between(x, lowerCI, upperCI, color=color, alpha=.3)
                 ax.set_ylabel('Percent pass')
                 ax.set_xlabel('Contamination (%)')
-                # ax.set_title('True RP: %.1f ms; contamination: %d' % (rp * 1000, contRate * 100) + '%')
                 ax.set_ylim(-10, 110)
                 ax.spines.right.set_visible(spinesSetting)
                 ax.spines.top.set_visible(spinesSetting)
-            # fig.text(0.65, 0.9-(.17*j), 'Proportion contamination: %.2f'%contRate)
-            # fig.suptitle('Proportion contamination: %.2f' % contRate*100, x=.5, y=1.1)
+
     handles, xx = ax.get_legend_handles_labels()
 
     if legendLabels is None:
-        labels = ['Flexible RP metric', 'Hill metric; threshold = 1.5 ms','Hill metric; threshold = 2 ms','Hill metric; threshold = 3 ms']
-        # labels = ['50%', '75%','90%']#,'99%']
-        # labels = ['10%', '10%','10%','10%']
         labels = pcDict_keys
-
-        # tsting just one
-        # labels=labels[0]
-        # handles=handles[0]
-        # title = 'Confidence threshold'
-        # title = 'Refractory Period (ms)'
         title = 'Contamination Metric'
     else:
         labels = legendLabels[0:-1]
         title = legendLabels[-1]
 
-
-
-    # fig.subplots_adjust(left=0.7, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
-
-
+    #figure legend/title
     fig.tight_layout()
-    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1, 1),title=title )
-    fig.legend(handles,labels, bbox_to_anchor = (1.05, 1.0), loc = 'upper left',title=title)
+    fig.legend(handles,labels, bbox_to_anchor = (1.07, 1.0),title=title)
     fig.suptitle('RP = {}    FR = {}'.format(rpPlot,frPlot))
+
+    #save and display figure
     fig.savefig(savefile + '_RP.svg', dpi=500)
     fig.savefig(savefile + '_RP.png', dpi=500)
+    plt.show()
 
 
 def plotDriftOverlay(pcDict,paramsDict,savefile, rpPlot=2.5,frPlotInput = 5,driftDir = 'Inc'):
@@ -1428,6 +1380,7 @@ def plotDriftOverlay(pcDict,paramsDict,savefile, rpPlot=2.5,frPlotInput = 5,drif
 
 def plotSensitivitySpecificity(pcOrig, pc2Ms, params, savefile, plusMinusThresh):
     """
+    function to plot sensitivity and specificity functions (data exploration, not in paper)
 
         crRange = range(len(params['contRates']))
         crInd = np.where(params['contRates'] == 0.1])[0] #the cutoff point where contamination is exactly 10%

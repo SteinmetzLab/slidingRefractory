@@ -353,7 +353,8 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
 
 def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     '''
-    
+    Code to plot single unit results for sliding refractory period metric.
+    Plots the ACG, confidence matrix, and a slice of the confidence matrix at 10% contamination.
 
     Parameters
     ----------
@@ -487,7 +488,7 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
 
 def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
     '''
-
+    Fits a sigmoid to the ACGs of a population of neurons, each of which has a spike cluster ID (spikeClusters, see below)
 
     Parameters
     ----------
@@ -556,15 +557,17 @@ def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, pa
 def fitSigmoidACG(st, timeBins, fr, amp, minFR = 1, minAmp = 50, params = None):
     '''
     
-
+    Code to fit a sigmoid to a
     Parameters
     ----------
-    acg : np.array
-        heights of acg bins (probability of spike for each timebin)
-    timeBins : np.array
-        timeBins used when computing acg
-    params : TYPE
-        DESCRIPTION.
+    spikeTimes : numpy.ndarray
+        array of spike times (ms)
+    timeBins : numpy.ndarray
+        timeBins to use when computing acg
+    fr:
+        overall firing rate of the neuron (spks/s)
+    amp:
+
 
     Returns
     -------
