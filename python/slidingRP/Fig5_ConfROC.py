@@ -6,7 +6,6 @@ from matplotlib.pyplot import cm
 
 def runSaveFig5_ROC(figSavePath,resultsBasePath):
 
-
     #load datasets (each set is a different confidence level and concatenate them into a dictionary
     pcDictAllConf = {} #initialize dictionary (percent correct matrix for each confidence value)
     confidence_values = [50, 60, 70, 75, 80, 85, 90, 99] #percent
