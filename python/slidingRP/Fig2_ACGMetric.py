@@ -38,6 +38,12 @@ def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
         combST = np.sort(np.concatenate((st, contST)))  # put spike times from both spike trains together (and sort chronologically)
 
 
+        # for this example neuron, save it to file to be able to reload
+        exampleNeuronFilename = resultsBasePath + '\\savedExampleSimulatedNeuron2.pickle'
+        with open(exampleNeuronFilename, 'wb') as handle:
+            pickle.dump(combST, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 
     #parameters needed for running metric and plotting ACG
     params = { 'contaminationThresh': 10,
@@ -52,9 +58,10 @@ def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
     # create a figure with 2 rows and nColumns columns (set to 3 examples for paper)
     nColumns = 3
     fig, axs = plt.subplots(2,nColumns)
-    nACG = plotFig2(combST,1,axs,params,columnValue=0,color = 'steelblue',color2='navy')
-    nACG = plotFig2(combST,1.5,axs,params,columnValue=1,color='forestgreen',color2 = 'darkgreen')
-    nACG = plotFig2(combST,2.2,axs,params,columnValue=2,color='orchid',color2='darkorchid')
+    verbose = False
+    nACG = plotFig2(combST,1,axs,params,columnValue=0,color = 'steelblue',color2='navy',verbose=verbose)
+    nACG = plotFig2(combST,1.5,axs,params,columnValue=1,color='forestgreen',color2 = 'darkgreen',verbose=verbose)
+    nACG = plotFig2(combST,2.2,axs,params,columnValue=2,color='orchid',color2='darkorchid',verbose=verbose)
     fig.show()
 
     print(figsavepath)
@@ -71,7 +78,7 @@ def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
     plotXs = [XsToPlot,Xcolors] #re-format for input to plotSlidingRP below
 
     #generate a figure object and format inputs to plotSlidingRP to save the figure
-    fig, axs = plt.subplots(1,2)
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (10,4))
     params['savefig']= True
     params['figpath'] = figsavepath + '\\traceAndMatrix'
 
@@ -171,6 +178,8 @@ def plotFig2(spikeTimes, tauR,axs,params,columnValue=0,color = 'b',color2 = 'dar
         ax.set_title('{0:.{1}}'.format(computedConf,2))
     ax.set_xlabel('Number of spikes')
     ax.set_ylabel('Probability')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
     plt.tight_layout()
 
 
