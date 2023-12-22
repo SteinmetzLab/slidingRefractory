@@ -351,7 +351,7 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
     return confidenceScore
 
 
-def plotSlidingRP(spikeTimes, params = None,plotXs = None):
+def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExtraContours=False):
     '''
     Code to plot single unit results for sliding refractory period metric.
     Plots the ACG, confidence matrix, and a slice of the confidence matrix at 10% contamination.
@@ -363,8 +363,14 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     params : dict
         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)
         params.sampleRate : sample rate of the recording (Hz)
+        params.clusterLabel: Label for cluster on ACG plot, if empty this defaults to False
+        params.savefig : True if you want to save this figure to ile, default is False
+        params.figpath : Path to save figure as .svg and .pdf, path should include figure title but not file extension
 
     plotXs: an optional parameter for plotting (for the paper)
+    inputAxes: optional input figure/axes, default is to create the figure/axes within this function.
+    plotExtraContours: an optional parameter for plotting (for the paper), to plot 7.5,10,and15% contamination.
+
     Returns
     -------
     None.
@@ -384,25 +390,36 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
         nSpikesBelow2, confMatrix, cont, rp, nACG, 
         firingRate,xx]  = slidingRP(spikeTimes, params)
-    
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (10,4))
-    
-    ax = axs[0]
 
-    ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0)) #TODO width??
-    ax.set_xlim([0, 5]) 
-    ax.set_xlabel('Time from spike (ms)')
-    ax.set_ylabel('ACG count (spks)')
-    if clusterlabel:
-        t1 = ('Cluster #%d: FR=%.2f' %(params['cidx'][0], firingRate))
+    if inputAxes is None:
+
+        #create axes and plot the ACG as subplot 0
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (10,4))
+
+        #if no axes are inputted, also plot the ACG in axis[0]
+        i = 0
+        ax = axs[i]
+
+        ax.bar(rp*1000, nACG[0:len(rp)], width = np.diff(rp)[0]*1000, color = 'k', edgecolor = (1, 0, 0, 0)) #TODO width??
+        ax.set_xlim([0, 5])
+        ax.set_xlabel('Time from spike (ms)')
+        ax.set_ylabel('ACG count (spks)')
+        ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+
+        i+=1 #set i = 1 to plot the next two subplots in axes 1 and 2.
+
     else:
-        t1 = ('Cluster FR = %.2f' %firingRate)
-    ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    
-    
-    ax = axs[1]
+        i=0
+        # load input figure and axes
+        fig = inputAxes[0]
+        axs = inputAxes[1]
+
+    #now in both cases, plot the matrix and a slice through the matrix
+
+
+    ax = axs[i]
     c = ax.imshow(confMatrix, extent = [rp[0]*1000, rp[-1]*1000, cont[0], cont[-1]], aspect = 'auto', vmin = 0, vmax = 100, origin = 'lower')
     ax.set_xlim((0,5))
     ax.spines['right'].set_visible(False)
@@ -413,10 +430,10 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     cbar.set_label('Confidence (%)')
     ax.invert_yaxis()
     ax.plot([rp[0]*1000, rp[-1]*1000], [10, 10], 'r', linewidth = 1)
-    # ax.plot(XsToPlot[0],10, color = XColors[0],marker = 'x',linewidth=3)
-    # ax.plot(XsToPlot[1],10, color = XColors[1],marker = 'x',linewidth=3)
-    # ax.plot(XsToPlot[2],10, color = XColors[2],marker = 'x',linewidth=3)
-    
+    if plotExtraContours:
+        ax.plot([rp[0] * 1000, rp[-1] * 1000], [7.5, 7.5], 'lightcoral', linewidth=1)
+        ax.plot([rp[0]*1000, rp[-1]*1000], [15, 15], 'maroon', linewidth = 1)
+
     if ~np.isnan(timeOfLowestCont):
         ax.plot(timeOfLowestCont*1000*np.array([1, 1]), [cont[0], cont[-1]],'r', linewidth = 1)
     
@@ -431,16 +448,19 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
         contContour[~np.isnan(ii)] = cont[(ii[~np.isnan(ii)]-1).astype(int)]
         ax.plot(rp*1000, contContour, 'r', linewidth = 2)
     val = ax.get_ylim()[1]
-    # ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 1) 
     ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
-    # ax.add_patch(patches.Rectangle((0,0), 0.5, val, fc = 'k') )
     ax.set_xlabel('Time from spike (ms)')
     ax.set_xlim([0, 5]) 
     ax.set_ylabel('Contamination (%)')
-    # ax.set_ylim([max(cont),0]) #seems unnecessary?
+
+    #set titles:
+    if clusterlabel:
+        t1 = ('Cluster #%d: FR=%.2f' % (params['cidx'][0], firingRate))
+    else:
+        t1 = ('Cluster FR = %.2f' % firingRate)
     t2 = ('max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms'% (maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont*1000))
-    
-    
+
+
     if minContWith90Confidence >= 10:
         print('FAIL')
         axs[0].set_title(t1, color='r')                   
@@ -455,8 +475,8 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
         axs[1].set_title(t2,color = 'g')
         
         
-    
-    ax = axs[2]
+    i+=1
+    ax = axs[i]
     ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'k', linewidth = 2.0)
 
     #add in the xs for figure2
@@ -484,7 +504,8 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None):
     fig.show()
     
     if params['savefig']:
-        fig.savefig(params['figpath'], dpi=300)
+        fig.savefig(params['figpath'] + '.svg', dpi=500)
+        fig.savefig(params['figpath'] + '.pdf', dpi=500)
 
 def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
     '''
