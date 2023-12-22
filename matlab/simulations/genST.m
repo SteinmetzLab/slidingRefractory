@@ -13,27 +13,24 @@ else
 end
 
 %%
-% mu = 1/rate;
-% n = rate*duration; 
-% isi = exprnd(mu, ceil(n*2), 1); % generate twice as many spikes as likely required
 
+rSim = rate/(1-refPeriod*rate); % this adjustment makes it so that the spikes generated with a RP will have the correct total rate
 
-rSim = rate/(1-refPeriod*rate);
+mu = 1/rSim; % mean of distribution of ISIs
 
-mu = 1/rSim;
+n = rate*duration; % number of spikes we'll need
 
-n = rate*duration; 
-
-isi = refPeriod+exprnd(mu, ceil(n*2), 1); 
+isi = refPeriod+exprnd(mu, ceil(n*2), 1); % generating twice as many spikes as we expect, we'll cut the extras
 
 while sum(isi)<duration
     % this part will be extremely slow if it needs to be invoked, but in
-    % general it should not be 
+    % general it should not be - only if we didn't get enough spikes
+    % somehow
     isi(end+1) = exprnd(mu);
 end
 
-st = cumsum(isi); 
-st = st(1:find(st<duration,1,'last'));
+st = cumsum(isi); % convert to spike times
+st = st(1:find(st<duration,1,'last')); %cut all the ones that we don't need
 
 return;
 
