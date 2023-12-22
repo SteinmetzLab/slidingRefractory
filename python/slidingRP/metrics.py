@@ -429,13 +429,13 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExt
     cbar = fig.colorbar(c, ax = ax, location = 'right')
     cbar.set_label('Confidence (%)')
     ax.invert_yaxis()
-    ax.plot([rp[0]*1000, rp[-1]*1000], [10, 10], 'r', linewidth = 1)
+    ax.plot([rp[0]*1000, rp[-1]*1000], [10, 10], 'r', linewidth = 2)
     if plotExtraContours:
         ax.plot([rp[0] * 1000, rp[-1] * 1000], [7.5, 7.5], 'lightcoral', linewidth=1)
         ax.plot([rp[0]*1000, rp[-1]*1000], [15, 15], 'maroon', linewidth = 1)
 
     if ~np.isnan(timeOfLowestCont):
-        ax.plot(timeOfLowestCont*1000*np.array([1, 1]), [cont[0], cont[-1]],'r', linewidth = 1)
+        ax.plot(timeOfLowestCont*1000*np.array([1, 1]), [cont[0], cont[-1]],'k--', linewidth = 1)
     
         # compute the conf=90 contour
         #zeropad confMatrix 
@@ -446,7 +446,7 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExt
         ii[ii==0] = np.nan
         contContour = np.empty(np.shape(ii)); contContour[:] = np.nan
         contContour[~np.isnan(ii)] = cont[(ii[~np.isnan(ii)]-1).astype(int)]
-        ax.plot(rp*1000, contContour, 'r', linewidth = 2)
+        ax.plot(rp*1000, contContour, 'k', linewidth = 2)
     val = ax.get_ylim()[1]
     ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
     ax.set_xlabel('Time from spike (ms)')
@@ -477,7 +477,18 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExt
         
     i+=1
     ax = axs[i]
-    ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'k', linewidth = 2.0)
+    ax.plot(rp*1000, np.squeeze(confMatrix[cont==10,:]), 'r', linewidth = 2)
+
+    ax.set_ylabel('Confidence of ≤10% contamination (%)')
+
+    if plotExtraContours:
+        ax.plot(rp*1000, np.squeeze(confMatrix[cont==7.5,:]), 'lightcoral', linewidth=1)
+        ax.plot(rp*1000, np.squeeze(confMatrix[cont==15,:]), 'maroon',linewidth=1)
+        ax.set_ylabel('Confidence of ≤C% contamination (%)')
+        ax.text(4,70,'C=7.5%',color='lightcoral')
+        ax.text(4,75,'C=10%', color = 'red')
+        ax.text(4,80,'C=15%', color = 'maroon')
+
 
     #add in the xs for figure2
     yVals = np.empty(len(XsToPlot))
@@ -485,17 +496,17 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExt
         rpInd = np.argmin(abs(rp-xVal/1000))
         if rpInd == len(rp)-1 : #edge case: last rp tested
             rpInd = rpInd-1
-        ax.plot(xVal,confMatrix[cont==10,rpInd],color = XColors[x],marker='x',linewidth=3)
+        ax.plot(xVal,confMatrix[cont==10,rpInd],color = XColors[x],marker='x',linewidth=4)
 
 
 
 
     ax.set_xlabel('Time from spike (ms)')
-    ax.set_ylabel('Confidence of ≤10% contamination (%)')
+
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     
-    ax.plot([0, 5], [90, 90], 'r'); 
+    ax.plot([0, 5], [90, 90], 'k',linewidth=2);
     ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 0.2)
     ax.set_xlim([0, 5]); 
     ax.set_ylim([0, 100]); 
