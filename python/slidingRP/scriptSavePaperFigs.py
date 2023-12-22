@@ -11,12 +11,12 @@ import os #import to create folders for each figure
 #Set rerun flag:
 rerunAllSims = False
 
-if rerunAllSims = True:
+if rerunAllSims == True:
     rerunFig3 = True
     rerunFig4 = True
     rerunFig5 = True
     rerunFig6 = True
-    rerunFig7 = True
+    # rerunFig7 = True
 
 
 
