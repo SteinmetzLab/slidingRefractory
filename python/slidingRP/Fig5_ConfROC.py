@@ -4,31 +4,91 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
-def runSaveFig5_ROC(figSavePath,resultsBasePath):
+def runSaveFig5_ROC(figSavePath,resultsBasePath, rerunFig5=False):
 
-    #load datasets (each set is a different confidence level and concatenate them into a dictionary
-    pcDictAllConf = {} #initialize dictionary (percent correct matrix for each confidence value)
-    confidence_values = [50, 60, 70, 75, 80, 85, 90, 99] #percent
-    dates = ['_07_19', '_07_25', '_07_25', '_07_19','_07_25', '_07_25', '_07_19', '_07_19'] #datasets saved on different days
-    nIter = 500
 
-    for conf, date in zip(confidence_values, dates):
-        print('loading sim results {0} conf'.format(conf))
-        resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date + str(conf) + '.pickle'
+    if rerunFig5:
+        # set up parameters to rerun simulations
+        sampleRate = 30000
+        params = {
+            'recDurs': np.array([0.5, 1, 2, 3]),  # recording durations (hours)
+            'RPs': np.array([0.001, 0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005, 0.006]),  # true RP (s)
+            'baseRates': [0.5, 1, 2, 5, 10],  # (spk/s)
+            'contRates': np.arange(0.00, 0.21, 0.02),  # contamination levels (proportion)
+            'nSim': 1000,
+            'contaminationThresh': 10,
+            'binSize': 1 / sampleRate,
+            'sampleRate': sampleRate,
+            'confidenceThresh': 90, #default confidence value (%)
+            'checkFR': False,
+            'binSizeCorr': 1 / sampleRate,
+            'returnMatrix': True,
+            'verbose': True,
+            'runLlobet': True,
+            'runLlobetPoiss': True
+        }
 
-        file = open(resultsPath, 'rb')
-        results = pickle.load(file)
-        file.close()
+        #set date for saving results to file:
+        date_now = datetime.datetime.now().strftime('_%m_%d')
+        #set different confidence values to run:
+        confidence_values = [60, 70, 80, 90, 99] #confidence (%)
+        #initialize dictionary to save simulation results for multiple confidence levels
+        pcDict = {}
+        for conf in confidence_values:
+            params['confidenceThresh'] = conf
+            print('in simulations, {0} conf'.format(conf))
 
-        pcDictAllConf[conf] = results[0] #save into pcDict: key = confidence, value = pc matrix
+            # run simulations with parameters above (params) and confidence level (conf)
+            [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+             pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3] = simulateContNeurons(params)
 
-    #also load parameter file to have all parameters used to run these simulations (they are the same across confidences)
-    params = results[-1]
+            # save all results to variable
+            results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
+                       pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3, params]
 
-    #load corresponding Hill results for comparison
-    pcDictAllConf['Hill 1.5ms'] = results[3]
-    pcDictAllConf['Hill 2ms'] = results[4]
-    pcDictAllConf['Hill 3ms'] = results[5]
+            #save results to file indicating date and confidence level
+            savefile = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationsPC' + str(
+                params['nSim']) + 'iter' + date_now + str(conf) + '.pickle'
+
+
+            with open(savefile, 'wb') as handle:
+                pickle.dump(results, handle)
+
+            pcDict[str(conf)] = results[0]
+
+        # We do not currently plot Hill results, so this loading is commented out (but can add these comparisons if wanted.)
+        # pcDict['Hill 1.5ms'] = results[3]
+        # pcDict['Hill 2ms'] = results[4]
+        # pcDict['Hill 3ms'] = results[5]
+
+        pcDict['Llobet 1.5ms'] = results[6]
+        pcDict['Llobet 2ms'] = results[7]
+        pcDict['Llobet 3ms'] = results[8]
+
+    else:
+        #load datasets (each set is a different confidence level and concatenate them into a dictionary
+        pcDictAllConf = {} #initialize dictionary (percent correct matrix for each confidence value)
+        confidence_values = [50, 60, 70, 75, 80, 85, 90, 99] #percent
+        dates = ['_07_19', '_07_25', '_07_25', '_07_19','_07_25', '_07_25', '_07_19', '_07_19'] #datasets saved on different days
+        nIter = 500
+
+        for conf, date in zip(confidence_values, dates):
+            print('loading sim results {0} conf'.format(conf))
+            resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date + str(conf) + '.pickle'
+
+            file = open(resultsPath, 'rb')
+            results = pickle.load(file)
+            file.close()
+
+            pcDictAllConf[conf] = results[0] #save into pcDict: key = confidence, value = pc matrix
+
+        #also load parameter file to have all parameters used to run these simulations (they are the same across confidences)
+        params = results[-1]
+
+        #load corresponding Hill results for comparison
+        pcDictAllConf['Hill 1.5ms'] = results[3]
+        pcDictAllConf['Hill 2ms'] = results[4]
+        pcDictAllConf['Hill 3ms'] = results[5]
 
     #set data parameters for plotting:
     frPlot = 2 # spks/s, base firing rate of the simulated neurons, parameter picked for plot
