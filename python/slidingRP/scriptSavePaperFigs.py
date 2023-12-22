@@ -12,7 +12,8 @@ import os #import to create folders for each figure
 from slidingRP.Fig2_ACGMetric import * #import code to make this figure
 figsavepath = figSaveBasePath + '\\figure2' #destination folder for all subfigures
 os.makedirs(figsavepath,exist_ok=True) #if this folder doesn't yet exist, create it
-runSaveFig2(figsavepath) #run code and save figure to figsavepath
+savedSimNeuronFlag=False #set to true to load a previously saved simulated contaminated neuron
+runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=savedSimNeuronFlag) #run code and save figure to figsavepath
 
 
 
