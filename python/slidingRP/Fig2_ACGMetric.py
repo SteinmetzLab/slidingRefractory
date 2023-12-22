@@ -2,28 +2,41 @@
 from slidingRP.metrics import slidingRP, plotSlidingRP
 from slidingRP.simulations import *
 from scipy import stats
+import pickle
 import phylib
 from phylib.stats import correlograms
 
 
 
-def runSaveFig2(figsavepath):
+def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
     #run and save the plots for the main figure 2
 
     # Simulate neuron and run the metric on it, plotting a schematic of the steps of the metric
 
-    #first, simulate a spike train for a fake example neuron
-    firingRate = 10 #spks/s
-    recDur = 3600 #seconds, i.e. a 1 hour recording
-    rp = 2.5 /1000 #seconds, i.e. a 2.5 ms refractory period
+    #possible to save combST, if savedSimNeuronFlag = True
+    if savedSimNeuronFlag: #load a saved simulated neuron
+        #path to load the simulated neuron
+        resultsPath = resultsBasePath + '\\savedExampleSimulatedNeuron.pickle'
 
-    st = genST(firingRate, recDur, rp, params=None)
+        file = open(resultsPath, 'rb')
+        combST = pickle.load(file)
+        file.close()
+    else:
+        #simulate a new contaminated neuron:
 
-    #now add contamination
-    contaminationProp = .1 #fractional contamination, i.e. 10% contamination
-    contRate = firingRate * contaminationProp #rate of the contaminating source
-    contST = genST(contRate, recDur, 0, params=None)  # add contaminating source, has 0 rp because may come from multiple neurons
-    combST = np.sort(np.concatenate((st, contST)))  # put spike times from both spike trains together (and sort chronologically)
+        #first, simulate a spike train for an uncontaminated example neuron
+        firingRate = 10 #spks/s
+        recDur = 3600 #seconds, i.e. a 1 hour recording
+        rp = 2.5 /1000 #seconds, i.e. a 2.5 ms refractory period
+
+        st = genST(firingRate, recDur, rp, params=None)
+
+        #now add contamination
+        contaminationProp = .1 #fractional contamination, i.e. 10% contamination
+        contRate = firingRate * contaminationProp #rate of the contaminating source
+        contST = genST(contRate, recDur, 0, params=None)  # add contaminating source, has 0 rp because may come from multiple neurons
+        combST = np.sort(np.concatenate((st, contST)))  # put spike times from both spike trains together (and sort chronologically)
+
 
 
     #parameters needed for running metric and plotting ACG
@@ -48,6 +61,21 @@ def runSaveFig2(figsavepath):
     print(fig)
     fig.savefig(figsavepath + '\shiftSchematic.svg', dpi=300)
     fig.savefig(figsavepath + '\shiftSchematic.pdf', dpi=300)
+
+
+    #add subplots b,c, run on this same simulated neuron
+
+    #mark X values corresponding to the example tauR's above
+    XsToPlot = [1,1.5,2.2] #tauR's to plot
+    Xcolors = ['steelblue','forestgreen','orchid'] #corresponding colors for each tauR value
+    plotXs = [XsToPlot,Xcolors] #re-format for input to plotSlidingRP below
+
+    #generate a figure object and format inputs to plotSlidingRP to save the figure
+    fig, axs = plt.subplots(1,2)
+    params['savefig']= True
+    params['figpath'] = figsavepath + '\\traceAndMatrix'
+
+    plotSlidingRP(combST,params,plotXs = plotXs,inputAxes=(fig,axs),plotExtraContours=True)
 
 
 
