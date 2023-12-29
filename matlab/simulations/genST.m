@@ -1,7 +1,7 @@
 
 
 function st = genST(rate, duration, varargin)
-% function st = genST(rate, duration)
+% function st = genST(rate, duration[, refractoryPeriod])
 %
 % generates a spike train with specified rate and duration. Rate and
 % duration should have the same units. 

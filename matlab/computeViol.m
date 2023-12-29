@@ -7,6 +7,7 @@ function [confidenceScore, expectedViol] = computeViol(...
 % contaminationProp is the query contamination level as a proportion,
 % i.e. 0.1 for 10% contamination
 
+% This is the old calculation, based on https://github.com/cortex-lab/sortingQuality/blob/master/core/ISIViolations.m
 % contaminationRate = firingRate*contaminationProp; 
 % expectedViol = contaminationRate*refDur*2*spikeCount; 
 
