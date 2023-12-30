@@ -17,7 +17,7 @@ figSaveDir = fullfile(githubDir, 'slidingRefractory', 'matlab', 'simulations');
 
 %% Fig 3a: performance across firing rates
 
-saveFig = false;
+saveFig = true;
 nSim = 1000; % number of simulations
 RPdur = 0.0025; % true RP duration, s
 recDur = 3600*2; % recording duration, s
@@ -38,12 +38,14 @@ passPct = zeros(numel(baseRates), numel(contProp));
 passErr = zeros(numel(baseRates), numel(contProp),2);
 
 for bidx = 1:numel(baseRates)
-    baseRate = baseRates(bidx)
+    totalRate = baseRates(bidx)
     for c = 1:numel(contProp)
         
         % this calculation ensures that the contaminating spikes generated
         % at this rate do form the correct proportion of the total
-        contRate = contProp(c)*baseRate/(1-contProp(c));
+        % contRate = contProp(c)*baseRate/(1-contProp(c));
+        baseRate = (1-contProp(c))*totalRate;
+        contRate = contProp(c)*totalRate;
         
         params.recDur = recDur;
         
@@ -59,7 +61,7 @@ for bidx = 1:numel(baseRates)
 %             simRes(n) = max(confMatrix(rpTestVals>0.0005))>conf;
             
             [passTest, confidence, contamination, timeOfLowestCont,...
-                nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
+                nSpikesBelow2, confMatrix, cont, rp, nACG] ...
                 = slidingRP(combST, params);
             
             simRes(n) = passTest;
@@ -91,7 +93,7 @@ if saveFig
 end
 
 %% Fig 3c: performance by recording duration
-
+% TODO: Update the base rate calculation method
 
 nSim = 1000; % number of simulations
 RPdur = 0.0025; % true RP duration, s
@@ -161,7 +163,7 @@ box off
 print(f, fullfile(figSaveDir, 'Fig3c.pdf'), '-dpdf');
 
 %% Fig 3d: performance by RP duration
-
+% TODO: update base rate calculation
 
 nSim = 1000; % number of simulations
 RPdurs = [1.5 2 3 4 5 6]/1000; % true RP duration, s
@@ -233,30 +235,36 @@ print(f, fullfile(figSaveDir, 'Fig3d.pdf'), '-dpdf');
 %% Run all simulations
 
 tic
-nSim = 1000; % number of simulations
-RPdurs = [1.5 2 3 4 5 6]/1000; % true RP duration, s
-recDurs = [0.5 1 2 3]*3600; % recording duration, s
-contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20]/100; % simulated proportion contamination
-baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
-confThreshes = [50:10:90]; % confidence we need to accept a neuron
+nSim = 10; % number of simulations
+% RPdurs = [1.5 2 3 4 5 6]/1000; % true RP duration, s
+% recDurs = [0.5 1 2 3]*3600; % recording duration, s
+% contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20]/100; % simulated proportion contamination
+% baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
+% confThreshes = [50:10:90]; % confidence we need to accept a neuron
 
-% RPdurs = [1.5 3 6]/1000; % true RP duration, s
-% recDurs = [0.5  2 ]*3600; % recording duration, s
-% contProp = [0  4   8  10  12   16  20]/100; % simulated proportion contamination
-% baseRates = [0.5 1  5 ]; % rate of the true neuron
-% confThreshes = [75 90]; % confidence we need to accept a neuron
-
-
+RPdurs = [1.5 3 6]/1000; % true RP duration, s
+recDurs = [0.5  2 ]*3600; % recording duration, s
+contProp = [0  4   8  10  12   16  20]/100; % simulated proportion contamination
+baseRates = [0.5 1  5 ]; % rate of the true neuron
+confThreshes = [75 90]; % confidence we need to accept a neuron
 
 contThresh = 10; % acceptable percentage of contamination when determining pass/fail
-
 
 params = struct(); params.cont = contThresh;
 params.contaminationThresh = contThresh;
 
+paramsCompare = struct(); 
+paramsCompare.contaminationThresh = contThresh;
+
 totalidx = 1; 
 totaln = numel(baseRates)*numel(contProp)*numel(RPdurs)*numel(recDurs)*numel(confThreshes);
 passPct = nan(totaln,1); 
+passPctLlobet1_5 = nan(totaln,1); 
+passPctLlobet2 = nan(totaln,1); 
+passPctLlobet3 = nan(totaln,1); 
+passPctHill1_5 = nan(totaln,1); 
+passPctHill2 = nan(totaln,1); 
+passPctHill3 = nan(totaln,1); 
 base_rate = nan(totaln,1); cont_prop = nan(totaln,1); RP_dur = nan(totaln,1); 
 rec_dur = nan(totaln,1); conf_level = nan(totaln,1); 
 
@@ -266,12 +274,14 @@ rec_dur = nan(totaln,1); conf_level = nan(totaln,1);
 % - could do some parfor
 
 for bidx = 1:numel(baseRates)
-    baseRate = baseRates(bidx);
+    totalRate = baseRates(bidx);
     for cidx = 1:numel(contProp)
         
         % this calculation ensures that the contaminating spikes generated
         % at this rate do form the correct proportion of the total
-        contRate = contProp(cidx)*baseRate/(1-contProp(cidx));
+        % contRate = contProp(cidx)*baseRate/(1-contProp(cidx));
+        baseRate = (1-contProp(cidx))*totalRate;
+        contRate = contProp(cidx)*totalRate;
         
         for RPidx = 1:numel(RPdurs)
             RPdur = RPdurs(RPidx);
@@ -282,12 +292,13 @@ for bidx = 1:numel(baseRates)
             for ridx = 1:numel(recDurs)
                 recDur = recDurs(ridx); 
                 params.recDur = recDur;
-                
+                paramsCompare.recDur = recDur;
+
                 for confIdx = 1:numel(confThreshes)
                     confThresh = confThreshes(confIdx);
                     params.confidenceThresh = confThresh;
         
-                    simRes = zeros(nSim, 1);
+                    simRes = zeros(nSim, 7);
                     for n = 1:nSim
 
                         st = genST(baseRate, recDur, RPdur); % true spikes
@@ -295,17 +306,49 @@ for bidx = 1:numel(baseRates)
                         combST = sort([st; contST]); % combined spike train
 
                         [passTest, confidence, contamination, timeOfLowestCont,...
-                            nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
+                            nSpikesBelow2, confMatrix, cont, rp, nACG] ...
                             = slidingRP(combST, params);
 
-                        simRes(n) = passTest;
+                        simRes(n,1) = passTest;
                         
-                        % to add: would it pass under hill2, hill3,
-                        % llobet2, llobet3? 
+                        paramsCompare.rp = rp; paramsCompare.nACG = nACG; paramsCompare.spikeCount = numel(combST);
+                        
+                        paramsCompare.metricType = 'Llobet';
+                        paramsCompare.RPdur = 0.0015;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,2) = passTest;
+
+                        paramsCompare.RPdur = 0.002;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,3) = passTest;
+
+                        paramsCompare.RPdur = 0.003;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,4) = passTest;
+
+                        paramsCompare.metricType = 'Hill';
+                        paramsCompare.RPdur = 0.0015;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,5) = passTest;
+
+                        paramsCompare.RPdur = 0.002;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,6) = passTest;
+
+                        paramsCompare.RPdur = 0.003;
+                        [passTest, estContam] = RPmetric_Classic([], paramsCompare);
+                        simRes(n,7) = passTest;
+
 
                     end
 
-                    passPct(totalidx) = sum(simRes)/nSim*100;
+                    passPct(totalidx) = sum(simRes(:,1))/nSim*100;
+                    passPctLlobet1_5(totalidx) = sum(simRes(:,2))/nSim*100;
+                    passPctLlobet2(totalidx) = sum(simRes(:,3))/nSim*100;
+                    passPctLlobet3(totalidx) = sum(simRes(:,4))/nSim*100;
+                    passPctHill1_5(totalidx) = sum(simRes(:,5))/nSim*100;
+                    passPctHill2(totalidx) = sum(simRes(:,6))/nSim*100;
+                    passPctHill3(totalidx) = sum(simRes(:,7))/nSim*100;
                     base_rate(totalidx) = baseRate; 
                     cont_prop(totalidx) = contProp(cidx); 
                     RP_dur(totalidx) = RPdur; 
@@ -321,8 +364,10 @@ for bidx = 1:numel(baseRates)
     end
 end
 
-simDat = table(base_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct);
-save simDat.mat simDat
+simDat = table(base_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct, ...
+    passPctLlobet1_5, passPctLlobet2, passPctLlobet3, passPctHill1_5, ...
+    passPctHill2, passPctHill3);
+% save simDat.mat simDat nSim
 toc
 %% example plot from simDat -- SEE simDatFigure.m for updated/better version
 
@@ -352,13 +397,17 @@ box off
 
 %% Comparing Sliding RP to Llobet and Hill
 
+% TODO: Is estContam returning the right thing?? 
 
+clearvars -except figSaveDir
 saveFig = false;
-nSim = 100; % number of simulations
+nSim = 500; % number of simulations
 RPdur = 0.0025; % true RP duration, s
 recDur = 3600*2; % recording duration, s
-contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20]/100; % simulated proportion contamination
-baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
+% contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20 25 30]/100; % simulated proportion contamination
+contProp = [0 4 10 14 16 18 19 20 21 22 25 30]/100; % simulated proportion contamination
+%baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
+baseRates = [0.5 1 10]; % rate of the true neuron
 contThresh = 10; % acceptable percentage of contamination when determining pass/fail
 confThresh = 75; % confidence we need to accept a neuron
 
@@ -385,12 +434,15 @@ passPctCompare = zeros(numel(baseRates), numel(contProp));
 passErrCompare = zeros(numel(baseRates), numel(contProp),2);
 
 for bidx = 1:numel(baseRates)
-    baseRate = baseRates(bidx)
+    %baseRate = baseRates(bidx)
+    totalRate = baseRates(bidx)
     for c = 1:numel(contProp)
         
         % this calculation ensures that the contaminating spikes generated
         % at this rate do form the correct proportion of the total
-        contRate = contProp(c)*baseRate/(1-contProp(c));
+        % contRate = contProp(c)*baseRate/(1-contProp(c));
+        contRate = contProp(c)*totalRate;
+        baseRate = (1-contProp(c))*totalRate;
         
         params.recDur = recDur;
         
@@ -415,6 +467,7 @@ for bidx = 1:numel(baseRates)
             paramsCompare.rp = rp; paramsCompare.nACG = nACG; paramsCompare.spikeCount = numel(combST);
             [passTest, estContam] = RPmetric_Classic([], paramsCompare);
             simResCompare(n) = passTest;
+            %simResCompare(n) = estContam<=contThresh;
 
         end
         

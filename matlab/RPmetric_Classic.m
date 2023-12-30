@@ -1,6 +1,10 @@
 
 
 function [passTest, estContam, rp, nACG] = RPmetric_Classic(spikeTimes, params)
+% TODO: docs
+% TODO: test when generating ACG in here
+% TODO: Is estContam returning the right thing?? 
+
 
 if nargin>1 && isfield(params, 'metricType')
     metricType = params.metricType;
