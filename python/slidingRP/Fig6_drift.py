@@ -6,7 +6,9 @@ import datetime
 def runSaveFig6(figSavePath, resultsBasePath, rerunFig6 = False):
 
 
-
+    #parameters for different drift settings:
+    drift_values = [-0.5, 0, 0.5]
+    drift_strings = ['Dec', 'Same', 'Inc']
 
     if rerunFig6:
         #set up parameters to rerun simulations
@@ -28,26 +30,59 @@ def runSaveFig6(figSavePath, resultsBasePath, rerunFig6 = False):
             'savePCfile': True
         }
 
-
-        drift_values = [-0.5,0, 0.5]
-        drift_strings = ['Dec','Same','Inc']
-
-
+        # get date for filename
         date_now = datetime.datetime.now().strftime('_%m_%d')
-        # run simulations with parameters above (params)
-        [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
-         pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3] = simulateContNeurons(params)
 
-        # save all results to variable
-        results = [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
-                   pcLlobetPoiss15, pcLlobetPoiss2, pcLlobetPoiss3, params]
+        #run simulation for each of the drift parameters:
+        for drift, string in zip(drift_values, drift_strings):
+            if drift == 0: #simulate many baserates to compare to overall rates of neurons with drift
+                params['baseRates'] = [0.75, 1, 1.25, 1.5, 2, 2.5, 3.75, 5, 6.25, 7.5, 10, 12.5]
+            else:
+                params['baseRates'] = [1, 2, 5, 10]
+            params['delta'] = drift
 
-        # save results to pickle file
-        date_now = datetime.datetime.now().strftime('_%m_%d')
-        savefile = resultsBasePath + '\\simulationsPC' + str(params['nSim']) + 'iter' + date_now + '.pickle'
+            print('in simulations, {0} drift'.format(drift))
+            [pc] = simulateChangingContNeurons(params)
 
-        with open(savefile, 'wb') as handle:
-            pickle.dump(results, handle)
+            savefile = resultsBasePath + '\\simulationsPC' + str(
+                params['nSim']) + 'iter' + date_now + 'delta' + string + '.pickle'
 
-    else:
-    # load previously saved simulation results
+            results = [pc, params]
+            if params['savePCfile']:
+                with open(savefile, 'wb') as handle:
+                    pickle.dump(results, handle)
+
+
+    else: # load previously saved simulation results
+        # initialize dictionary to load simulation results for multiple drift levels
+        pcDict = {}
+        # initialize dictionary to load parameters for multiple runs of the simulation
+        paramsDict = {}
+
+        #parameters for loading file
+        date_now = '_08_02'
+        nIter = 500
+
+        for drift, string in zip(drift_values, drift_strings):
+            print('loading sim results {0} drift'.format(drift))
+            savefile = resultsBasePath + '\\simulationsPC' + str(nIter)+ 'iter' + date_now + 'delta' + string + '.pickle'
+
+            file = open(savefile, 'rb')
+            results = pickle.load(file)
+            file.close()
+
+            pcDict[string] = results[0]
+            paramsDict[string] = results[1]
+
+
+
+    #now plot drift overlay for increasing and decreasing firing rates (subplots a-b)
+    rpPlot = 2
+    frPlot=5
+    for driftDir in ['Inc', 'Dec']:
+        params = paramsDict[driftDir]
+        for frPlot in [1, 2, 5, 10]:
+            figsavefile = resultsBasePath + '\\simulationsDrift' + driftDir + str(params['nSim']) + 'iterFR' + str(frPlot)
+            plotDriftOverlay(pcDict, paramsDict, figsavefile, rpPlot=rpPlot, frPlotInput=frPlot, driftDir=driftDir)
+
+

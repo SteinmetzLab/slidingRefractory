@@ -13,7 +13,7 @@ def runSaveFig3(figSavePath, resultsBasePath,rerunFig3 = False):
             'recDurs': np.array([0.5, 1, 2, 3]),  # recording durations (hours)
             'RPs': np.array([0.001, 0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005, 0.006]), #true RP (s)
             'baseRates': [0.5, 1, 2, 5, 10],#   (spk/s)
-            'contRates': np.arange(0.00, 0.21, 0.02), #contamination levels (proportion)
+            'contRates': np.arange(0.00, 0.21, 0.01), #contamination levels (proportion)
             'nSim': 1000,
             'contaminationThresh': 10,
             'binSize': 1 / sampleRate,
@@ -26,6 +26,25 @@ def runSaveFig3(figSavePath, resultsBasePath,rerunFig3 = False):
             'runLlobet': True,
             'runLlobetPoiss': True
         }
+
+
+        # params = {
+        #     'recDurs': np.array([ 2]),  # recording durations (hours)
+        #     'RPs': np.array([0.0025]), #true RP (s)
+        #     'baseRates': [0.5, 1, 2, 5, 10],#   (spk/s)
+        #     'contRates': np.arange(0.00, 0.21, 0.01), #contamination levels (proportion)
+        #     'nSim': 1000,
+        #     'contaminationThresh': 10,
+        #     'binSize': 1 / sampleRate,
+        #     'sampleRate': sampleRate,
+        #     'confidenceThresh': 90,
+        #     'checkFR': False,
+        #     'binSizeCorr': 1 / sampleRate,
+        #     'returnMatrix': True,
+        #     'verbose': True,
+        #     'runLlobet': True,
+        #     'runLlobetPoiss': True
+        # }
 
         #run simulations with parameters above (params)
         [pc, pc2MsNoSpikes, pcHalfInactive, pcHill15, pcHill2, pcHill3, pcLlobet15, pcLlobet2, pcLlobet3,
@@ -49,6 +68,14 @@ def runSaveFig3(figSavePath, resultsBasePath,rerunFig3 = False):
         version = '1'
 
         resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date_now + version + '.pickle'
+
+        #load just saved simulation results
+        date_now = datetime.datetime.now().strftime('_%m_%d')
+        nIter = 1000
+
+        resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date_now + '.pickle'
+
+
 
         file = open(resultsPath, 'rb')
         results = pickle.load(file)

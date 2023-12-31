@@ -19,7 +19,7 @@ from statsmodels.stats.proportion import proportion_confint as binofit
 
 
 
-def genST(rate, duration, rp, params=None):
+def genST(rate, duration, rp = 0, params=None):
 
     '''
     
@@ -30,8 +30,8 @@ def genST(rate, duration, rp, params=None):
         desired firing rate of simulated neuron (spks/s).
     duration: float
         length of recording of simulated neuron (s)
+    rp:
     params : dict, optional
-        Todo: here include any parameters like bursty, drifty? The default is None.
 
     Returns
     -------
@@ -49,9 +49,9 @@ def genST(rate, duration, rp, params=None):
     while sum(isi) < duration:
         isi = np.append(isi, np.random.exponential(mu))
 
-    st = np.cumsum(isi)
+    st = np.cumsum(isi) #convert from isi's to spike times
     if len(np.where(st < duration)[0]) > 0:
-        st = st[0:np.where(st < duration)[0][(-1)]]
+        st = st[0:np.where(st < duration)[0][(-1)]] #cut spike times after the recording duration
     else:
         st = []
 
@@ -96,7 +96,8 @@ def genChangingST(rate,duration,params,delta):
     return st
 
 def simulateContNeurons(params):
-    # initialize matrices of percent neurons pass
+
+    #initialize matrices of percent neurons pass
     passPct = np.empty([len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPct[:] = np.nan
 
@@ -120,8 +121,7 @@ def simulateContNeurons(params):
         [len(params['recDurs']), len(params['RPs']), len(params['baseRates']), len(params['contRates'])])
     passPctHill3[:] = np.nan
 
-
-
+    #check whether to simultaneously run comparison Llobet simulations
     if params and 'runLlobet' in params:
         runLlobet = params['runLlobet']
         print('running Llobet regular')
@@ -176,8 +176,11 @@ def simulateContNeurons(params):
                 print('baseRate %.2f' % baseRate)
                 cidx = 0
                 for c in params['contRates']:
-                    contRate = baseRate * c   #contamination rate is the base firing rate times the fraction contamination
+                    # contRate = baseRate * c   #contamination rate is the base firing rate times the fraction contamination
 
+                    contRate = c * baseRate / (1-c)
+                    #from Nick's code:
+                    #contRate = contProp(c) * baseRate / (1 - contProp(c));
 
                     #initialize vectors to save passing neurons
                     passVec = np.empty(params['nSim'])
@@ -222,10 +225,12 @@ def simulateContNeurons(params):
 
                     for n in range(params['nSim']):
                         if n % 20 == 0:
-                            print('-', end="")
+                            print(':', end="")
                         if c == (params['contRates'][-1]) and n == (params['nSim'] - 1):
                             print(' ')
+
                         st = genST(baseRate, recDur, rp, params)  # generate a spike train with the current base rate
+
                         if c > 0:
                             contST = genST(contRate, recDur, 0, params) #add contaminating neuron
                         else:
@@ -241,11 +246,21 @@ def simulateContNeurons(params):
                          firingRate, secondsElapsed] = slidingRP(combST, params)
 
                         #the neuron passes if the minimum contamination (at our confidence threshold) is smaller than
-                        # our contamination threshold (in percent)
-                        if minContWithConfidenceThresh <= params['contaminationThresh']:
-                            passVec[n] = 1
-                        else:
-                            passVec[n] = 0
+                        # # our contamination threshold (in percent)
+                        passVec[n] = int(maxConfidenceAtContThresh>params['confidenceThresh'])
+                        # if minContWithConfidenceThresh <= params['contaminationThresh']:
+                        #     passVec[n] = 1
+                        # else:
+                        #     passVec[n] = 0
+                        # testTimes = rpVec>0.0005
+                        # passVec[n] = max(confMatrix())
+                        # if testSliding
+                        #     % normal
+                        #     sliding
+                        #     rp
+                        #     test
+                        #     result
+                        #     simRes(n) = max(confMatrix(rpTestVals > 0.0005)) > conf;
 
                         # to evaluate the 2ms no spikes condition, check whether there are no spikes below 2ms.
                         passVec2MsNoSpikes[n] = passVec[n]
@@ -445,7 +460,7 @@ def HillMetric(firingRate, recDur, nACG, rpVec, refDur, minISI=0):
 
 
 def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
-    #recompute false positive rate as defined in Llobet et al.
+    #compute false positive rate as defined in Llobet et al.
     #This is essentially the same as our (revised) metric, but only tested at one time point instead of all possible bins.
 
     # number of violations between minISI and refDur
@@ -464,11 +479,8 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
     # rate of violations
     violationRate = nViol / violationTime
 
-    # original Hill metric fpRate
-    # false positive rate (f_1^p in Hill paper)
+    # false positive rate (called f_1^p in Hill paper)
     fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t**2 * (refDur - minISI))))
-
-    # expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + (N_c - 1)/2) #number of expected violations, as defined in Llobet et al.
 
     expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + N_c/2) #number of expected violations, as defined in Llobet et al., this gets rid of the minus 1, not sure what this difference is about
 
@@ -482,7 +494,7 @@ def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
 
     return fpRate, confidenceScore
 
-def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
+def plotSimulations(pc, params, savefile, rp_valFig1 = 0.0025,frPlot = [0.5,1,2,5,10], input_color=cc.linear_protanopic_deuteranopic_kbw_5_95_c34,
                     subplot1 = False, subplot2 = False, subplot3 = False, subplot4 = False,
                     sensSpecPlot=False, plotType='paper', zoomCont = False, addPCflag = 0, highCont=False):
     # plot type = 'full' or plot type = 'paper'
@@ -537,9 +549,8 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
             rpInd = np.where(rps == rp_valFig1)[0]
 
             # plot just baseRates = [0.5, 1, 5, 10]
-            fr_plot = [0.45, 1, 2, 5, 10]  # changed on 12/26 to look at all
             # fr_plot = [0.05,0.25,0.45,0.75,1,10]
-            fr_plot = [0.5, 1, 5, 10]
+            fr_plot = [0.5, 1, 2, 5, 10]
             # fr_plot = [0.05,0.25,0.45,0.75,1,2, 5,10]
             # fr_plot = params['baseRates']
             frs = params['baseRates']
@@ -559,7 +570,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
                     # different base rates get different colors
                     for b, baseRate in enumerate(frInd):
                         fr_use = frs[frInd[b]]
-
+                        print('here in loop')
                         if zoomCont:
                             lowerCI = CI[0][recDursInd, rpInd, frInd[b], 6:15][0]
                             upperCI = CI[1][recDursInd, rpInd, frInd[b], 6:15][0]
@@ -625,6 +636,7 @@ def plotSimulations(pc, params, savefile, rp_valFig1 = 0.002,frPlot = [0.5,1,5,1
                     plt.figtext(0.5, titleyvals[j], 'Recording duration: %.1f hour' % recDur, ha="center",
                                 va="top", fontsize=14, color="k")
 
+            print('now here')
             handles, labels = ax.get_legend_handles_labels()
             # fig.tight_layout(pad=1, w_pad=1.1, h_pad=1.3)
             # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=1.2)
@@ -1265,7 +1277,7 @@ def plotDriftOverlay(pcDict,paramsDict,savefile, rpPlot=2.5,frPlotInput = 5,drif
                 frMean = frPlot
         else:
             frPlot = frPlotInput
-
+            frMean = frPlot
         pc = pcDict[pc_key]
         params = paramsDict[pc_key]
         print(pc_key)

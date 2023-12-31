@@ -4,6 +4,7 @@
 figSaveBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\paper_figs_Nick'
 resultsBasePath = r'C:\Users\noamroth\int-brain-lab\slidingRefractory\python\slidingRP\simulationResults'
 
+
 import os #import to create folders for each figure
 
 
@@ -37,7 +38,7 @@ figsavepath = figSaveBasePath + '\\figure3'
 os.makedirs(figsavepath,exist_ok=True)
 
 
-rerunFig3 = False
+rerunFig3 = True
 runSaveFig3(figsavepath,resultsBasePath, rerunFig3 = rerunFig3)
 
 
@@ -66,13 +67,14 @@ runSaveFig5_ROC(figsavepath,resultsBasePath, rerunFig5 = rerunFig5)
 
 
 #%% Figure 6:
-# from slidingRP.Fig6_drift import *
-# figsavepath = figSaveBasePath + '\\figure6'
-# os.makedirs(figsavepath,exist_ok=True)
+from slidingRP.Fig6_drift import *
+figsavepath = figSaveBasePath + '\\figure6'
+os.makedirs(figsavepath,exist_ok=True)
 
 rerunFig6 = False
-# runSaveFig6(figsavepath, resultsBasePath, rerunFig6 = rerunFig6)
+runSaveFig6(figsavepath, resultsBasePath, rerunFig6 = rerunFig6)
 
+#%%
 # Figure 7:
 
 rerunFig7 = False

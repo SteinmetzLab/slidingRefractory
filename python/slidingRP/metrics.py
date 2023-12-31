@@ -81,7 +81,8 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     if 'recordingDuration' not in params:
         params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
         # based on the spike times
-
+    if 'runLlobet' not in params:
+        params['runLlobet'] = False #default to not run Llobet metric
 
     cids = np.unique(spikeClusters)
     
@@ -93,6 +94,9 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     rpMetrics['timeOfLowestCont'] = []
     rpMetrics['nSpikesBelow2'] = []
     rpMetrics['firingRate'] = []
+    if params['runLlobet'] == True:
+        rpMetrics['Llobet2'] = []
+        rpMetrics['Llobet3'] = []
     
     if verbose:
         print("Computing metrics for %d clusters \n" % len(cids))
@@ -102,17 +106,27 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
         st = spikeTimes[spikeClusters==cids[cidx]] 
         
         [maxConfidenceAtContaminationThresh, minContAtConfidenceThresh, timeOfLowestCont,
-            nSpikesBelow2, confMatrix, cont, rp, nACG,
+            nSpikesBelow2, confMatrix, cont, rpVec, nACG,
             firingRate, secondsElapsed] = slidingRP(st, params)
-    
+
         rpMetrics['cidx'].append(cids[cidx]) 
         rpMetrics['maxConfidenceAtContaminationThresh'].append(maxConfidenceAtContaminationThresh)
         rpMetrics['minContAtConfidenceThresh'].append(minContAtConfidenceThresh)
         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
         rpMetrics['firingRate'].append(firingRate)
-       
-        
+
+        if params['runLlobet'] == True:
+            testedCont = params['contaminationThresh']/100 #convert to fraction
+
+            fp,confLlobet2 = LlobetMetric(firingRate, params['recordingDuration'], nACG, rpVec, testedCont, 0.002, minISI=0)
+            fp,confLlobet3 = LlobetMetric(firingRate, params['recordingDuration'], nACG, rpVec, testedCont, 0.003, minISI=0)
+            #convert confidences from fractional to percent to match maxConfAtContThresh
+            confLlobet2=confLlobet2*100
+            confLlobet3=confLlobet3*100
+            rpMetrics['Llobet2'].append(confLlobet2)
+            rpMetrics['Llobet3'].append(confLlobet3)
+
         if returnMatrix:
             if 'confMatrix' not in rpMetrics:
                 rpMetrics['confMatrix'] = []
@@ -190,10 +204,18 @@ def slidingRP(spikeTimes, params = None):
         params['cidx'] = [0]
         params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
         # based on the spike times of this neuron
+        params['contaminationThresh']=10
+        params['confidenceThresh'] = 90
 
     if 'recordingDuration' not in params:
         params['recordingDuration']  = max(spikeTimes) - min(spikeTimes) #if no recording duration listed, compute a rough estimate
         # based on the spike times of this neuron
+    if 'contaminationThresh' not in params:
+        params['contaminationThresh']=10 #default confidence threshold
+    if 'confidenceThresh' not in params:
+        params['confidenceThresh']=90 #default confidence threshold
+    if '2msNoSpikesCondition' not in params:
+        params['2msNoSpikesCondition'] = False  # default is without this condition
 
     seconds_start = time.time()
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
@@ -202,8 +224,7 @@ def slidingRP(spikeTimes, params = None):
     testTimes = rp>0.0005 # (in seconds)
     #only test for refractory period durations greater than 0.5 ms
     
-    maxConfidenceAtContaminationThresh = max(confMatrix[cont==(params['contaminationThresh']),testTimes]) #TODO check behavior if no max
-    
+    maxConfidenceAtContaminationThresh = max(confMatrix[cont==(params['contaminationThresh']),testTimes])
     
     indsConf = np.row_stack(np.where(confMatrix[:,testTimes]>params['confidenceThresh']))
     ii = indsConf[0] #row inds
@@ -518,14 +539,50 @@ def plotSlidingRP(spikeTimes, params = None,plotXs = None,inputAxes=None,plotExt
         fig.savefig(params['figpath'] + '.svg', dpi=500)
         fig.savefig(params['figpath'] + '.pdf', dpi=500)
 
-def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
+
+def LlobetMetric(firingRate, recDur, nACG, rpVec, testedCont, refDur, minISI=0):
+    #compute false positive rate as defined in Llobet et al.
+    #This is essentially the same as our (revised) metric, but only tested at one time point instead of all possible bins.
+
+    # number of violations between minISI and refDur
+    nViol = np.sum(nACG[np.where(rpVec > minISI)[0][0]: np.where(rpVec > refDur)[0][0] + 1])
+    contaminationRate = firingRate * testedCont
+
+    # time for violations to occur
+    N_t = firingRate * recDur  # total number of spikes
+    N_c = contaminationRate * recDur  #total number of contaminating spikes you would expect under the tested contamination value
+    N_b = N_t - N_c # the "base" number of spikes under the inputted (tested) contamination value
+
+
+    violationTime = 2 * N_t * (refDur - minISI)
+    # this violationTime was previously written equivalently as  2 * firingRate * recDur * (refDur - minISI)
+
+    # rate of violations
+    violationRate = nViol / violationTime
+
+    # false positive rate (called f_1^p in Hill paper)
+    fpRate = 1 - np.sqrt(1 - ((nViol * recDur)/ (N_t**2 * (refDur - minISI))))
+
+    expectedViol = 2 * refDur * 1/recDur * N_c * (N_b + N_c/2) #number of expected violations, as defined in Llobet et al., this gets rid of the minus 1, not sure what this difference is about
+
+    # the confidence that this neuron is contaminated at a level less than contaminationProp, given the number of true
+    # observed violations and under the assumption of Poisson firing
+    confidenceScore = 1 - stats.poisson.cdf(nViol, expectedViol)
+
+    # For cases where this is greater than 1, set to 1
+    if fpRate > 1:
+        fpRate = 1
+
+    return fpRate, confidenceScore
+
+def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps,timeBins, params):
     '''
     Fits a sigmoid to the ACGs of a population of neurons, each of which has a spike cluster ID (spikeClusters, see below)
 
     Parameters
     ----------
     spikeTimes : numpy.ndarray
-        array of spike times (ms)
+        array of spike times (s) #NR changed comment rom ms to s 12/28/23
     spikeClusters: numpy.ndarray
         array of spike cluster ids, corresponding to each spike time in spikeTimes
     brainRegions: numpy.ndarray
@@ -567,9 +624,9 @@ def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, pa
         minFR = 1 #spks/s
         minAmp = 50 #uV
         print('Firing rate is',fr)
-        estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
+        estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, timeBins, fr, amp, minFR, minAmp, params)
         try:
-            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
+            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, timeBins, fr, amp, minFR, minAmp, params)
 
             rpFit['cidx'].append(cids[cidx]) 
             rpFit['rpEstimate'].append(estimatedRP)

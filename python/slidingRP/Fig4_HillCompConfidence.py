@@ -68,7 +68,6 @@ def runSaveFig4(figsavepath, resultsBasePath,rerunFig4 = False):
 
     else: #load simulation results from file
 
-        #initialize dictionary to load simulation results for multiple confidence levels
         pcDict = {}
 
         #parameters for loading file

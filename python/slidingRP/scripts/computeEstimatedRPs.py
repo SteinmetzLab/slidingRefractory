@@ -22,7 +22,9 @@ import sys
 sys.path.append(r'C:\Users\Steinmetz Lab User\int-brain-lab\paper-reproducible-ephys')
 sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\metrics\slidingRP')
 sys.path.append(r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python')
+
 #from reproducible_ephys_functions import query
+
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 import mpl_scatter_density # adds projection='scatter_density'
@@ -31,10 +33,8 @@ from one.api import ONE
 from slidingRP import *
 import pickle
 one = ONE()
-
-
 from phylib.stats import correlograms
-from RP_plotting import *
+# from RP_plotting import *
 import matplotlib as mpl
 mpl.rcParams['pdf.fonttype'] = 42 #sets fonts as editable
 
