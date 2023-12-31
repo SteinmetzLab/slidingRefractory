@@ -299,9 +299,9 @@ C_llobet2 = 1/2 * (1 - sqrt(1 - 2*Nv*D/Nt^2/P))
 %% testing the comparison between hill / old / corrected
 
 D = 7200; 
-P = 0.003; 
-Nb = 2*D; 
-Nc = 0.5*D; 
+P = 0.002; 
+Nb = 0.5*D; 
+Nc = 0.125*D; 
 Nt = Nb+Nc; 
 Nv = 2*P/D * Nc .* (Nb + (Nc-1)/2);
 
@@ -325,9 +325,9 @@ xlabel('Recording dur (s)'); ylabel('Reported contamination');
 legend({'Llobet (true)', 'Old method', 'Hill'});
 
 D = 7200; 
-P = 0.003; 
-Nb = 2*D; 
-Nc = 0.5*D; 
+P = 0.002; 
+Nb = 0.5*D; 
+Nc = 0.125*D; 
 Nt = Nb+Nc; 
 Nv = 2*P/D * Nc .* (Nb + (Nc-1)/2);
 
@@ -351,8 +351,8 @@ legend({'Llobet (true)', 'Old method', 'Hill'});
 
 
 D = 7200; 
-P = 0.003; 
-Nt = 3*D; 
+P = 0.002; 
+Nt = 0.625*D; 
 
 subplot(2,2,3); 
 contPropVals = 0:0.02:0.5;
@@ -379,7 +379,7 @@ legend({'Llobet (true)', 'Old method', 'Hill', '(imaginary)'});
 
 
 D = 7200; 
-P = 0.003; 
+P = 0.002; 
 CP = 0.2;
 
 subplot(2,2,4); 
@@ -403,3 +403,69 @@ plot(totalRateVals, C_hill, '.-', 'Color', co(2,:));
 plot(totalRateVals(isim), C_hill(isim), 'ko'); 
 xlabel('Total spike count'); ylabel('Reported contamination'); 
 legend({'Llobet (true)', 'Old method', 'Hill', '(imaginary)'});
+
+
+%% Scratch test of the source of the weird non-linearity in the proportion passing in Llobet at 0.5 sp/s and 20% contamination
+
+baseRate = 0.5;
+totalRate = 0.5;
+RPdur = 0.002;
+recDur = 7200;
+contProps = 0:0.01:0.3;
+obsViol = 0:20; 
+contaminationThresh = 10; % (%)
+
+figure; 
+colors = myCopper(0.6, numel(contProps));
+
+for c = 1:numel(contProps)
+    
+    % main version in the sims: adding on contamination on top of the base
+    % rate
+    %contRate = contProps(c)*baseRate/(1-contProps(c));
+
+    % different version: setting a fixed "total rate" and splitting it
+    % between real and contamination
+    baseRate = totalRate*(1-contProps(c)); 
+    contRate = totalRate*contProps(c); 
+
+    spikeCount = recDur*(baseRate+contRate);
+
+    expectedNc = spikeCount * contProps(c);
+    expectedNb = spikeCount * (1-contProps(c));
+
+    %expectedViol = 2*P/D * N_c .* (N_b + (N_c-1)/2);
+    expectedViol = 2*RPdur/recDur * expectedNc .* (expectedNb + (expectedNc-1)/2);
+
+    formulaCheck = 1 - sqrt(1 - expectedViol*recDur/(spikeCount^2*RPdur));
+
+    %estContam = 1 - sqrt(1 - Nv*D/(Nt^2*P));
+    estContam = 1 - sqrt(1 - obsViol*recDur/(spikeCount^2*RPdur));
+    %isr = arrayfun(@isreal,estContam); % wtf why doesn't this work
+
+    subplot(2,2,1); 
+    plot(contProps(c), expectedViol, 'ko'); hold on; 
+    xlabel('contamination'); ylabel('expected N violations'); 
+
+    subplot(2,2,2); 
+    plot(obsViol, real(estContam), '.-', 'Color', colors(c,:)); hold on; 
+    xlabel('observed N violations'); ylabel('inferred contamination');
+
+    subplot(2,2,3); 
+    plot(contProps(c), formulaCheck, 'ko'); hold on;
+    xlabel('contamination'); ylabel('inferred contamination')
+
+    subplot(2,2,4); 
+    maxPassing = find(real(estContam)<(contaminationThresh/100),1, 'last');
+    pctPass = poisscdf(maxPassing-1, expectedViol); 
+    plot(contProps(c), pctPass, 'ko'); hold on; 
+    xlabel('contamination'); ylabel('proportion passing'); 
+end
+
+% so the answer is clear: since total spike rate increases as contamination
+% increases, the 'cost' of having a single violating spike slowly
+% decreases. eventually, you can pass with one violating spike - this
+% happens at a total rate right around 0.5sp/s base plus 20% contamination.
+% So while there are more and more simulations with 1 violation, these
+% suddenly don't cause a failure anymore, resulting in a jump in the
+% proportion passing. 
