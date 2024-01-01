@@ -95,14 +95,14 @@ df_Horwitz = pd.DataFrame(dataList,columns = dataframeColumns)
 
 
 #now do the same for IBL, Steinmetz,Allen:
-#%%
+#%%Steinmetz data
 
 from one.api import ONE
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\savedSteinmetzFits2\\'
+savefile = r'C:\Users\Steinmetz Lab User\Documents\GitHub\analysis\slidingRefractory\python\savedSteinmetzFits\\'
 
 one = ONE(cache_dir='E:\Steinmetz2019\Steinmetz_et_al_2019_9974357\9974357')  # The location of the unarchived data
 sessions = one.search()
@@ -435,3 +435,14 @@ for iIns, ins in enumerate(insertions):
 
 
 
+#%%
+#concatenate all to a dataframe, and save:
+
+listDFs = [df_Horwitz, df_Steinmetz, df_IBL, df_Allen]
+
+df_AllData = pd.concat(listDFs)
+
+#save to tsv:
+saveFileName = dataBasePath + '\\AllRPNeurons.tsv'
+
+df_AllData.to_csv(saveFileName, sep = "\t")
