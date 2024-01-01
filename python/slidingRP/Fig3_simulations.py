@@ -63,18 +63,11 @@ def runSaveFig3(figSavePath, resultsBasePath,rerunFig3 = False):
 
     else:
         #load previously saved simulation results
-        nIter = 500 #number of simulation iterations run
-        date_now = '_06_29' #date simulations were run
-        version = '1'
+        nIter = 1000 #number of simulation iterations run
+        date_now = '_12_29' #date simulations were run
 
-        resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date_now + version + '.pickle'
-
-        #load just saved simulation results
-        date_now = datetime.datetime.now().strftime('_%m_%d')
-        nIter = 1000
 
         resultsPath = resultsBasePath + '\\simulationsPC' + str(nIter) + 'iter' + date_now + '.pickle'
-
 
 
         file = open(resultsPath, 'rb')

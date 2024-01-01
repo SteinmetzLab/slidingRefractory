@@ -71,7 +71,7 @@ def runSaveFig4(figsavepath, resultsBasePath,rerunFig4 = False):
         pcDict = {}
 
         #parameters for loading file
-        date_load = '_10_08' #date of simulations
+        date_load = '_12_29' #date of simulations
         nIter = 1000 #number of iterations run for this run of simulations
 
         # set parameters for plotting
