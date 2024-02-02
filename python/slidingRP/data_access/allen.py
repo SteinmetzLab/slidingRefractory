@@ -20,7 +20,7 @@ class AllenDataAccess:
         return self.insertions
     
     def session2probes(self, session):
-        return list(self.clusters[self.clusters.ecephys_session_id==sid].index.get_level_values(0).unique())
+        return list(self.clusters[self.clusters.ecephys_session_id==session].index.get_level_values(0).unique())
         
     def probe2session(self, probe):
         return self.clusters.loc[probe].ecephys_session_id.iloc[0]
