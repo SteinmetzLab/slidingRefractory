@@ -26,9 +26,11 @@ def compute_timebins(acg, bin_size_secs):
 
 def compute_rf(acg,
                min_sig=np.array([0.0, 0.0005]),  # 0-0.5 ms
-               t_medfilter=0.0008,
+               t_medfilter=0.00083,
                bin_size_secs=1 / 30_000,
-               timeBins=None):
+               timeBins=None,
+               RPEstimateFromPercentageOfSlope = 0.05,
+               fr_percentage=10 / 100):
     if timeBins is None:  # Compute timebins
         x = np.arange(corr_rf.shape[1])
         timeBins = x.dot(bin_size_secs)
@@ -44,7 +46,14 @@ def compute_rf(acg,
     # max forces the peak to be outside of this time window
 
     # To find the peak, make sure it is strictly higher than this value
-    peaks_possible = np.where(med_filt[peaks_idx] > minSigmoid)[0]
+    # peaks_possible = np.where(med_filt[peaks_idx] > minSigmoid)[0]
+
+    # To find the peak, make sure it is strictly higher than this value
+    # and above a baseline percentage firing rate
+    fr_baseline = fr_percentage * (med_filt.max() - med_filt.min())
+    peaks_possible = np.where((med_filt[peaks_idx] > minSigmoid) &
+                              (med_filt[peaks_idx] > fr_baseline))[0]
+
     # if no peak is found, abort and return NaN
     if len(peaks_possible) == 0:
         estimatedRP = np.nan
@@ -70,7 +79,6 @@ def compute_rf(acg,
         ySigmoid = sigmoid(xSigmoid, *fitParams)
 
         # find RP
-        RPEstimateFromPercentageOfSlope = 0.10
         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
         estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
     except:
