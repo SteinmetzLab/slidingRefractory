@@ -14,6 +14,7 @@ import matplotlib.patches as patches
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
+import scipy
 import time
 
 
@@ -48,8 +49,8 @@ def compute_rf(acg,
     if len(peaks_possible) == 0:
         estimatedRP = np.nan
         estimateIdx = np.nan
-        xSigmoid = np.nan
-        ySigmoid = np.nan
+        xSigmoid = np.array([])
+        ySigmoid = np.array([])
         return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 
     # Use first peak possible found (i.e. closest to 0 second on the ACG)
@@ -76,8 +77,8 @@ def compute_rf(acg,
         # print('fit error')
         estimatedRP = np.nan
         estimateIdx = np.nan
-        xSigmoid = np.nan
-        ySigmoid = np.nan
+        xSigmoid = np.array([])
+        ySigmoid = np.array([])
     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 
 
