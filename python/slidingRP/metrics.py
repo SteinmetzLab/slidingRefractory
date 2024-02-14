@@ -23,6 +23,64 @@ def compute_timebins(acg, bin_size_secs):
     return timeBins
 
 
+def compute_rf(acg,
+               min_sig=np.array([0.0, 0.0005]),  # 0-0.5 ms
+               t_medfilter=0.0008,
+               bin_size_secs=1 / 30_000,
+               timeBins=None):
+    if timeBins is None:  # Compute timebins
+        x = np.arange(corr_rf.shape[1])
+        timeBins = x.dot(bin_size_secs)
+
+    # Median filter
+    med_filt = scipy.ndimage.median_filter(acg, size=int(np.round(t_medfilter / bin_size_secs)))
+    # Find all the peaks on this filtered trace
+    peaks_idx = scipy.signal.find_peaks(med_filt)[0]
+
+    # Compute value (max) in short time window near 0
+    minSigmoid = np.max(med_filt[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])
+    # Note: could be using either the max() or mean()
+    # max forces the peak to be outside of this time window
+
+    # To find the peak, make sure it is strictly higher than this value
+    peaks_possible = np.where(med_filt[peaks_idx] > minSigmoid)[0]
+    # if no peak is found, abort and return NaN
+    if len(peaks_possible) == 0:
+        estimatedRP = np.nan
+        estimateIdx = np.nan
+        xSigmoid = np.nan
+        ySigmoid = np.nan
+        return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+
+    # Use first peak possible found (i.e. closest to 0 second on the ACG)
+    peak_idx = peaks_idx[peaks_possible[0]]
+    maxSigmoid = med_filt[peak_idx]
+
+    # Truncate ACG and time bins according to max
+    timeBins_fit = timeBins[0:peak_idx]
+    acg_fit = med_filt[0:peak_idx]
+
+    # fit the sigmoid with max and min fixed
+    try:
+        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid), timeBins_fit, acg_fit)
+        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
+
+        xSigmoid = timeBins
+        ySigmoid = sigmoid(xSigmoid, *fitParams)
+
+        # find RP
+        RPEstimateFromPercentageOfSlope = 0.10
+        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
+        estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
+    except:
+        # print('fit error')
+        estimatedRP = np.nan
+        estimateIdx = np.nan
+        xSigmoid = np.nan
+        ySigmoid = np.nan
+    return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+
+
 def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
     # remove first ms from the computation
     # idx_time = (timeBins > min_sig[0])
