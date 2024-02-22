@@ -56,8 +56,7 @@ def compute_rf(acg,
 
     '''
     if timeBins is None:  # Compute timebins
-        x = np.arange(acg.shape[1])
-        timeBins = x.dot(bin_size_secs)
+        timeBins = compute_timebins(acg, bin_size_secs)
 
     # Median filter
     med_filt = scipy.ndimage.median_filter(acg, size=int(np.round(t_medfilter / bin_size_secs)))
