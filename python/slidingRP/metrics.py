@@ -56,7 +56,7 @@ def compute_rf(acg,
 
     '''
     if timeBins is None:  # Compute timebins
-        x = np.arange(corr_rf.shape[1])
+        x = np.arange(acg.shape[1])
         timeBins = x.dot(bin_size_secs)
 
     # Median filter
