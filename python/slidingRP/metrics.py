@@ -24,6 +24,11 @@ def compute_timebins(acg, bin_size_secs):
     return timeBins
 
 
+def sigmoid(x, L, x0, k, b):  # L is max value; x0 is the midpoint x value; k is the steepness, b is the baseline shift
+    y = L / (1 + np.exp(-k * (x - x0))) + b
+    return y
+
+
 def compute_rf(acg,
                min_sig=np.array([0.0, 0.0005]),  # 0-0.5 ms
                t_medfilter=0.00083,
@@ -31,6 +36,25 @@ def compute_rf(acg,
                timeBins=None,
                RPEstimateFromPercentageOfSlope = 0.05,
                fr_percentage=10 / 100):
+    '''
+    Compute the refractory period (RP) from an auto-correlogram (ACG) array, by :
+    - filtering the ACG (median filter)
+    - finding the ACG first local peak above a certain firing rate threshold
+    - fitting a sigmoid to the first portion of the filtered ACG
+    - The RP is defined as the time at which a certain percentage of the sigmoid fit is reached.
+    :param acg: the autocorrelogram, 1D numpy array containing spike number in bins of size bin_size_secs
+    :param min_sig: time window in second to compute the minimum of the sigmoid fit
+    :param t_medfilter: window for the median filter, in seconds
+    :param bin_size_secs: size of the acg bins, in seconds
+    :param timeBins: time of the bins, re-computed if None
+    :param RPEstimateFromPercentageOfSlope: portion of the sigmoid fit at which to take the time as RP; value from 0-1
+    :param fr_percentage: percentage of the max-min firing rate, used to find the first peak.
+    :return:
+    estimatedRP: the estimated RP in milliseconds
+    estimateIdx: the index of the RP (which corresponds to the bin index of the ACG)
+    xSigmoid, ySigmoid: the sigmoid fit (x-values: times, y-values: curve values)
+
+    '''
     if timeBins is None:  # Compute timebins
         x = np.arange(corr_rf.shape[1])
         timeBins = x.dot(bin_size_secs)
@@ -44,9 +68,6 @@ def compute_rf(acg,
     minSigmoid = np.max(med_filt[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])
     # Note: could be using either the max() or mean()
     # max forces the peak to be outside of this time window
-
-    # To find the peak, make sure it is strictly higher than this value
-    # peaks_possible = np.where(med_filt[peaks_idx] > minSigmoid)[0]
 
     # To find the peak, make sure it is strictly higher than this value
     # and above a baseline percentage firing rate
@@ -89,6 +110,10 @@ def compute_rf(acg,
         ySigmoid = np.array([])
     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 
+
+'''
+The below is legacy code, written prior to 22-Feb-2024 by N. Steinmetz and N. Roth
+'''
 
 def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
     # remove first ms from the computation
@@ -619,11 +644,6 @@ def find_nearest(array, value):
         out = np.nan
 
     return out
-
-
-def sigmoid(x, L, x0, k, b):  # L is max value; x0 is the midpoint x value; k is the steepness, b is the baseline shift
-    y = L / (1 + np.exp(-k * (x - x0))) + b
-    return y
 
 
 def closest(lst, K):
