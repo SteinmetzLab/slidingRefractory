@@ -6,7 +6,8 @@ Created on Sun Jul 10 11:34:59 2022
 
 compute the metric for a single cluster (neuron) in a recording
 """
-
+import warnings
+from scipy.optimize import OptimizeWarning
 from phylib.stats import correlograms
 from types import SimpleNamespace
 import matplotlib.pyplot as plt
@@ -55,6 +56,9 @@ def compute_rf(acg,
     xSigmoid, ySigmoid: the sigmoid fit (x-values: times, y-values: curve values)
 
     '''
+    # This is a hack: we do not want to return the fit on an ACG where the fit is poor
+    warnings.simplefilter("error", OptimizeWarning)
+
     if timeBins is None:  # Compute timebins
         timeBins = compute_timebins(acg, bin_size_secs)
 
@@ -101,7 +105,7 @@ def compute_rf(acg,
         # find RP
         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
         estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
-    except:
+    except OptimizeWarning:  # This is in the case the bins are too few
         # print('fit error')
         estimatedRP = np.nan
         estimateIdx = np.nan
