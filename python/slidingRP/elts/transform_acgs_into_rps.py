@@ -7,6 +7,7 @@ import numpy as np
 from one.api import ONE
 import ephys_atlas.data
 from iblatlas.atlas import BrainRegions
+from brainwidemap import bwm_query
 
 pic_path = Path("/Users/gaelle/Desktop/Reports/RefractoryPeriod/Picture")
 data_path = Path("/Users/gaelle/Desktop/Reports/RefractoryPeriod/Data")
@@ -18,6 +19,15 @@ regions = ['Isocortex', 'TH', 'HPF']
 # --- Datasets for Steinmetz and Allen were pre-downloaded from G-drive
 # https://github.com/orgs/int-brain-lab/projects/11/views/6?sliceBy%5Bvalue%5D=GaelleChapuis&filterQuery=-status%3ANew%2C%22On+Hold%22%2C%22Info+needed%22+sprint%3A%40current+sprint%3A%22Sprint+6%22&pane=issue&itemId=56008576
 
+##
+# LOAD IBL EPHYS ATLAS DATA AND FILTER TO INCORPORATE ONLY BW PID AND GOOD UNITS
+# --- Get BW PIDs
+pw = 'international'
+one = ONE(base_url='https://openalyx.internationalbrainlab.org',
+          password=pw, silent=True)
+df = bwm_query(one)
+pids_bw = np.unique(df[['pid']].values)
+
 # --- Load IBL dataset once (filter for good units and region later)
 one = ONE(base_url="https://alyx.internationalbrainlab.org", mode='local')
 LABEL = '2024_W04'
@@ -27,7 +37,13 @@ df_raw_features, df_clusters, df_channels, df_probes = ephys_atlas.data.download
 corr_rf = ephys_atlas.data.read_correlogram(LOCAL_DATA_PATH.joinpath(
     LABEL, 'clusters_correlograms_refractory_period.bin'), df_clusters.shape[0])
 
-# Remap acronyms to Cosmos
+# --- Take only BW datasets
+df_clusters = df_clusters.drop(columns=['cluster_id']).reset_index()
+index_pid = np.where(df_clusters['pid'].isin(pids_bw))[0]
+df_clusters = df_clusters.iloc[index_pid]
+corr_rf = corr_rf[index_pid, :]
+
+# ---Remap acronyms to Cosmos
 mapping = 'Cosmos'
 br = BrainRegions()
 # Remove atlas_id nans
@@ -38,12 +54,17 @@ corr_rf = corr_rf[index_nonnan, :]
 df_clusters[mapping + '_id'] = br.remap(df_clusters['atlas_id'].values.astype(int),
                                         source_map='Allen', target_map=mapping)
 df_clusters[mapping + '_acronym'] = br.id2acronym(df_clusters[mapping + '_id'])
+
 # Keep only good units
-df_clusters = df_clusters.drop(columns=['cluster_id']).reset_index()
-indx_good = df_clusters.index[df_clusters['label'] == 1]
+indx_good = np.where(df_clusters['label'] == 1)[0]
 df_clusters_good = df_clusters.iloc[indx_good]
 acgs_ibl = corr_rf[indx_good, :]
-#TODO take only BW datasets
+
+# Save file
+file = data_path.joinpath('ibl').joinpath(f'acgs.npy')
+with open(file, 'wb') as f:
+    np.save(file, acgs_ibl, allow_pickle=True)
+
 ##
 # --- For all datasets, we used a bin size of 1 / 30000 seconds to make the ACG
 bin_size_secs = 1 / 30_000
