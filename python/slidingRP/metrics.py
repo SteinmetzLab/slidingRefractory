@@ -104,6 +104,14 @@ def compute_rf(acg,
 
         # find RP
         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
+        '''
+        # ---- Leaving the below commented because this is not a suitable approach
+        # ---- Not to be repeated
+        # Compute the index of the first ACG bin with non-null firing rate
+        first_index = np.where(acg != 0)[0][0]
+        if estimateIdx > first_index:  # If the estimate RP is AFTER the first ACG bin
+            estimateIdx = first_index  # Replace
+        '''
         estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
         if np.max(ySigmoid) - np.min(ySigmoid) < 1:  # The fit is essentially flat
             raise OptimizeWarning

@@ -30,9 +30,14 @@ corr_rf = ephys_atlas.data.read_correlogram(LOCAL_DATA_PATH.joinpath(
 # Remap acronyms to Cosmos
 mapping = 'Cosmos'
 br = BrainRegions()
-df_clusters[mapping + '_id'] = br.remap(df_clusters['atlas_id'], source_map='Allen', target_map=mapping)
+# Remove atlas_id nans
+index_nonnan = np.where(~np.isnan(df_clusters['atlas_id']))[0]
+df_clusters = df_clusters.iloc[index_nonnan]
+corr_rf = corr_rf[index_nonnan, :]
+# Remap (make sure atlas ID are int prior to remapping)
+df_clusters[mapping + '_id'] = br.remap(df_clusters['atlas_id'].values.astype(int),
+                                        source_map='Allen', target_map=mapping)
 df_clusters[mapping + '_acronym'] = br.id2acronym(df_clusters[mapping + '_id'])
-
 # Keep only good units
 df_clusters = df_clusters.drop(columns=['cluster_id']).reset_index()
 indx_good = df_clusters.index[df_clusters['label'] == 1]
