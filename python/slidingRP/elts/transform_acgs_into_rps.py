@@ -59,6 +59,7 @@ df_clusters[mapping + '_acronym'] = br.id2acronym(df_clusters[mapping + '_id'])
 indx_good = np.where(df_clusters['label'] == 1)[0]
 df_clusters_good = df_clusters.iloc[indx_good]
 acgs_ibl = corr_rf[indx_good, :]
+acgs_ibl = acgs_ibl
 
 # Save file
 file = data_path.joinpath('ibl').joinpath(f'acgs.npy')
@@ -79,9 +80,11 @@ for dataset in datasets:
             ADA = AllenDataAccess(pqt_path, data_dir)
             # Load acgs for a given brain region
             acgs, df = ADA.load_acgs_region(region)
+            acgs = np.transpose(acgs)
         elif dataset == "steinmetz":
             SDA = SteinmetzDataAccess(pqt_path, data_dir)
             acgs, df = SDA.load_acgs_region(region)
+            acgs = np.transpose(acgs)
         elif dataset == 'ibl':
             # Filter for region
             indx_reg = df_clusters_good[mapping + '_acronym'] == region
@@ -91,7 +94,7 @@ for dataset in datasets:
         estimatedRP_array = np.empty((acgs.shape[0], 1))
         mean_fr_array = np.empty((acgs.shape[0], 1))
         for i_unit in range(0, acgs.shape[0]):
-            acg = acgs[:, i_unit]
+            acg = acgs[i_unit, :]
             mean_fr = sum(acg)/len(acg)
             estimatedRP, estimateIdx, xSigmoid, ySigmoid = \
                 compute_rf(acg, bin_size_secs=bin_size_secs)
