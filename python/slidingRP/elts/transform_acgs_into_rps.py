@@ -28,9 +28,10 @@ corr_rf = ephys_atlas.data.read_correlogram(LOCAL_DATA_PATH.joinpath(
     LABEL, 'clusters_correlograms_refractory_period.bin'), df_clusters.shape[0])
 
 # Remap acronyms to Cosmos
+mapping = 'Cosmos'
 br = BrainRegions()
-df_clusters['cosmos_id'] = br.remap(df_clusters['atlas_id'], source_map='Allen', target_map='Cosmos')
-df_clusters['cosmos_acronym'] = br.id2acronym(df_clusters['cosmos_id'])
+df_clusters[mapping + '_id'] = br.remap(df_clusters['atlas_id'], source_map='Allen', target_map=mapping)
+df_clusters[mapping + '_acronym'] = br.id2acronym(df_clusters[mapping + '_id'])
 
 # Keep only good units
 df_clusters = df_clusters.drop(columns=['cluster_id']).reset_index()
@@ -57,7 +58,7 @@ for dataset in datasets:
             acgs, df = SDA.load_acgs_region(region)
         elif dataset == 'ibl':
             # Filter for region
-            indx_reg = df_clusters_good['Cosmos_acronym'] == region
+            indx_reg = df_clusters_good[mapping + '_acronym'] == region
             acgs = acgs_ibl[indx_reg, :]
 
         # Compute RF from ACG for single unit
