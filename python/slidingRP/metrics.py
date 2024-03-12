@@ -105,6 +105,8 @@ def compute_rf(acg,
         # find RP
         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
         estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
+        if np.max(ySigmoid) - np.min(ySigmoid) < 1:  # The fit is essentially flat
+            raise OptimizeWarning
     except (OptimizeWarning, RuntimeWarning, RuntimeError):  # This is in the case the bins are too few
         # print('fit error')
         estimatedRP = np.nan
