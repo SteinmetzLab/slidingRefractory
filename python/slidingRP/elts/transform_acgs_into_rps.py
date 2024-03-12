@@ -43,7 +43,7 @@ df_clusters = df_clusters.drop(columns=['cluster_id']).reset_index()
 indx_good = df_clusters.index[df_clusters['label'] == 1]
 df_clusters_good = df_clusters.iloc[indx_good]
 acgs_ibl = corr_rf[indx_good, :]
-
+#TODO take only BW datasets
 ##
 # --- For all datasets, we used a bin size of 1 / 30000 seconds to make the ACG
 bin_size_secs = 1 / 30_000
@@ -68,13 +68,16 @@ for dataset in datasets:
 
         # Compute RF from ACG for single unit
         estimatedRP_array = np.empty((acgs.shape[0], 1))
+        mean_fr_array = np.empty((acgs.shape[0], 1))
         for i_unit in range(0, acgs.shape[0]):
             acg = acgs[:, i_unit]
+            mean_fr = sum(acg)/len(acg)
             estimatedRP, estimateIdx, xSigmoid, ySigmoid = \
                 compute_rf(acg, bin_size_secs=bin_size_secs)
 
             # Save into array
             estimatedRP_array[i_unit] = estimatedRP
+            mean_fr_array[i_unit] = mean_fr
 
             # Plot auto-corr
             if is_plot and not np.isnan(estimatedRP):
@@ -91,6 +94,11 @@ for dataset in datasets:
                 plt.close(fig)
 
         # Save file
-        file = data_path.joinpath(dataset).joinpath(f'{region}.npy')
+        file = data_path.joinpath(dataset).joinpath(f'estimatedRP_{region}.npy')
         with open(file, 'wb') as f:
             np.save(file, estimatedRP_array, allow_pickle=True)
+
+        file = data_path.joinpath(dataset).joinpath(f'mean_fr_{region}.npy')
+        with open(file, 'wb') as f:
+            np.save(file, mean_fr_array, allow_pickle=True)
+
