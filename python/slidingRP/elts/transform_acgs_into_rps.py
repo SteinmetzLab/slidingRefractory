@@ -61,11 +61,13 @@ df_clusters_good = df_clusters.iloc[indx_good]
 acgs_ibl = corr_rf[indx_good, :]
 acgs_ibl = acgs_ibl
 
-# Save file
+# Save files (ACG and DF)
 file = data_path.joinpath('ibl').joinpath(f'acgs.npy')
 with open(file, 'wb') as f:
     np.save(file, acgs_ibl, allow_pickle=True)
 
+file = data_path.joinpath('ibl').joinpath(f'clusters_df.csv')
+df_clusters_good.to_parquet(file)
 ##
 # --- For all datasets, we used a bin size of 1 / 30000 seconds to make the ACG
 bin_size_secs = 1 / 30_000
@@ -80,11 +82,11 @@ for dataset in datasets:
             ADA = AllenDataAccess(pqt_path, data_dir)
             # Load acgs for a given brain region
             acgs, df = ADA.load_acgs_region(region)
-            acgs = np.transpose(acgs)
+            acgs = np.transpose(acgs)  # So that it is in the format Nunit x Nbin
         elif dataset == "steinmetz":
             SDA = SteinmetzDataAccess(pqt_path, data_dir)
             acgs, df = SDA.load_acgs_region(region)
-            acgs = np.transpose(acgs)
+            acgs = np.transpose(acgs)  # So that it is in the format Nunit x Nbin
         elif dataset == 'ibl':
             # Filter for region
             indx_reg = df_clusters_good[mapping + '_acronym'] == region
