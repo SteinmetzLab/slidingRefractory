@@ -74,14 +74,16 @@ for dataset, linestyle in zip(datasets, linestyles):
     elif figstyle == 'kde':
         sns.kdeplot(df_dataset, x="estimatedRP", hue='region',
                     ax=ax, linestyle=linestyle, legend=False, palette=palette)
-
+# Set x min axis limit to 0
 axlim = ax.get_xlim()
 ax.set_xlim(0, axlim[1])
+# Count N units per categories
+count = df_all.groupby(['dataset', 'region'])['estimatedRP'].count()
 # Create labels
 labels = list()
 for dataset in datasets:
     for region in regions:
-        labels.append(f'{region} - {dataset}')
+        labels.append(f'{dataset} - {region} - {count[dataset][region]}')
 
 plt.legend(title='Datasets',
            loc='upper right', labels=labels)
