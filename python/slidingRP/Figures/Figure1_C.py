@@ -55,14 +55,28 @@ linestyles=["--", "-", ":"]
 palette = {"HPF": "#9b59b6", "TH": "#3498db", "Isocortex": "orange"}
 # Violet (HPF), blue (TH), orange (Isocortex)
 
-arrow_len = 0.025
+figstyle = 'kde'
+
+if figstyle == 'hist':
+    arrow_len = 2
+    head_length = 0.4
+elif figstyle == 'kde':
+    arrow_len = 0.025
+    head_length = 0.01
 
 fig, ax = plt.subplots()
 for dataset, linestyle in zip(datasets, linestyles):
     df_dataset = df_all.loc[df_all['dataset'] == dataset]
-    sns.kdeplot(df_dataset, x="estimatedRP", hue='region',
-                ax=ax, linestyle=linestyle, legend=False, palette=palette)
+    if figstyle == 'hist':
+        sns.histplot(df_dataset, x="estimatedRP", hue='region',
+                    ax=ax, linestyle=linestyle, legend=False, palette=palette,
+                    element="step", fill=False, kde=False, stat='percent')
+    elif figstyle == 'kde':
+        sns.kdeplot(df_dataset, x="estimatedRP", hue='region',
+                    ax=ax, linestyle=linestyle, legend=False, palette=palette)
 
+axlim = ax.get_xlim()
+ax.set_xlim(0, axlim[1])
 # Create labels
 labels = list()
 for dataset in datasets:
@@ -73,8 +87,8 @@ plt.legend(title='Datasets',
            loc='upper right', labels=labels)
 
 # Set arrow limits based on axis limits
-axlim = ax.get_ylim()
-arrow_min = axlim[1]+10/100*(axlim[1]-axlim[0])  # Add 10% of range
+aylim = ax.get_ylim()
+arrow_min = aylim[1]+10/100*(aylim[1]-aylim[0])  # Add 10% of range
 
 # Need to plot median as arrows after otherwise taken into legends
 for dataset, linestyle in zip(datasets, linestyles):
@@ -83,11 +97,11 @@ for dataset, linestyle in zip(datasets, linestyles):
     med = df_dataset.groupby(['region'])['estimatedRP'].median()
     for region in regions:
         plt.arrow(x=med[region], dx=0, y=arrow_min, dy=-arrow_len, linestyle=linestyle,
-                  head_width=0.1, head_length=0.01, color=palette[region],
+                  head_width=0.1, head_length=head_length, color=palette[region],
                   linewidth=1.5)
         # Trick to get the arrow head filled (replot on top with small arrow tail)
         plt.arrow(x=med[region], dx=0, y=arrow_min-arrow_len, dy=-0.0001, linestyle="-",
-                  head_width=0.1, head_length=0.01, color=palette[region],
+                  head_width=0.1, head_length=head_length, color=palette[region],
                   linewidth=1.5)
 
 # Save
