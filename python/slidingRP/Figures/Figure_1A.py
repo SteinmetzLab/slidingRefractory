@@ -63,11 +63,12 @@ pid = pids[5]
 indx_good = np.where(df_clusters_good['pid'] == pid)[0]
 df_clusters_good = df_clusters_good.iloc[indx_good]
 acgs_ibl = acgs_ibl[indx_good, :]
-##
+
 # Get channels xyz:
 xyz = df_clusters_good[['x', 'y', 'z']].to_numpy()
-
+##
 # Plot
+# Want to plot without the traj as line
 plt.figure()
 ax = plt.gca()
 ax.axis('equal')
@@ -79,3 +80,17 @@ height = height * 1e6
 depth = depth * 1e6
 
 ax.imshow(tslice, extent=np.r_[width, height], cmap=cmap)
+'''
+# Use this for debugging
+ba.plot_tilted_slice(xyz, axis=1)
+'''
+##
+# Chose 3 random neurons
+
+for region in region_set:
+    indx_good = np.where(df_clusters_good['Cosmos_acronym'] == region)[0]
+    df_neuron = df_clusters_good.iloc[indx_good[0]]  # select first neuron
+    acgs_neuron = acgs_ibl[indx_good, :]
+
+    # Plot neurons
+    ax.plot(df_neuron['x'] * 1e6, df_neuron['y'] * 1e6, 'o')
