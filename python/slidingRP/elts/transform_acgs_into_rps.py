@@ -66,7 +66,7 @@ file = data_path.joinpath('ibl').joinpath(f'acgs.npy')
 with open(file, 'wb') as f:
     np.save(file, acgs_ibl, allow_pickle=True)
 
-file = data_path.joinpath('ibl').joinpath(f'clusters_df.csv')
+file = data_path.joinpath('ibl').joinpath(f'clusters_df.pqt')
 df_clusters_good.to_parquet(file)
 ##
 # --- For all datasets, we used a bin size of 1 / 30000 seconds to make the ACG
