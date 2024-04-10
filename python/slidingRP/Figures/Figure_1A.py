@@ -57,7 +57,7 @@ acgs_ibl = acgs_ibl[indx_good, :]
 
 ##
 # Take random PID and plot tilted slice
-pid = pids[5]
+pid = pids[2]
 
 # Keep only units within 1 pid
 indx_good = np.where(df_clusters_good['pid'] == pid)[0]
@@ -84,6 +84,8 @@ ax.imshow(tslice, extent=np.r_[width, height], cmap=cmap)
 # Use this for debugging
 ba.plot_tilted_slice(xyz, axis=1)
 '''
+
+# ax.plot(df_clusters_good['x'] * 1e6, df_clusters_good['z'] * 1e6, 'o')
 ##
 # Chose 3 random neurons
 
@@ -93,4 +95,4 @@ for region in region_set:
     acgs_neuron = acgs_ibl[indx_good, :]
 
     # Plot neurons
-    ax.plot(df_neuron['x'] * 1e6, df_neuron['y'] * 1e6, 'o')
+    ax.plot(df_neuron['x'] * 1e6, df_neuron['z'] * 1e6, 'o')
