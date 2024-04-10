@@ -80,6 +80,7 @@ height = height * 1e6
 depth = depth * 1e6
 
 ax.imshow(tslice, extent=np.r_[width, height], cmap=cmap)
+ax_slice = ax
 '''
 # Use this for debugging
 ba.plot_tilted_slice(xyz, axis=1)
@@ -88,11 +89,28 @@ ba.plot_tilted_slice(xyz, axis=1)
 # ax.plot(df_clusters_good['x'] * 1e6, df_clusters_good['z'] * 1e6, 'o')
 ##
 # Chose 3 random neurons
+bin_size_secs = 1 / 30_000
+fig_acg, axs = plt.subplots(1, len(region_set))
 
-for region in region_set:
+for i_reg, region in enumerate(region_set):
     indx_good = np.where(df_clusters_good['Cosmos_acronym'] == region)[0]
-    df_neuron = df_clusters_good.iloc[indx_good[0]]  # select first neuron
+    indx_select = 0  # select first neuron
+    df_neuron = df_clusters_good.iloc[indx_good[indx_select]]
     acgs_neuron = acgs_ibl[indx_good, :]
+    acg = acgs_neuron[indx_select, :]
 
-    # Plot neurons
+    # Plot neurons as dots onto brain slice
+    ax = ax_slice
     ax.plot(df_neuron['x'] * 1e6, df_neuron['z'] * 1e6, 'o')
+
+    # Plot neurons acg
+    ax = axs[i_reg]
+    x = np.arange(len(acg))
+    ax.bar(x, list(acg))
+    xstep = 35
+    ax.set_xticks(x[0:-1:xstep])
+    # Plot in millisecond
+    ax.set_xticklabels(np.around(x[0:-1:xstep].dot(bin_size_secs) * 1e3, decimals=2))
+    ax.set_title(f'{region}')
+    # ax.plot(np.array([estimatedRP, estimatedRP]) / (1000 * bin_size_secs), [acg.min(), acg.max()], 'k')
+
