@@ -282,7 +282,7 @@ def confidence_contamin(confMatrix, cont, rp, cont_level=10.0, rp_reject = 0.000
     '''
     # Find index in cont vector where there is cont_level or closest (higher) value
     idx_cont = np.where(cont >= cont_level)[0][0]
-    cont_level = cont[idx_cont]  # Actual level of contamination studied
+    cont_level = cont[idx_cont]  # Return actual level of contamination studied
 
     # We want to compute the curve of contamination only for RPs above a certain value
     # Remove those small RP values from the rp vector and conf matrix
@@ -292,7 +292,33 @@ def confidence_contamin(confMatrix, cont, rp, cont_level=10.0, rp_reject = 0.000
 
     # At the contamination level studied, find the maximal value of confidence
     max_conf = np.max(confMatrix[idx_cont, :])
-    return max_conf, cont_level
+    return max_conf, idx_cont, cont_level
+
+
+def slidingRP_GC(confMatrix, cont, rp, conf_thresh=90, cont_threshold=10, rp_reject=0.0005):
+    # We want to compute the curve of contamination only for RPs above a certain value
+    # Remove those small RP values from the rp vector and conf matrix
+    rp_idx_keep = rp > rp_reject
+    rp = rp[rp_idx_keep]
+    confMatrix = confMatrix[:, rp_idx_keep]
+
+    # Find matrix indices that are above or equal to the confidence threshold
+    a = np.where(confMatrix >= conf_thresh)
+
+    # Find minimum contamination value for this conf threshold
+    min_idx = np.min(a[0])  # Min on rows axis = contamination axis
+    min_cont = cont[min_idx]
+    '''
+    # TODO I do not understand what they wanted to achieve here
+    # Why find the RP at the contamination level at the max confidence val ?
+    '''
+    rp_min_val = rp[np.argmax(confMatrix[min_idx, :])]
+
+    # Check if this unit passes the sliding RP metric
+    pass_cont_thresh = min_cont <= cont_threshold
+
+    return pass_cont_thresh, min_cont, rp_min_val
+
 
 
 def slidingRP(spikeTimes, params=None):
@@ -341,7 +367,7 @@ def slidingRP(spikeTimes, params=None):
 
     maxConfidenceAt10Cont = max(confMatrix[cont == 10, testTimes])  # TODO check behavior if no max
 
-    indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] > 90))
+    indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] >= 90))
     ii = indsConf90[0]  # row inds
     jj = indsConf90[1]  # col inds
 
