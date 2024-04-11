@@ -266,6 +266,35 @@ def slidingRP_all(spikeTimes, spikeClusters, **params):
     return rpMetrics
 
 
+def confidence_contamin(confMatrix, cont, rp, cont_level=10.0, rp_reject = 0.0005):
+    '''
+    For a level of contamination contamin_level given (default 10%), find the smallest confidence
+    value for which the minimum value of the contamination curve is equal or lower to the
+    contamin_level.
+    In practice, this is equivalent to finding the maximum value of the confidence of
+    the confidence matrix at the contamination level row.
+    Uses the output of the function computeMatrix()
+    :param confMatrix: the confidence matrix (contamination x RP, values: confidence, ranging from 0-1)
+    :param cont: contamination vector at which the confidence is computed (ranges by default from 0-35)
+    :param rp: refractory period vector at which the confidence is computed
+    :param cont_level: level of contamination searched for, default is 10% (0.1)
+    :return:
+    '''
+    # Find index in cont vector where there is cont_level or closest (higher) value
+    idx_cont = np.where(cont >= cont_level)[0][0]
+    cont_level = cont[idx_cont]  # Actual level of contamination studied
+
+    # We want to compute the curve of contamination only for RPs above a certain value
+    # Remove those small RP values from the rp vector and conf matrix
+    rp_idx_keep = rp > rp_reject
+    rp = rp[rp_idx_keep]
+    confMatrix = confMatrix[:, rp_idx_keep]
+
+    # At the contamination level studied, find the maximal value of confidence
+    max_conf = np.max(confMatrix[idx_cont, :])
+    return max_conf, cont_level
+
+
 def slidingRP(spikeTimes, params=None):
     '''
     Compute the metric for one cluster
