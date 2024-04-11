@@ -187,10 +187,7 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
         # Find minimum contamination value for this conf threshold
         min_idx = np.min(a[0])  # Min on rows axis = contamination axis
         min_cont = cont[min_idx]  # Legacy name: minContWith90Confidence
-        '''
-        # TODO I do not understand what they wanted to achieve here
-        # Why find the RP at the contamination level at the max confidence val ?
-        '''
+        # Find the smallest RP possible at the contamination level at the max confidence val
         minRP = np.argmax(confMatrix[min_idx, :])
         rp_min_val = rp[minRP + 1]  # Legacy name: timeOfLowestCont
 
@@ -204,8 +201,8 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
     return pass_cont_thresh, min_cont, rp_min_val  # Legacy: value, minContWith90Confidence, timeOfLowestCont
 
 
-def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
-                params=None):
+def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
+              params=None):
     if params is None:
         params = {}
         params['sampleRate'] = 30000
@@ -226,7 +223,7 @@ def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
     # Legacy
     nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
 
-    # We apply this for IBL data, that has a duration of 1h on average:
+    # We apply this for IBL data, that has a duration of 1h on average hence the hardcoded FR>0.5:
     if (nSpikesBelow2 == 0) and (firingRate > 0.5) and (pass_cont_thresh is False):
         pass_forced = True
     else:
@@ -240,8 +237,15 @@ def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
         pass_cont_thresh, pass_forced
 
 
-
-def slidingRP_all_2(spikeTimes, spikeClusters, params=None):
+def slidingRP_all(spikeTimes, spikeClusters,
+                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
+                  params=None):
+    """
+    :param spikeTimes:  array of spike times (s)
+    :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
+    :param params:
+    :return: dictionary of values
+    """
 
     cids = np.unique(spikeClusters)
 
@@ -262,7 +266,9 @@ def slidingRP_all_2(spikeTimes, spikeClusters, params=None):
 
         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
          nSpikesBelow2, firingRate,
-         pass_cont_thresh, pass_forced] = slidingRP_2(st, params=params)
+         pass_cont_thresh, pass_forced] = slidingRP(st,
+                                                    conf_thresh=conf_thresh, cont_thresh=cont_thresh,
+                                                    rp_reject=rp_reject, params=params)
 
         rpMetrics['cidx'].append(cids[cidx])
         rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
