@@ -9,9 +9,7 @@ compute the metric for a single cluster (neuron) in a recording
 import warnings
 from scipy.optimize import OptimizeWarning
 from phylib.stats import correlograms
-from types import SimpleNamespace
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
@@ -122,234 +120,88 @@ def compute_rf(acg,
     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 
 
-'''
-The below is legacy code, written prior to 22-Feb-2024 by N. Steinmetz and N. Roth
-'''
-
-def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
-    # remove first ms from the computation
-    # idx_time = (timeBins > min_sig[0])
-    # acg = acg[idx_time]
-    # timeBins = timeBins[idx_time]
-
-    # Force first ms to 0 in acg
-    # idx_time = (timeBins < min_sig[0])
-    # acg[idx_time] = 0
-
-    #Compute
-    minSigmoid = np.mean(acg[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])  # first 0.4-0.8 ms of data
-    peakIdx = np.argmax(acg)
-    peakVal = np.max(acg)
-
-    # 2ms around peak
-    timeValuesMin = np.where(timeBins >= timeBins[peakIdx] - 0.001)[0][0]
-    timeValuesMax = np.where(timeBins <= timeBins[peakIdx] + 0.001)[0][-1]
-    maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax + 1)])
-
-    # if the peak is well before the end of the acg, only fit data up to the peak + n bins
-    if peakIdx < len(acg) - peakDistFromEndBin:
-        acg = acg[0:peakIdx + peakDistFromEndBin]
-        timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
-
-    # fit the sigmoid with max and min fixed
-    try:
-        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid), timeBins, acg)
-        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
-
-        xSigmoid = timeBins
-        ySigmoid = sigmoid(xSigmoid, *fitParams)
-
-        # find RP
-        RPEstimateFromPercentageOfSlope = 0.10
-        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
-        estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
-    except:
-        # print('fit error')
-        estimatedRP = np.nan
-        estimateIdx = np.nan
-        xSigmoid = np.nan
-        ySigmoid = np.nan
-    return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+def remove_lowrp_confmat(confMatrix, rp, rp_reject=0.0005):
+    # We want to compute on the matrix only for RPs above a certain value
+    # Remove those small RP values from the rp vector and conf matrix
+    rp_idx_keep = rp > rp_reject
+    rp = rp[rp_idx_keep]
+    confMatrix = confMatrix[:, rp_idx_keep]
+    return confMatrix, rp
 
 
-def slidingRP_all(spikeTimes, spikeClusters, **params):
-    '''
-
-    Compute the metric for each cluster in a recording
-
-    Parameters
-    ----------
-    spikeTimes : numpy.ndarray
-        array of spike times (ms)
-    spikeClusters : numpy.ndarray
-        array of spike cluster ids that corresponds to spikeTimes.
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
-
-    Returns
-    -------
-    rpMetrics: dict
-        keys:
-            maxConfidenceAt10Cont
-            minContWith90Confidence
-            timeOfLowestCont
-            nSpikesBelow2
-            confMatrix (optional, if returnMatrix ==1)
-        note: minContWith90Confidence, timeOfLowestCont will return np.nan
-        for neurons with too few spikes -- these neurons have "empty"
-        confidence and should be rejected.
-    cont: nd.array
-        Vector of contamination values tested
-    rp: nd.array
-        Vector of refractory period durations tested
-
-    '''
-
-    if params and 'returnMatrix' in params:
-        returnMatrix = params['returnMatrix']
-    else:
-        returnMatrix = False
-
-    if params and 'verbose' in params:
-        verbose = params['verbose'];
-    else:
-        verbose = False
-
-    cids = np.unique(spikeClusters)
-
-    # initialize rpMetrics as dict
-    rpMetrics = {}
-    rpMetrics['cidx'] = []
-    rpMetrics['maxConfidenceAt10Cont'] = []
-    rpMetrics['minContWith90Confidence'] = []
-    rpMetrics['timeOfLowestCont'] = []
-    rpMetrics['nSpikesBelow2'] = []
-
-    if verbose:
-        print("Computing metrics for %d clusters \n" % len(cids))
-
-    for cidx in range(len(cids)):
-        st = spikeTimes[spikeClusters == cids[cidx]]
-
-        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-         nSpikesBelow2, confMatrix, cont, rp, nACG,
-         firingRate, secondsElapsed] = slidingRP(st, params)
-
-        rpMetrics['cidx'].append(cids[cidx])
-        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
-        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
-        rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
-        rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
-
-        if returnMatrix:
-            if 'confMatrix' not in rpMetrics:
-                rpMetrics['confMatrix'] = []
-            rpMetrics['confMatrix'].append(confMatrix)
-
-        if 'value' not in rpMetrics:
-            rpMetrics['value'] = []
-        if minContWith90Confidence <= 10:
-            rpMetrics['value'].append(1)
-        else:
-            rpMetrics['value'].append(0)
-
-        if verbose:
-            if minContWith90Confidence <= 10:
-                pfstring = 'PASS'
-            else:
-                pfstring = 'FAIL'
-            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (
-            cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000,
-            nSpikesBelow2))
-
-    return rpMetrics
-
-
-def confidence_contamin(confMatrix, cont, rp, cont_level=10.0, rp_reject = 0.0005):
+def confidence_contamin(confMatrix, cont, rp, cont_thresh=10.0, rp_reject = 0.0005):
     '''
     For a level of contamination contamin_level given (default 10%), find the smallest confidence
     value for which the minimum value of the contamination curve is equal or lower to the
     contamin_level.
     In practice, this is equivalent to finding the maximum value of the confidence of
     the confidence matrix at the contamination level row.
+
     Uses the output of the function computeMatrix()
+
     :param confMatrix: the confidence matrix (contamination x RP, values: confidence, ranging from 0-1)
     :param cont: contamination vector at which the confidence is computed (ranges by default from 0-35)
     :param rp: refractory period vector at which the confidence is computed
     :param cont_level: level of contamination searched for, default is 10% (0.1)
     :return:
     '''
-    # Find index in cont vector where there is cont_level or closest (higher) value
-    idx_cont = np.where(cont >= cont_level)[0][0]
-    cont_level = cont[idx_cont]  # Return actual level of contamination studied
+    # Find index in cont vector where there is cont_thresh or closest (higher) value
+    idx_cont = np.where(cont >= cont_thresh)[0][0]
+    cont_thresh = cont[idx_cont]  # Return actual level of contamination studied
 
     # We want to compute the curve of contamination only for RPs above a certain value
     # Remove those small RP values from the rp vector and conf matrix
-    rp_idx_keep = rp > rp_reject
-    rp = rp[rp_idx_keep]
-    confMatrix = confMatrix[:, rp_idx_keep]
+    confMatrix, _ = remove_lowrp_confmat(confMatrix, rp, rp_reject=rp_reject)
 
     # At the contamination level studied, find the maximal value of confidence
-    max_conf = np.max(confMatrix[idx_cont, :])
-    return max_conf, idx_cont, cont_level
+    max_conf = np.max(confMatrix[idx_cont, :])  # Legacy name: 'maxConfidenceAt10Cont'
+    return max_conf, idx_cont, cont_thresh
 
 
-def slidingRP_GC(confMatrix, cont, rp, conf_thresh=90, cont_threshold=10, rp_reject=0.0005):
+def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10, rp_reject=0.0005):
+    '''
+    Given a confidence matrix, a confidence threshold (default 90%) and a contamination threshold (default=10),
+    assess whether the unit passes the sliding RP metric
+
+    Uses the output of the function computeMatrix()
+
+    :param confMatrix:
+    :param cont:
+    :param rp:
+    :param conf_thresh:
+    :param cont_thresh:
+    :param rp_reject:
+    :return:
+    '''
     # We want to compute the curve of contamination only for RPs above a certain value
     # Remove those small RP values from the rp vector and conf matrix
-    rp_idx_keep = rp > rp_reject
-    rp = rp[rp_idx_keep]
-    confMatrix = confMatrix[:, rp_idx_keep]
+    confMatrix, rp = remove_lowrp_confmat(confMatrix, rp, rp_reject=rp_reject)
 
     # Find matrix indices that are above or equal to the confidence threshold
     a = np.where(confMatrix >= conf_thresh)
+    if len(a[0]) > 0:
+        # Find minimum contamination value for this conf threshold
+        min_idx = np.min(a[0])  # Min on rows axis = contamination axis
+        min_cont = cont[min_idx]  # Legacy name: minContWith90Confidence
+        '''
+        # TODO I do not understand what they wanted to achieve here
+        # Why find the RP at the contamination level at the max confidence val ?
+        '''
+        minRP = np.argmax(confMatrix[min_idx, :])
+        rp_min_val = rp[minRP + 1]  # Legacy name: timeOfLowestCont
 
-    # Find minimum contamination value for this conf threshold
-    min_idx = np.min(a[0])  # Min on rows axis = contamination axis
-    min_cont = cont[min_idx]
-    '''
-    # TODO I do not understand what they wanted to achieve here
-    # Why find the RP at the contamination level at the max confidence val ?
-    '''
-    rp_min_val = rp[np.argmax(confMatrix[min_idx, :])]
+        # Check if this unit passes the sliding RP metric
+        pass_cont_thresh = min_cont <= cont_thresh
+    else:
+        pass_cont_thresh = False
+        min_cont = np.nan
+        rp_min_val = np.nan
 
-    # Check if this unit passes the sliding RP metric
-    pass_cont_thresh = min_cont <= cont_threshold
-
-    return pass_cont_thresh, min_cont, rp_min_val
-
-
-
-def slidingRP(spikeTimes, params=None):
-    '''
-    Compute the metric for one cluster
-
-    Parameters
-    ----------
-    spikeTimes : numpy.ndarray
-        array of spike times (ms) for one cluster
-
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
-
-    Returns
-    -------
+    return pass_cont_thresh, min_cont, rp_min_val  # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
 
 
-
-    maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
-    minContWith90Confidence: Minimum contamination for which you have >=90% confidence
-    timeOfLowestCont:        Time at which best score happens
-    nSpikesBelow2:           Number of observed spikes that occur before 2 ms
-    confMatrix:              Full confidence matrix of size nCont x nRP
-    cont:Vector of contamination values tested
-    rp: Vector of refractory period durations tested
-    nACG: the autocorrelogram of the neuron
-    firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
-    '''
-
+def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
+                params=None):
     if params is None:
         params = {}
         params['sampleRate'] = 30000
@@ -358,40 +210,26 @@ def slidingRP(spikeTimes, params=None):
         params['verbose'] = True
         params['cidx'] = [0]
 
-    seconds_start = time.time()
     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
-    # matrix is [nCont x nRP]
+    # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
+    pass_cont_thresh, min_cont, rp_min_val = \
+        pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
 
-    testTimes = rp > 0.0005  # (in seconds)
-    # only test for refractory period durations greater than 0.5 ms
+    # Legacy 'maxConfidenceAt10Cont'
+    max_conf, _, _ = \
+        confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
 
-    maxConfidenceAt10Cont = max(confMatrix[cont == 10, testTimes])  # TODO check behavior if no max
-
-    indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] >= 90))
-    ii = indsConf90[0]  # row inds
-    jj = indsConf90[1]  # col inds
-
-    try:
-        minI = np.min(ii)
-        idx = np.argmin(ii)
-        minContWith90Confidence = cont[minI]
-        minRP = np.argmax(confMatrix[minI, testTimes])
-
-
-    except:
-        minContWith90Confidence = np.nan
-
-        minRP = np.nan
-
-    try:
-        timeOfLowestCont = rp[minRP + np.where(testTimes)[0][0] + 1]
-    except:
-        timeOfLowestCont = np.nan
-
+    # Legacy
     nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
 
-    secondsElapsed = time.time() - seconds_start
-    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+    # Legacy:
+    # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2,
+    # confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+    return max_conf, min_cont, rp_min_val, nSpikesBelow2, \
+        confMatrix, cont, rp, nACG, firingRate
+
+
+## Code from OW
 
 
 def computeMatrix(spikeTimes, params):
@@ -473,6 +311,233 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 
     return confidenceScore
+
+# --------
+##
+'''
+The below is legacy code, written prior to 22-Feb-2024 by N. Steinmetz and N. Roth
+'''
+
+def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
+    # remove first ms from the computation
+    # idx_time = (timeBins > min_sig[0])
+    # acg = acg[idx_time]
+    # timeBins = timeBins[idx_time]
+
+    # Force first ms to 0 in acg
+    # idx_time = (timeBins < min_sig[0])
+    # acg[idx_time] = 0
+
+    #Compute
+    minSigmoid = np.mean(acg[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])  # first 0.4-0.8 ms of data
+    peakIdx = np.argmax(acg)
+    peakVal = np.max(acg)
+
+    # 2ms around peak
+    timeValuesMin = np.where(timeBins >= timeBins[peakIdx] - 0.001)[0][0]
+    timeValuesMax = np.where(timeBins <= timeBins[peakIdx] + 0.001)[0][-1]
+    maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax + 1)])
+
+    # if the peak is well before the end of the acg, only fit data up to the peak + n bins
+    if peakIdx < len(acg) - peakDistFromEndBin:
+        acg = acg[0:peakIdx + peakDistFromEndBin]
+        timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
+
+    # fit the sigmoid with max and min fixed
+    try:
+        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid), timeBins, acg)
+        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
+
+        xSigmoid = timeBins
+        ySigmoid = sigmoid(xSigmoid, *fitParams)
+
+        # find RP
+        RPEstimateFromPercentageOfSlope = 0.10
+        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
+        estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
+    except:
+        # print('fit error')
+        estimatedRP = np.nan
+        estimateIdx = np.nan
+        xSigmoid = np.nan
+        ySigmoid = np.nan
+    return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+
+
+def slidingRP_all(spikeTimes, spikeClusters, params=None):
+    '''
+
+    Compute the metric for each cluster in a recording
+
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (ms)
+    spikeClusters : numpy.ndarray
+        array of spike cluster ids that corresponds to spikeTimes.
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
+        params.sampleRate : sample rate of the recording (Hz)
+
+    Returns
+    -------
+    rpMetrics: dict
+        keys:
+            maxConfidenceAt10Cont
+            minContWith90Confidence
+            timeOfLowestCont
+            nSpikesBelow2
+            confMatrix (optional, if returnMatrix ==1)
+        note: minContWith90Confidence, timeOfLowestCont will return np.nan
+        for neurons with too few spikes -- these neurons have "empty"
+        confidence and should be rejected.
+    cont: nd.array
+        Vector of contamination values tested
+    rp: nd.array
+        Vector of refractory period durations tested
+
+    '''
+
+    if params and 'returnMatrix' in params:
+        returnMatrix = params['returnMatrix']
+    else:
+        returnMatrix = False
+
+    if params and 'verbose' in params:
+        verbose = params['verbose'];
+    else:
+        verbose = False
+
+    cids = np.unique(spikeClusters)
+
+    # initialize rpMetrics as dict
+    rpMetrics = {}
+    rpMetrics['cidx'] = []
+    rpMetrics['maxConfidenceAt10Cont'] = []
+    rpMetrics['minContWith90Confidence'] = []
+    rpMetrics['timeOfLowestCont'] = []
+    rpMetrics['nSpikesBelow2'] = []
+
+    if verbose:
+        print("Computing metrics for %d clusters \n" % len(cids))
+
+    for cidx in range(len(cids)):
+        st = spikeTimes[spikeClusters == cids[cidx]]
+
+        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+         nSpikesBelow2, confMatrix, cont, rp, nACG,
+         firingRate] = slidingRP_2(st, params=params)
+
+        '''
+        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+         nSpikesBelow2, confMatrix, cont, rp, nACG,
+         firingRate, secondsElapsed] = slidingRP(st, params=params)
+        '''
+
+        rpMetrics['cidx'].append(cids[cidx])
+        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
+        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
+        rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
+        rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+
+        if returnMatrix:
+            if 'confMatrix' not in rpMetrics:
+                rpMetrics['confMatrix'] = []
+            rpMetrics['confMatrix'].append(confMatrix)
+
+        if 'value' not in rpMetrics:
+            rpMetrics['value'] = []
+        if minContWith90Confidence <= 10:
+            rpMetrics['value'].append(1)
+        else:
+            rpMetrics['value'].append(0)
+
+        if verbose:
+            if minContWith90Confidence <= 10:
+                pfstring = 'PASS'
+            else:
+                pfstring = 'FAIL'
+            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (
+            cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000,
+            nSpikesBelow2))
+
+    return rpMetrics
+
+
+
+## ------ LEGACY CODE BELOW BY NICK S. & NOAM R. -------
+
+def slidingRP(spikeTimes, params=None):
+    '''
+    Compute the metric for one cluster
+
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (ms) for one cluster
+
+    params : dict
+        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
+        params.sampleRate : sample rate of the recording (Hz)
+
+    Returns
+    -------
+
+
+
+    maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
+    minContWith90Confidence: Minimum contamination for which you have >=90% confidence
+    timeOfLowestCont:        Time at which best score happens
+    nSpikesBelow2:           Number of observed spikes that occur before 2 ms
+    confMatrix:              Full confidence matrix of size nCont x nRP
+    cont:Vector of contamination values tested
+    rp: Vector of refractory period durations tested
+    nACG: the autocorrelogram of the neuron
+    firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
+    '''
+
+    if params is None:
+        params = {}
+        params['sampleRate'] = 30000
+        params['binSizeCorr'] = 1 / params['sampleRate']
+        params['returnMatrix'] = True
+        params['verbose'] = True
+        params['cidx'] = [0]
+
+    seconds_start = time.time()
+    [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
+    # matrix is [nCont x nRP]
+
+    testTimes = rp > 0.0005  # (in seconds)
+    # only test for refractory period durations greater than 0.5 ms
+
+    maxConfidenceAt10Cont = max(confMatrix[cont == 10, testTimes])  # TODO check behavior if no max
+
+    indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] >= 90))
+    ii = indsConf90[0]  # row inds
+    jj = indsConf90[1]  # col inds
+
+    try:
+        minI = np.min(ii)
+        idx = np.argmin(ii)
+        minContWith90Confidence = cont[minI]
+        minRP = np.argmax(confMatrix[minI, testTimes])
+
+
+    except:
+        minContWith90Confidence = np.nan
+
+        minRP = np.nan
+
+    try:
+        timeOfLowestCont = rp[minRP + np.where(testTimes)[0][0] + 1]
+    except:
+        timeOfLowestCont = np.nan
+
+    nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
+
+    secondsElapsed = time.time() - seconds_start
+    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
 
 
 def plotSlidingRP(spikeTimes, params=None):
