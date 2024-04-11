@@ -197,7 +197,7 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
         min_cont = np.nan
         rp_min_val = np.nan
 
-    return pass_cont_thresh, min_cont, rp_min_val  # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
+    return pass_cont_thresh, min_cont, rp_min_val  # Legacy: value, minContWith90Confidence, timeOfLowestCont
 
 
 def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
@@ -222,11 +222,18 @@ def slidingRP_2(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
     # Legacy
     nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
 
+    # We apply this for IBL data, that has a duration of 1h on average:
+    if (nSpikesBelow2 == 0) and (firingRate > 0.5) and (pass_cont_thresh is False):
+        pass_forced = True
+    else:
+        pass_forced = False
+
     # Legacy:
     # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2,
     # confMatrix, cont, rp, nACG, firingRate, secondsElapsed
     return max_conf, min_cont, rp_min_val, nSpikesBelow2, \
-        confMatrix, cont, rp, nACG, firingRate
+        confMatrix, cont, rp, nACG, firingRate,\
+        pass_cont_thresh, pass_forced
 
 
 ## Code from OW
@@ -425,8 +432,8 @@ def slidingRP_all(spikeTimes, spikeClusters, params=None):
         st = spikeTimes[spikeClusters == cids[cidx]]
 
         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-         nSpikesBelow2, confMatrix, cont, rp, nACG,
-         firingRate] = slidingRP_2(st, params=params)
+         nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate,
+         pass_cont_thresh, pass_forced] = slidingRP_2(st, params=params)
 
         '''
         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
