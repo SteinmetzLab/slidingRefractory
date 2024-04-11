@@ -2,7 +2,7 @@
 """
 Created on Sun Jul 10 11:34:59 2022
 
-@author: Noam Roth, Gaelle Chapuis
+@author: Gaelle Chapuis ; Legacy code from Noam Roth commented below
 
 compute the metric for a single cluster (neuron) in a recording
 """
