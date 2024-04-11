@@ -211,7 +211,7 @@ def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
         params['verbose'] = True
         params['cidx'] = [0]
 
-    [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
+    [confMatrix, cont, rp, nACG, firing_rate] = computeMatrix(spikeTimes, params)
     # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
     pass_cont_thresh, min_cont, rp_min_val = \
         pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
@@ -221,10 +221,10 @@ def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
         confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
 
     # Legacy
-    nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
+    n_spikes_below2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
 
     # We apply this for IBL data, that has a duration of 1h on average hence the hardcoded FR>0.5:
-    if (nSpikesBelow2 == 0) and (firingRate > 0.5) and (pass_cont_thresh is False):
+    if (n_spikes_below2 == 0) and (firing_rate > 0.5) and (pass_cont_thresh is False):
         pass_forced = True
     else:
         pass_forced = False
@@ -233,7 +233,7 @@ def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
     # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2,
     # confMatrix, cont, rp, nACG, firingRate, secondsElapsed
     return max_conf, min_cont, rp_min_val, \
-        nSpikesBelow2, firingRate,\
+        n_spikes_below2, firing_rate,\
         pass_cont_thresh, pass_forced
 
 
@@ -252,11 +252,11 @@ def slidingRP_all(spikeTimes, spikeClusters,
     # initialize rpMetrics as dict
     rpMetrics = {}
     rpMetrics['cidx'] = []
-    rpMetrics['maxConfidenceAt10Cont'] = []
-    rpMetrics['minContWith90Confidence'] = []
-    rpMetrics['timeOfLowestCont'] = []
-    rpMetrics['nSpikesBelow2'] = []
-    rpMetrics['firingRate'] = []
+    rpMetrics['max_confidence'] = []
+    rpMetrics['min_contamination'] = []
+    rpMetrics['rp_min_val'] = []
+    rpMetrics['n_spikes_below2'] = []
+    rpMetrics['firing_rate'] = []
     rpMetrics['value'] = []
     rpMetrics['value_forced'] = []
 
@@ -264,18 +264,18 @@ def slidingRP_all(spikeTimes, spikeClusters,
     for cidx in range(len(cids)):
         st = spikeTimes[spikeClusters == cids[cidx]]
 
-        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-         nSpikesBelow2, firingRate,
+        [max_confidence, min_contamination, rp_min_val,
+         n_spikes_below2, firing_rate,
          pass_cont_thresh, pass_forced] = slidingRP(st,
                                                     conf_thresh=conf_thresh, cont_thresh=cont_thresh,
                                                     rp_reject=rp_reject, params=params)
 
         rpMetrics['cidx'].append(cids[cidx])
-        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
-        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
-        rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
-        rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
-        rpMetrics['firingRate'].append(firingRate)
+        rpMetrics['max_confidence'].append(max_confidence)
+        rpMetrics['min_contamination'].append(min_contamination)
+        rpMetrics['rp_min_val'].append(rp_min_val)
+        rpMetrics['n_spikes_below2'].append(n_spikes_below2)
+        rpMetrics['firing_rate'].append(firing_rate)
         rpMetrics['value'].append(int(pass_cont_thresh))
         rpMetrics['value_forced'].append(int(pass_forced))
 

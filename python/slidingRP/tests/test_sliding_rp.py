@@ -41,7 +41,7 @@ def test_multi_clusters():
     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
     table = metrics.slidingRP_all(spikes_times, spikes_clusters, params=params)
     for i, clu in enumerate(table['cidx']):
-        assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
-                                 table['minContWith90Confidence'][i],
-                                 table['timeOfLowestCont'][i],
-                                 table['nSpikesBelow2'][i])
+        assert EXPECTED[clu] == (table['max_confidence'][i],
+                                 table['min_contamination'][i],
+                                 table['rp_min_val'][i],
+                                 table['n_spikes_below2'][i])
