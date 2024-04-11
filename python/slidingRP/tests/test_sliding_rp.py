@@ -9,6 +9,7 @@ EXPECTED = {
     275: (53.88397133550098, 15.0, 0.00055, 99),  # FAIL
 }
 
+
 def generate_test_data():
     #  167: FAIL max conf = 0.80%, min cont = nan%, time = nan ms, n below 2 ms = 0
     #  274: PASS max conf = 100.00%, min cont = 0.5%, time = 1.22 ms, n below 2 ms = 2
@@ -24,26 +25,26 @@ def generate_test_data():
     np.save(TEST_DATA_PATH.joinpath("spikes.clusters.npy"), spikes.clusters[ispi])
 
 
-def test_single_cluster():
-    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
-    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
-    params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-    for clu in np.unique(spikes_clusters):
-        sel = spikes_clusters == clu
-        out = metrics.slidingRP(spikes_times[sel], params)
-        assert EXPECTED[clu] == out[:4]
-
-
-def test_multi_clusters():
-    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
-    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
-    params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-    table = metrics.slidingRP_all(spikes_times, spikes_clusters, params=params)
-    for i, clu in enumerate(table['cidx']):
-        assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
-                                 table['minContWith90Confidence'][i],
-                                 table['timeOfLowestCont'][i],
-                                 table['nSpikesBelow2'][i])
+# def test_single_cluster():
+#     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+#     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+#     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
+#     for clu in np.unique(spikes_clusters):
+#         sel = spikes_clusters == clu
+#         out = metrics.slidingRP(spikes_times[sel], params)
+#         assert EXPECTED[clu] == out[:4]
+#
+#
+# def test_multi_clusters():
+#     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+#     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+#     params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
+#     table = metrics.slidingRP_all(spikes_times, spikes_clusters, params=params)
+#     for i, clu in enumerate(table['cidx']):
+#         assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
+#                                  table['minContWith90Confidence'][i],
+#                                  table['timeOfLowestCont'][i],
+#                                  table['nSpikesBelow2'][i])
 
 
 def test_single_cluster_2():
@@ -55,3 +56,14 @@ def test_single_cluster_2():
         out = metrics.slidingRP_2(spikes_times[sel], params=params)
         assert EXPECTED[clu] == out[:4]
 
+
+def test_multi_clusters_2():
+    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+    params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
+    table = metrics.slidingRP_all_2(spikes_times, spikes_clusters, params=params)
+    for i, clu in enumerate(table['cidx']):
+        assert EXPECTED[clu] == (table['maxConfidenceAt10Cont'][i],
+                                 table['minContWith90Confidence'][i],
+                                 table['timeOfLowestCont'][i],
+                                 table['nSpikesBelow2'][i])
