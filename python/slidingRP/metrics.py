@@ -2,21 +2,23 @@
 """
 Created on Sun Jul 10 11:34:59 2022
 
-@author: Noam Roth, Gaelle Chapuis
+@author: Gaelle Chapuis ; Legacy code from Noam Roth commented below
 
 compute the metric for a single cluster (neuron) in a recording
 """
 import warnings
 from scipy.optimize import OptimizeWarning
 from phylib.stats import correlograms
-from types import SimpleNamespace
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
 import scipy
-import time
+
+
+def closest(lst, K):
+    lst = np.asarray(lst)
+    idx = (np.abs(lst - K)).argmin()
+    return idx, lst[idx]
 
 
 def compute_timebins(acg, bin_size_secs):
@@ -122,234 +124,85 @@ def compute_rf(acg,
     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 
 
-'''
-The below is legacy code, written prior to 22-Feb-2024 by N. Steinmetz and N. Roth
-'''
-
-def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
-    # remove first ms from the computation
-    # idx_time = (timeBins > min_sig[0])
-    # acg = acg[idx_time]
-    # timeBins = timeBins[idx_time]
-
-    # Force first ms to 0 in acg
-    # idx_time = (timeBins < min_sig[0])
-    # acg[idx_time] = 0
-
-    #Compute
-    minSigmoid = np.mean(acg[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])  # first 0.4-0.8 ms of data
-    peakIdx = np.argmax(acg)
-    peakVal = np.max(acg)
-
-    # 2ms around peak
-    timeValuesMin = np.where(timeBins >= timeBins[peakIdx] - 0.001)[0][0]
-    timeValuesMax = np.where(timeBins <= timeBins[peakIdx] + 0.001)[0][-1]
-    maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax + 1)])
-
-    # if the peak is well before the end of the acg, only fit data up to the peak + n bins
-    if peakIdx < len(acg) - peakDistFromEndBin:
-        acg = acg[0:peakIdx + peakDistFromEndBin]
-        timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
-
-    # fit the sigmoid with max and min fixed
-    try:
-        popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid), timeBins, acg)
-        fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
-
-        xSigmoid = timeBins
-        ySigmoid = sigmoid(xSigmoid, *fitParams)
-
-        # find RP
-        RPEstimateFromPercentageOfSlope = 0.10
-        estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
-        estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
-    except:
-        # print('fit error')
-        estimatedRP = np.nan
-        estimateIdx = np.nan
-        xSigmoid = np.nan
-        ySigmoid = np.nan
-    return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+def remove_lowrp_confmat(confMatrix, rp, rp_reject=0.0005):
+    # We want to compute on the matrix only for RPs above a certain value
+    # Remove those small RP values from the rp vector and conf matrix
+    rp_idx_keep = rp > rp_reject
+    rp = rp[rp_idx_keep]
+    confMatrix = confMatrix[:, rp_idx_keep]
+    return confMatrix, rp
 
 
-def slidingRP_all(spikeTimes, spikeClusters, **params):
-    '''
-
-    Compute the metric for each cluster in a recording
-
-    Parameters
-    ----------
-    spikeTimes : numpy.ndarray
-        array of spike times (ms)
-    spikeClusters : numpy.ndarray
-        array of spike cluster ids that corresponds to spikeTimes.
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
-
-    Returns
-    -------
-    rpMetrics: dict
-        keys:
-            maxConfidenceAt10Cont
-            minContWith90Confidence
-            timeOfLowestCont
-            nSpikesBelow2
-            confMatrix (optional, if returnMatrix ==1)
-        note: minContWith90Confidence, timeOfLowestCont will return np.nan
-        for neurons with too few spikes -- these neurons have "empty"
-        confidence and should be rejected.
-    cont: nd.array
-        Vector of contamination values tested
-    rp: nd.array
-        Vector of refractory period durations tested
-
-    '''
-
-    if params and 'returnMatrix' in params:
-        returnMatrix = params['returnMatrix']
-    else:
-        returnMatrix = False
-
-    if params and 'verbose' in params:
-        verbose = params['verbose'];
-    else:
-        verbose = False
-
-    cids = np.unique(spikeClusters)
-
-    # initialize rpMetrics as dict
-    rpMetrics = {}
-    rpMetrics['cidx'] = []
-    rpMetrics['maxConfidenceAt10Cont'] = []
-    rpMetrics['minContWith90Confidence'] = []
-    rpMetrics['timeOfLowestCont'] = []
-    rpMetrics['nSpikesBelow2'] = []
-
-    if verbose:
-        print("Computing metrics for %d clusters \n" % len(cids))
-
-    for cidx in range(len(cids)):
-        st = spikeTimes[spikeClusters == cids[cidx]]
-
-        [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-         nSpikesBelow2, confMatrix, cont, rp, nACG,
-         firingRate, secondsElapsed] = slidingRP(st, params)
-
-        rpMetrics['cidx'].append(cids[cidx])
-        rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
-        rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
-        rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
-        rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
-
-        if returnMatrix:
-            if 'confMatrix' not in rpMetrics:
-                rpMetrics['confMatrix'] = []
-            rpMetrics['confMatrix'].append(confMatrix)
-
-        if 'value' not in rpMetrics:
-            rpMetrics['value'] = []
-        if minContWith90Confidence <= 10:
-            rpMetrics['value'].append(1)
-        else:
-            rpMetrics['value'].append(0)
-
-        if verbose:
-            if minContWith90Confidence <= 10:
-                pfstring = 'PASS'
-            else:
-                pfstring = 'FAIL'
-            print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (
-            cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000,
-            nSpikesBelow2))
-
-    return rpMetrics
-
-
-def confidence_contamin(confMatrix, cont, rp, cont_level=10.0, rp_reject = 0.0005):
+def confidence_contamin(confMatrix, cont, rp, cont_thresh=10.0, rp_reject = 0.0005):
     '''
     For a level of contamination contamin_level given (default 10%), find the smallest confidence
     value for which the minimum value of the contamination curve is equal or lower to the
     contamin_level.
     In practice, this is equivalent to finding the maximum value of the confidence of
     the confidence matrix at the contamination level row.
+
     Uses the output of the function computeMatrix()
+
     :param confMatrix: the confidence matrix (contamination x RP, values: confidence, ranging from 0-1)
     :param cont: contamination vector at which the confidence is computed (ranges by default from 0-35)
     :param rp: refractory period vector at which the confidence is computed
     :param cont_level: level of contamination searched for, default is 10% (0.1)
     :return:
     '''
-    # Find index in cont vector where there is cont_level or closest (higher) value
-    idx_cont = np.where(cont >= cont_level)[0][0]
-    cont_level = cont[idx_cont]  # Return actual level of contamination studied
+    # Find index in cont vector where there is cont_thresh or closest (higher) value
+    idx_cont = np.where(cont >= cont_thresh)[0][0]
+    cont_thresh = cont[idx_cont]  # Return actual level of contamination studied
 
     # We want to compute the curve of contamination only for RPs above a certain value
     # Remove those small RP values from the rp vector and conf matrix
-    rp_idx_keep = rp > rp_reject
-    rp = rp[rp_idx_keep]
-    confMatrix = confMatrix[:, rp_idx_keep]
+    confMatrix, _ = remove_lowrp_confmat(confMatrix, rp, rp_reject=rp_reject)
 
     # At the contamination level studied, find the maximal value of confidence
-    max_conf = np.max(confMatrix[idx_cont, :])
-    return max_conf, idx_cont, cont_level
+    max_conf = np.max(confMatrix[idx_cont, :])  # Legacy name: 'maxConfidenceAt10Cont'
+    return max_conf, idx_cont, cont_thresh
 
 
-def slidingRP_GC(confMatrix, cont, rp, conf_thresh=90, cont_threshold=10, rp_reject=0.0005):
+def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10, rp_reject=0.0005):
+    '''
+    Given a confidence matrix, a confidence threshold (default 90%) and a contamination threshold (default=10),
+    assess whether the unit passes the sliding RP metric
+
+    Uses the output of the function computeMatrix()
+
+    :param confMatrix:
+    :param cont:
+    :param rp:
+    :param conf_thresh:
+    :param cont_thresh:
+    :param rp_reject:
+    :return:
+    '''
     # We want to compute the curve of contamination only for RPs above a certain value
     # Remove those small RP values from the rp vector and conf matrix
-    rp_idx_keep = rp > rp_reject
-    rp = rp[rp_idx_keep]
-    confMatrix = confMatrix[:, rp_idx_keep]
+    confMatrix, rp = remove_lowrp_confmat(confMatrix, rp, rp_reject=rp_reject)
 
     # Find matrix indices that are above or equal to the confidence threshold
     a = np.where(confMatrix >= conf_thresh)
+    if len(a[0]) > 0:
+        # Find minimum contamination value for this conf threshold
+        min_idx = np.min(a[0])  # Min on rows axis = contamination axis
+        min_cont = cont[min_idx]  # Legacy name: minContWith90Confidence
+        # Find the smallest RP possible at the contamination level at the max confidence val
+        minRP = np.argmax(confMatrix[min_idx, :])
+        rp_min_val = rp[minRP + 1]  # Legacy name: timeOfLowestCont
 
-    # Find minimum contamination value for this conf threshold
-    min_idx = np.min(a[0])  # Min on rows axis = contamination axis
-    min_cont = cont[min_idx]
-    '''
-    # TODO I do not understand what they wanted to achieve here
-    # Why find the RP at the contamination level at the max confidence val ?
-    '''
-    rp_min_val = rp[np.argmax(confMatrix[min_idx, :])]
+        # Check if this unit passes the sliding RP metric
+        pass_cont_thresh = min_cont <= cont_thresh
+    else:
+        pass_cont_thresh = False
+        min_cont = np.nan
+        rp_min_val = np.nan
 
-    # Check if this unit passes the sliding RP metric
-    pass_cont_thresh = min_cont <= cont_threshold
-
-    return pass_cont_thresh, min_cont, rp_min_val
-
-
-
-def slidingRP(spikeTimes, params=None):
-    '''
-    Compute the metric for one cluster
-
-    Parameters
-    ----------
-    spikeTimes : numpy.ndarray
-        array of spike times (ms) for one cluster
-
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
-
-    Returns
-    -------
+    return pass_cont_thresh, min_cont, rp_min_val  # Legacy: value, minContWith90Confidence, timeOfLowestCont
 
 
-
-    maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
-    minContWith90Confidence: Minimum contamination for which you have >=90% confidence
-    timeOfLowestCont:        Time at which best score happens
-    nSpikesBelow2:           Number of observed spikes that occur before 2 ms
-    confMatrix:              Full confidence matrix of size nCont x nRP
-    cont:Vector of contamination values tested
-    rp: Vector of refractory period durations tested
-    nACG: the autocorrelogram of the neuron
-    firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
-    '''
-
+def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
+              params=None):
     if params is None:
         params = {}
         params['sampleRate'] = 30000
@@ -358,40 +211,79 @@ def slidingRP(spikeTimes, params=None):
         params['verbose'] = True
         params['cidx'] = [0]
 
-    seconds_start = time.time()
-    [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
-    # matrix is [nCont x nRP]
+    [confMatrix, cont, rp, nACG, firing_rate] = computeMatrix(spikeTimes, params)
+    # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
+    pass_cont_thresh, min_cont, rp_min_val = \
+        pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
 
-    testTimes = rp > 0.0005  # (in seconds)
-    # only test for refractory period durations greater than 0.5 ms
+    # Legacy 'maxConfidenceAt10Cont'
+    max_conf, _, _ = \
+        confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
 
-    maxConfidenceAt10Cont = max(confMatrix[cont == 10, testTimes])  # TODO check behavior if no max
+    # Legacy
+    n_spikes_below2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
 
-    indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] >= 90))
-    ii = indsConf90[0]  # row inds
-    jj = indsConf90[1]  # col inds
+    # We apply this for IBL data, that has a duration of 1h on average hence the hardcoded FR>0.5:
+    if (n_spikes_below2 == 0) and (firing_rate > 0.5) and (pass_cont_thresh is False):
+        pass_forced = True
+    else:
+        pass_forced = False
 
-    try:
-        minI = np.min(ii)
-        idx = np.argmin(ii)
-        minContWith90Confidence = cont[minI]
-        minRP = np.argmax(confMatrix[minI, testTimes])
+    # Legacy:
+    # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2,
+    # confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+    return max_conf, min_cont, rp_min_val, \
+        n_spikes_below2, firing_rate,\
+        pass_cont_thresh, pass_forced
 
 
-    except:
-        minContWith90Confidence = np.nan
+def slidingRP_all(spikeTimes, spikeClusters,
+                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
+                  params=None):
+    """
+    :param spikeTimes:  array of spike times (s)
+    :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
+    :param params:
+    :return: dictionary of values
+    """
 
-        minRP = np.nan
+    cids = np.unique(spikeClusters)
 
-    try:
-        timeOfLowestCont = rp[minRP + np.where(testTimes)[0][0] + 1]
-    except:
-        timeOfLowestCont = np.nan
+    # initialize rpMetrics as dict
+    rpMetrics = {}
+    rpMetrics['cidx'] = []
+    rpMetrics['max_confidence'] = []
+    rpMetrics['min_contamination'] = []
+    rpMetrics['rp_min_val'] = []
+    rpMetrics['n_spikes_below2'] = []
+    rpMetrics['firing_rate'] = []
+    rpMetrics['value'] = []
+    rpMetrics['value_forced'] = []
 
-    nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
+    # Loop over clusters
+    for cidx in range(len(cids)):
+        st = spikeTimes[spikeClusters == cids[cidx]]
 
-    secondsElapsed = time.time() - seconds_start
-    return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+        [max_confidence, min_contamination, rp_min_val,
+         n_spikes_below2, firing_rate,
+         pass_cont_thresh, pass_forced] = slidingRP(st,
+                                                    conf_thresh=conf_thresh, cont_thresh=cont_thresh,
+                                                    rp_reject=rp_reject, params=params)
+
+        rpMetrics['cidx'].append(cids[cidx])
+        rpMetrics['max_confidence'].append(max_confidence)
+        rpMetrics['min_contamination'].append(min_contamination)
+        rpMetrics['rp_min_val'].append(rp_min_val)
+        rpMetrics['n_spikes_below2'].append(n_spikes_below2)
+        rpMetrics['firing_rate'].append(firing_rate)
+        rpMetrics['value'].append(int(pass_cont_thresh))
+        rpMetrics['value_forced'].append(int(pass_forced))
+
+    return rpMetrics
+
+
+
+## Code from OW
 
 
 def computeMatrix(spikeTimes, params):
@@ -474,245 +366,471 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
 
     return confidenceScore
 
+# --------
+##
 
-def plotSlidingRP(spikeTimes, params=None):
-    '''
+#
+# '''
+# The below is legacy code, written prior to 22-Feb-2024 by N. Steinmetz and N. Roth
+# '''
+#
+# def fit_sigmoid(acg, timeBins, min_sig=[0.0004, 0.0008], peakDistFromEndBin=5):
+#     # remove first ms from the computation
+#     # idx_time = (timeBins > min_sig[0])
+#     # acg = acg[idx_time]
+#     # timeBins = timeBins[idx_time]
+#
+#     # Force first ms to 0 in acg
+#     # idx_time = (timeBins < min_sig[0])
+#     # acg[idx_time] = 0
+#
+#     #Compute
+#     minSigmoid = np.mean(acg[(timeBins > min_sig[0]) & (timeBins < min_sig[1])])  # first 0.4-0.8 ms of data
+#     peakIdx = np.argmax(acg)
+#     peakVal = np.max(acg)
+#
+#     # 2ms around peak
+#     timeValuesMin = np.where(timeBins >= timeBins[peakIdx] - 0.001)[0][0]
+#     timeValuesMax = np.where(timeBins <= timeBins[peakIdx] + 0.001)[0][-1]
+#     maxSigmoid = np.mean(acg[timeValuesMin:(timeValuesMax + 1)])
+#
+#     # if the peak is well before the end of the acg, only fit data up to the peak + n bins
+#     if peakIdx < len(acg) - peakDistFromEndBin:
+#         acg = acg[0:peakIdx + peakDistFromEndBin]
+#         timeBins = timeBins[0:peakIdx + peakDistFromEndBin]
+#
+#     # fit the sigmoid with max and min fixed
+#     try:
+#         popt, pcov = curve_fit(lambda x, x0, k: sigmoid(x, maxSigmoid, x0, k, minSigmoid), timeBins, acg)
+#         fitParams = [maxSigmoid, popt[0], popt[1], minSigmoid]
+#
+#         xSigmoid = timeBins
+#         ySigmoid = sigmoid(xSigmoid, *fitParams)
+#
+#         # find RP
+#         RPEstimateFromPercentageOfSlope = 0.10
+#         estimateIdx, _ = closest(ySigmoid, RPEstimateFromPercentageOfSlope * (maxSigmoid - minSigmoid) + minSigmoid)
+#         estimatedRP = 1000 * xSigmoid[estimateIdx]  # in ms
+#     except:
+#         # print('fit error')
+#         estimatedRP = np.nan
+#         estimateIdx = np.nan
+#         xSigmoid = np.nan
+#         ySigmoid = np.nan
+#     return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+#
+#
+# def slidingRP_all(spikeTimes, spikeClusters, params=None):
+#     '''
+#
+#     Compute the metric for each cluster in a recording
+#
+#     Parameters
+#     ----------
+#     spikeTimes : numpy.ndarray
+#         array of spike times (ms)
+#     spikeClusters : numpy.ndarray
+#         array of spike cluster ids that corresponds to spikeTimes.
+#     params : dict
+#         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
+#         params.sampleRate : sample rate of the recording (Hz)
+#
+#     Returns
+#     -------
+#     rpMetrics: dict
+#         keys:
+#             maxConfidenceAt10Cont
+#             minContWith90Confidence
+#             timeOfLowestCont
+#             nSpikesBelow2
+#             confMatrix (optional, if returnMatrix ==1)
+#         note: minContWith90Confidence, timeOfLowestCont will return np.nan
+#         for neurons with too few spikes -- these neurons have "empty"
+#         confidence and should be rejected.
+#     cont: nd.array
+#         Vector of contamination values tested
+#     rp: nd.array
+#         Vector of refractory period durations tested
+#
+#     '''
+#
+#     if params and 'returnMatrix' in params:
+#         returnMatrix = params['returnMatrix']
+#     else:
+#         returnMatrix = False
+#
+#     if params and 'verbose' in params:
+#         verbose = params['verbose'];
+#     else:
+#         verbose = False
+#
+#     cids = np.unique(spikeClusters)
+#
+#     # initialize rpMetrics as dict
+#     rpMetrics = {}
+#     rpMetrics['cidx'] = []
+#     rpMetrics['maxConfidenceAt10Cont'] = []
+#     rpMetrics['minContWith90Confidence'] = []
+#     rpMetrics['timeOfLowestCont'] = []
+#     rpMetrics['nSpikesBelow2'] = []
+#
+#     if verbose:
+#         print("Computing metrics for %d clusters \n" % len(cids))
+#
+#     for cidx in range(len(cids)):
+#         st = spikeTimes[spikeClusters == cids[cidx]]
+#
+#         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+#          nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate,
+#          pass_cont_thresh, pass_forced] = slidingRP_2(st, params=params)
+#
+#         '''
+#         [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+#          nSpikesBelow2, confMatrix, cont, rp, nACG,
+#          firingRate, secondsElapsed] = slidingRP(st, params=params)
+#         '''
+#
+#         rpMetrics['cidx'].append(cids[cidx])
+#         rpMetrics['maxConfidenceAt10Cont'].append(maxConfidenceAt10Cont)
+#         rpMetrics['minContWith90Confidence'].append(minContWith90Confidence)
+#         rpMetrics['timeOfLowestCont'].append(timeOfLowestCont)
+#         rpMetrics['nSpikesBelow2'].append(nSpikesBelow2)
+#
+#         if returnMatrix:
+#             if 'confMatrix' not in rpMetrics:
+#                 rpMetrics['confMatrix'] = []
+#             rpMetrics['confMatrix'].append(confMatrix)
+#
+#         if 'value' not in rpMetrics:
+#             rpMetrics['value'] = []
+#         if minContWith90Confidence <= 10:
+#             rpMetrics['value'].append(1)
+#         else:
+#             rpMetrics['value'].append(0)
+#
+#         if verbose:
+#             if minContWith90Confidence <= 10:
+#                 pfstring = 'PASS'
+#             else:
+#                 pfstring = 'FAIL'
+#             print('  %d: %s max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms, n below 2 ms = %d' % (
+#             cids[cidx], pfstring, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000,
+#             nSpikesBelow2))
+#
+#     return rpMetrics
+#
+#
+#
+# ## ------ LEGACY CODE BELOW BY NICK S. & NOAM R. -------
+#
+# def slidingRP(spikeTimes, params=None):
+#     '''
+#     Compute the metric for one cluster
+#
+#     Parameters
+#     ----------
+#     spikeTimes : numpy.ndarray
+#         array of spike times (ms) for one cluster
+#
+#     params : dict
+#         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
+#         params.sampleRate : sample rate of the recording (Hz)
+#
+#     Returns
+#     -------
+#
+#
+#
+#     maxConfidenceAt10Cont:   Max confidence that you have <= 10% contamination
+#     minContWith90Confidence: Minimum contamination for which you have >=90% confidence
+#     timeOfLowestCont:        Time at which best score happens
+#     nSpikesBelow2:           Number of observed spikes that occur before 2 ms
+#     confMatrix:              Full confidence matrix of size nCont x nRP
+#     cont:Vector of contamination values tested
+#     rp: Vector of refractory period durations tested
+#     nACG: the autocorrelogram of the neuron
+#     firingRate: firing rate of the cluster, computed as the average acg value from 1-2 seconds
+#     '''
+#
+#     if params is None:
+#         params = {}
+#         params['sampleRate'] = 30000
+#         params['binSizeCorr'] = 1 / params['sampleRate']
+#         params['returnMatrix'] = True
+#         params['verbose'] = True
+#         params['cidx'] = [0]
+#
+#     seconds_start = time.time()
+#     [confMatrix, cont, rp, nACG, firingRate] = computeMatrix(spikeTimes, params)
+#     # matrix is [nCont x nRP]
+#
+#     testTimes = rp > 0.0005  # (in seconds)
+#     # only test for refractory period durations greater than 0.5 ms
+#
+#     maxConfidenceAt10Cont = max(confMatrix[cont == 10, testTimes])  # TODO check behavior if no max
+#
+#     indsConf90 = np.row_stack(np.where(confMatrix[:, testTimes] >= 90))
+#     ii = indsConf90[0]  # row inds
+#     jj = indsConf90[1]  # col inds
+#
+#     try:
+#         minI = np.min(ii)
+#         idx = np.argmin(ii)
+#         minContWith90Confidence = cont[minI]
+#         minRP = np.argmax(confMatrix[minI, testTimes])
+#
+#
+#     except:
+#         minContWith90Confidence = np.nan
+#
+#         minRP = np.nan
+#
+#     try:
+#         timeOfLowestCont = rp[minRP + np.where(testTimes)[0][0] + 1]
+#     except:
+#         timeOfLowestCont = np.nan
+#
+#     nSpikesBelow2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
+#
+#     secondsElapsed = time.time() - seconds_start
+#     return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+#
+#
+# def plotSlidingRP(spikeTimes, params=None):
+#     '''
+#
+#
+#     Parameters
+#     ----------
+#     spikeTimes : numpy.ndarray
+#         array of spike times (ms)
+#     params : dict
+#         params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
+#         params.sampleRate : sample rate of the recording (Hz)
+#
+#     Returns
+#     -------
+#     None.
+#
+#     '''
+#     if params is None:
+#         clusterlabel = False
+#
+#     [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
+#      nSpikesBelow2, confMatrix, cont, rp, nACG,
+#      firingRate, xx] = slidingRP(spikeTimes, params)
+#
+#     fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(12, 4))
+#
+#     ax = axs[0]
+#
+#     ax.bar(rp * 1000, nACG[0:len(rp)], width=np.diff(rp)[0] * 1000, color='k', edgecolor=(1, 0, 0, 0))  # TODO width??
+#     ax.set_xlim([0, 5])
+#     ax.set_xlabel('Time from spike (ms)')
+#     ax.set_ylabel('ACG count (spks)')
+#     if clusterlabel:
+#         t1 = ('Cluster #%d: FR=%.2f' % (params['cidx'][0], firingRate))
+#     ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
+#     ax.spines['right'].set_visible(False)
+#     ax.spines['top'].set_visible(False)
+#
+#     ax = axs[1]
+#     c = ax.imshow(confMatrix, extent=[rp[0] * 1000, rp[-1] * 1000, cont[0], cont[-1]], aspect='auto', vmin=0, vmax=100,
+#                   origin='lower')
+#     ax.set_xlim((0, 5))
+#     ax.spines['right'].set_visible(False)
+#     ax.spines['top'].set_visible(False)
+#     ax.spines['left'].set_visible(False)
+#     ax.spines['bottom'].set_visible(False)
+#     cbar = fig.colorbar(c, ax=ax, location='right')
+#     cbar.set_label('Confidence (%)')
+#     ax.invert_yaxis()
+#     ax.plot([rp[0] * 1000, rp[-1] * 1000], [10, 10], 'r', linewidth=1)
+#
+#     if ~np.isnan(timeOfLowestCont):
+#         ax.plot(timeOfLowestCont * 1000 * np.array([1, 1]), [cont[0], cont[-1]], 'r', linewidth=1)
+#
+#         # compute the conf=90 contour
+#         # zeropad confMatrix
+#         z = np.zeros((np.shape(confMatrix)[0] + 1, np.shape(confMatrix)[1]))
+#         z[1:, :] = confMatrix
+#
+#         ii = np.argmax(z > 90, 0).astype(float)
+#         ii[ii == 0] = np.nan
+#         contContour = np.empty(np.shape(ii));
+#         contContour[:] = np.nan
+#         contContour[~np.isnan(ii)] = cont[(ii[~np.isnan(ii)] - 1).astype(int)]
+#         ax.plot(rp * 1000, contContour, 'r', linewidth=2)
+#     val = ax.get_ylim()[1]
+#     # ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 1)
+#     ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
+#     # ax.add_patch(patches.Rectangle((0,0), 0.5, val, fc = 'k') )
+#     ax.set_xlabel('Time from spike (ms)')
+#     ax.set_xlim([0, 5])
+#     ax.set_ylabel('Contamination (%)')
+#     # ax.set_ylim([max(cont),0]) #seems unnecessary?
+#     t2 = ('max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms' % (
+#     maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000))
+#
+#     if minContWith90Confidence >= 10:
+#         axs[0].set_title(t1, color='r')
+#         axs[1].set_title(t2, color='r')
+#     elif nSpikesBelow2 == 0:
+#         axs[0].set_title(t1, color='b')
+#         axs[1].set_title(t2, color='b')
+#     else:
+#         axs[0].set_title(t1, color='g')
+#         axs[1].set_title(t2, color='g')
+#
+#     ax = axs[2]
+#     ax.plot(rp * 1000, np.squeeze(confMatrix[cont == 10, :]), 'k', linewidth=2.0)
+#     ax.set_xlabel('Time from spike (ms)')
+#     ax.set_ylabel('Confidence of \leq10% contamination (%)')
+#     ax.spines['right'].set_visible(False)
+#     ax.spines['top'].set_visible(False)
+#
+#     ax.plot([0, 5], [90, 90], 'r');
+#     ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
+#     ax.set_xlim([0, 5]);
+#     ax.set_ylim([0, 100]);
+#
+#     fig.tight_layout()
+#
+#
+# def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
+#     cids = np.unique(spikeClusters)
+#
+#     # initialize rpMetrics as dict
+#     rpFit = {}
+#     rpFit['cidx'] = []
+#     rpFit['rpEstimate'] = []
+#     rpFit['brainRegion'] = []
+#     rpFit['amp'] = []
+#     rpFit['fr'] = []
+#
+#     for cidx in range(len(cids)):
+#         st = spikeTimes[spikeClusters == cids[cidx]]
+#         brainRegion = brainRegions[cidx]
+#         fr = len(st) / (st[-1] - st[0])
+#
+#         sa = spikeAmps[spikeClusters == cids[cidx]]
+#         amp = np.nanmedian(sa) * 1000000
+#
+#         # estimate rp
+#         minFR = 1  # spks/s
+#         minAmp = 50  # uV
+#
+#         try:
+#             estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
+#
+#             rpFit['cidx'].append(cids[cidx])
+#             rpFit['rpEstimate'].append(estimatedRP)
+#             rpFit['brainRegion'].append(brainRegion)
+#             rpFit['fr'].append(fr)
+#             rpFit['amp'].append(amp)
+#             if verbose:
+#                 print('Estimated RP for cluster %d is %.2f ms' % (cids[cidx], estimatedRP))
+#         except:
+#             continue
+#
+#     return rpFit
+#
+#
+# def fitSigmoidACG(st, timeBins, fr, amp, minFR=1, minAmp=50, params=None, return_acg=False):
+#     '''
+#     Compute the autocorrelogram from spike train
+#     Apply sigmoid fit if certain conditions are met and return it
+#
+#     Parameters
+#     ----------
+#     acg : np.array
+#         heights of acg bins (probability of spike for each timebin)
+#     timeBins : np.array
+#         timeBins used when computing acg
+#     params : TYPE
+#         DESCRIPTION.
+#
+#     Returns
+#     -------
+#     estimatedRP:
+#
+#     x:
+#
+#     y:
+#
+#     '''
+#     if params and 'verbose' in params.keys():
+#         verbose = params['verbose']
+#     else:
+#         verbose = False
+#     if params and 'sampleRate' in params.keys():
+#         sampleRate = params['sampleRate']
+#     else:
+#         sampleRate = 30000
+#     if params and 'binSizeCorr' in params.keys():
+#         binSizeCorr = params['binSizeCorr']
+#     else:
+#         binSizeCorr = 1 / 30000
+#     if params and 'numSpikesThresh' in params.keys():
+#         numSpikesThresh = params['numSpikesThresh']
+#     else:
+#         numSpikesThresh = 20  # need at least this many total spikes to compute fit
+#
+#     # setup for acg
+#     clustersIds = [0]  # call the cluster id 0 (not used, but required input for correlograms)
+#     spikeClustersACG = np.zeros(len(st), dtype='int8')  # each spike time gets cluster id 0
+#     # compute acg
+#     acg = correlograms(st, spikeClustersACG, cluster_ids=clustersIds, bin_size=binSizeCorr, sample_rate=sampleRate,
+#                        window_size=2, symmetrize=False)[0][0]  # compute acg
+#
+#     if len(acg) > len(timeBins):
+#         acg = acg[0:len(timeBins)]
+#
+#     if fr >= minFR and amp >= minAmp and len(st) > numSpikesThresh:  # (sum(acg)>numSpikesThresh):
+#         # potential todo: insert a case here for if the acg is symmetric?
+#         estimatedRP, estimateIdx, xSigmoid, ySigmoid = fit_sigmoid(acg, timeBins)
+#     else:
+#         # Criteria not matched to run fit
+#         estimatedRP = np.nan
+#         estimateIdx = np.nan
+#         xSigmoid = np.nan
+#         ySigmoid = np.nan
+#     if return_acg:
+#         return estimatedRP, estimateIdx, xSigmoid, ySigmoid, acg
+#     else:
+#         return estimatedRP, estimateIdx, xSigmoid, ySigmoid
+#
+#
+# def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
+#     if len(acg) > len(timeBins):
+#         acg = acg[0:len(timeBins)]
+#     ax.bar(timeBins * 1000, acg, width=np.diff(timeBins * 1000)[0], alpha=0.5)
+#     ax.set_xlim(0, 5)
+#
+#     ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'k')
+#     ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
+#     ax.spines['right'].set_visible(False)
+#     ax.spines['top'].set_visible(False)
+#     ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
+#     ax.set_ylabel('Number of spikes')
+#     ax.set_xlabel('Time (ms)')
+#     return acg
+#
+#     # helper functions
+#
+#
+# def find_nearest(array, value):
+#     array = np.asarray(array)
+#     subtracted = (array - value)
+#     valid_idx = np.where(subtracted >= 0)[0]
+#     if len(valid_idx) > 0:
+#
+#         out = valid_idx[subtracted[valid_idx].argmin()]
+#
+#     else:
+#         out = np.nan
+#
+#     return out
+#
+#
 
-
-    Parameters
-    ----------
-    spikeTimes : numpy.ndarray
-        array of spike times (ms)
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
-
-    Returns
-    -------
-    None.
-
-    '''
-    if params is None:
-        clusterlabel = False
-
-    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,
-     nSpikesBelow2, confMatrix, cont, rp, nACG,
-     firingRate, xx] = slidingRP(spikeTimes, params)
-
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(12, 4))
-
-    ax = axs[0]
-
-    ax.bar(rp * 1000, nACG[0:len(rp)], width=np.diff(rp)[0] * 1000, color='k', edgecolor=(1, 0, 0, 0))  # TODO width??
-    ax.set_xlim([0, 5])
-    ax.set_xlabel('Time from spike (ms)')
-    ax.set_ylabel('ACG count (spks)')
-    if clusterlabel:
-        t1 = ('Cluster #%d: FR=%.2f' % (params['cidx'][0], firingRate))
-    ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-
-    ax = axs[1]
-    c = ax.imshow(confMatrix, extent=[rp[0] * 1000, rp[-1] * 1000, cont[0], cont[-1]], aspect='auto', vmin=0, vmax=100,
-                  origin='lower')
-    ax.set_xlim((0, 5))
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    cbar = fig.colorbar(c, ax=ax, location='right')
-    cbar.set_label('Confidence (%)')
-    ax.invert_yaxis()
-    ax.plot([rp[0] * 1000, rp[-1] * 1000], [10, 10], 'r', linewidth=1)
-
-    if ~np.isnan(timeOfLowestCont):
-        ax.plot(timeOfLowestCont * 1000 * np.array([1, 1]), [cont[0], cont[-1]], 'r', linewidth=1)
-
-        # compute the conf=90 contour
-        # zeropad confMatrix
-        z = np.zeros((np.shape(confMatrix)[0] + 1, np.shape(confMatrix)[1]))
-        z[1:, :] = confMatrix
-
-        ii = np.argmax(z > 90, 0).astype(float)
-        ii[ii == 0] = np.nan
-        contContour = np.empty(np.shape(ii));
-        contContour[:] = np.nan
-        contContour[~np.isnan(ii)] = cont[(ii[~np.isnan(ii)] - 1).astype(int)]
-        ax.plot(rp * 1000, contContour, 'r', linewidth=2)
-    val = ax.get_ylim()[1]
-    # ax.fill(np.array([0, 1, 1, 0])*0.5, np.array([0, 0, 1, 1])*ax.get_ylim()[1], 'k',alpha= 1)
-    ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
-    # ax.add_patch(patches.Rectangle((0,0), 0.5, val, fc = 'k') )
-    ax.set_xlabel('Time from spike (ms)')
-    ax.set_xlim([0, 5])
-    ax.set_ylabel('Contamination (%)')
-    # ax.set_ylim([max(cont),0]) #seems unnecessary?
-    t2 = ('max conf = %.2f%%, min cont = %.1f%%, time = %.2f ms' % (
-    maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont * 1000))
-
-    if minContWith90Confidence >= 10:
-        axs[0].set_title(t1, color='r')
-        axs[1].set_title(t2, color='r')
-    elif nSpikesBelow2 == 0:
-        axs[0].set_title(t1, color='b')
-        axs[1].set_title(t2, color='b')
-    else:
-        axs[0].set_title(t1, color='g')
-        axs[1].set_title(t2, color='g')
-
-    ax = axs[2]
-    ax.plot(rp * 1000, np.squeeze(confMatrix[cont == 10, :]), 'k', linewidth=2.0)
-    ax.set_xlabel('Time from spike (ms)')
-    ax.set_ylabel('Confidence of \leq10% contamination (%)')
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-
-    ax.plot([0, 5], [90, 90], 'r');
-    ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1], 'k', alpha=0.2)
-    ax.set_xlim([0, 5]);
-    ax.set_ylim([0, 100]);
-
-    fig.tight_layout()
-
-
-def fitSigmoidACG_All(spikeTimes, spikeClusters, brainRegions, spikeAmps, rp, params):
-    cids = np.unique(spikeClusters)
-
-    # initialize rpMetrics as dict
-    rpFit = {}
-    rpFit['cidx'] = []
-    rpFit['rpEstimate'] = []
-    rpFit['brainRegion'] = []
-    rpFit['amp'] = []
-    rpFit['fr'] = []
-
-    for cidx in range(len(cids)):
-        st = spikeTimes[spikeClusters == cids[cidx]]
-        brainRegion = brainRegions[cidx]
-        fr = len(st) / (st[-1] - st[0])
-
-        sa = spikeAmps[spikeClusters == cids[cidx]]
-        amp = np.nanmedian(sa) * 1000000
-
-        # estimate rp
-        minFR = 1  # spks/s
-        minAmp = 50  # uV
-
-        try:
-            estimatedRP, estimateIdx, xSigmoid, ySigmoid = fitSigmoidACG(st, rp, fr, amp, minFR, minAmp, params)
-
-            rpFit['cidx'].append(cids[cidx])
-            rpFit['rpEstimate'].append(estimatedRP)
-            rpFit['brainRegion'].append(brainRegion)
-            rpFit['fr'].append(fr)
-            rpFit['amp'].append(amp)
-            if verbose:
-                print('Estimated RP for cluster %d is %.2f ms' % (cids[cidx], estimatedRP))
-        except:
-            continue
-
-    return rpFit
-
-
-def fitSigmoidACG(st, timeBins, fr, amp, minFR=1, minAmp=50, params=None, return_acg=False):
-    '''
-    Compute the autocorrelogram from spike train
-    Apply sigmoid fit if certain conditions are met and return it
-
-    Parameters
-    ----------
-    acg : np.array
-        heights of acg bins (probability of spike for each timebin)
-    timeBins : np.array
-        timeBins used when computing acg
-    params : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    estimatedRP:
-
-    x:
-
-    y:
-
-    '''
-    if params and 'verbose' in params.keys():
-        verbose = params['verbose']
-    else:
-        verbose = False
-    if params and 'sampleRate' in params.keys():
-        sampleRate = params['sampleRate']
-    else:
-        sampleRate = 30000
-    if params and 'binSizeCorr' in params.keys():
-        binSizeCorr = params['binSizeCorr']
-    else:
-        binSizeCorr = 1 / 30000
-    if params and 'numSpikesThresh' in params.keys():
-        numSpikesThresh = params['numSpikesThresh']
-    else:
-        numSpikesThresh = 20  # need at least this many total spikes to compute fit
-
-    # setup for acg
-    clustersIds = [0]  # call the cluster id 0 (not used, but required input for correlograms)
-    spikeClustersACG = np.zeros(len(st), dtype='int8')  # each spike time gets cluster id 0
-    # compute acg
-    acg = correlograms(st, spikeClustersACG, cluster_ids=clustersIds, bin_size=binSizeCorr, sample_rate=sampleRate,
-                       window_size=2, symmetrize=False)[0][0]  # compute acg
-
-    if len(acg) > len(timeBins):
-        acg = acg[0:len(timeBins)]
-
-    if fr >= minFR and amp >= minAmp and len(st) > numSpikesThresh:  # (sum(acg)>numSpikesThresh):
-        # potential todo: insert a case here for if the acg is symmetric?
-        estimatedRP, estimateIdx, xSigmoid, ySigmoid = fit_sigmoid(acg, timeBins)
-    else:
-        # Criteria not matched to run fit
-        estimatedRP = np.nan
-        estimateIdx = np.nan
-        xSigmoid = np.nan
-        ySigmoid = np.nan
-    if return_acg:
-        return estimatedRP, estimateIdx, xSigmoid, ySigmoid, acg
-    else:
-        return estimatedRP, estimateIdx, xSigmoid, ySigmoid
-
-
-def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
-    if len(acg) > len(timeBins):
-        acg = acg[0:len(timeBins)]
-    ax.bar(timeBins * 1000, acg, width=np.diff(timeBins * 1000)[0], alpha=0.5)
-    ax.set_xlim(0, 5)
-
-    ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'k')
-    ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
-    ax.set_ylabel('Number of spikes')
-    ax.set_xlabel('Time (ms)')
-    return acg
-
-    # helper functions
-
-
-def find_nearest(array, value):
-    array = np.asarray(array)
-    subtracted = (array - value)
-    valid_idx = np.where(subtracted >= 0)[0]
-    if len(valid_idx) > 0:
-
-        out = valid_idx[subtracted[valid_idx].argmin()]
-
-    else:
-        out = np.nan
-
-    return out
-
-
-def closest(lst, K):
-    lst = np.asarray(lst)
-    idx = (np.abs(lst - K)).argmin()
-    return idx, lst[idx]
