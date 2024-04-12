@@ -188,8 +188,12 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
         min_idx = np.min(a[0])  # Min on rows axis = contamination axis
         min_cont = cont[min_idx]  # Legacy name: minContWith90Confidence
         # Find the smallest RP possible at the contamination level at the max confidence val
+        # TODO this code could be deleted as rp_mini_val is not informative
         minRP = np.argmax(confMatrix[min_idx, :])
-        rp_min_val = rp[minRP + 1]  # Legacy name: timeOfLowestCont
+        if minRP == len(confMatrix[min_idx, :]):
+            rp_min_val = rp[-1]
+        else:
+            rp_min_val = rp[minRP + 1]  # Legacy name: timeOfLowestCont
 
         # Check if this unit passes the sliding RP metric
         pass_cont_thresh = min_cont <= cont_thresh
