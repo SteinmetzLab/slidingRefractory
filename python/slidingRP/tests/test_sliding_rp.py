@@ -3,10 +3,11 @@ from slidingRP import metrics
 from pathlib import Path
 
 TEST_DATA_PATH = Path(__file__).parents[3].joinpath('test-data', 'unit')
+
 EXPECTED = {
     167: (0.7968085162939342, np.nan, np.nan, 0),  # FAIL
-    274: (100.0, 0.5, 0.0012166666666666667, 2),   # PASS
-    275: (53.88397133550098, 15.0, 0.00055, 99),  # FAIL
+    274: (100.0, 0.5, 0.0011833333333333333, 2),   # PASS
+    275: (53.88397133550098, 15.0, 0.0005166666666666667, 99),  # FAIL
 }
 
 
