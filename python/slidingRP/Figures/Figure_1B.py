@@ -53,3 +53,7 @@ timeBins = compute_timebins(acg, bin_size_secs)
 plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP)
 ax.set_title('Estimated RP:%.2f ms' % estimatedRP,
              color=palette[df_neuron['Cosmos_acronym']])
+
+# Save
+fig_name = 'Fig_1B'
+fig_sig.savefig(fig_path.joinpath(f'{fig_name}.pdf'))
