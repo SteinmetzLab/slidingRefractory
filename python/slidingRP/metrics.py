@@ -827,7 +827,7 @@ def plot_acg(ax, acg, timeBins, estimatedIdx=None):
 def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
     plot_acg(ax, acg, timeBins, estimatedIdx=estimatedIdx)
     # Plot on top of ACG the sigmoid
-    ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'k')
+    ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'b')
     ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
     ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
 
