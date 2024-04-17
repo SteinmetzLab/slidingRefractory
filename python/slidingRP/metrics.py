@@ -802,19 +802,35 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
 #         return estimatedRP, estimateIdx, xSigmoid, ySigmoid
 #
 #
-# def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
-#     if len(acg) > len(timeBins):
-#         acg = acg[0:len(timeBins)]
-#     ax.bar(timeBins * 1000, acg, width=np.diff(timeBins * 1000)[0], alpha=0.5)
-#     ax.set_xlim(0, 5)
-#
-#     ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'k')
-#     ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
-#     ax.spines['right'].set_visible(False)
-#     ax.spines['top'].set_visible(False)
-#     ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
-#     ax.set_ylabel('Number of spikes')
-#     ax.set_xlabel('Time (ms)')
+
+
+def plot_acg(ax, acg, timeBins, estimatedIdx=None):
+    # Convert time in milliseconds for plotting
+    timeBins = timeBins * 1000
+
+    if len(acg) > len(timeBins):
+        acg = acg[0:len(timeBins)]
+        # TODO change this so the correct bins are taken for whatever values of timeBins
+    ax.bar(timeBins, acg, width=np.diff(timeBins)[0], alpha=0.5)
+    ax.set_xlim(0, timeBins[-1])
+
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    if estimatedIdx is not None:
+        # Plot RP as black vertical line
+        ax.plot([timeBins[estimatedIdx], timeBins[estimatedIdx]], [0, max(acg)], 'k-')
+
+    ax.set_ylabel('Number of spikes')
+    ax.set_xlabel('Time (ms)')
+
+def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
+    plot_acg(ax, acg, timeBins, estimatedIdx=estimatedIdx)
+    # Plot on top of ACG the sigmoid
+    ax.plot(timeBins[0:len(ySigmoid)] * 1000, ySigmoid, 'k')
+    ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
+    ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
+
 #     return acg
 #
 #     # helper functions

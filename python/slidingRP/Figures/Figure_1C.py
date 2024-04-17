@@ -12,8 +12,9 @@ from pathlib import Path
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from slidingRP.Figures.Fig_1_format import palette, linestyles
 
-fig_name = "Figure_1c"
+fig_name = "Fig_1C"
 fig_path = Path("/Users/gaelle/Desktop/Reports/RefractoryPeriod/Figure")
 data_path = Path("/Users/gaelle/Desktop/Reports/RefractoryPeriod/Data")
 
@@ -49,11 +50,6 @@ df_all = df_all.iloc[index_fr]
 df_all = df_all.reset_index()
 ##
 # Plot distributions and median
-
-# Set linestyle and palette in flatui
-linestyles=["--", "-", ":"]
-palette = {"HPF": "#9b59b6", "TH": "#3498db", "Isocortex": "orange"}
-# Violet (HPF), blue (TH), orange (Isocortex)
 
 figstyle = 'kde'
 
