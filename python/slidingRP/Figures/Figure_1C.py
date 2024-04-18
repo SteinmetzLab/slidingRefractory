@@ -73,14 +73,17 @@ for dataset, linestyle in zip(datasets, linestyles):
 # Set x min axis limit to 0
 axlim = ax.get_xlim()
 ax.set_xlim(0, axlim[1])
-# Count N units per categories
+# Count N units + median RP per categories
 count = df_all.groupby(['dataset', 'region'])['estimatedRP'].count()
+medianRP = df_all.groupby(['dataset', 'region'])['estimatedRP'].median()
 # Create labels
 labels = list()
 for dataset in datasets:
-    for region in regions:
-        labels.append(f'{dataset} - {region} - {count[dataset][region]}')
-
+    for region in [regions[2], regions[1], regions[0]]:
+        # TODO This ordering of label is precarious, for some reason seaborn rearranges them
+        labels.append(f'{dataset} - {region} - {count[dataset][region]} - '
+                      f' RP:%.2f ms' % medianRP[dataset][region])
+# 'Estimated RP:%.2f ms' % estimatedRP
 plt.legend(title='Datasets',
            loc='upper right', labels=labels)
 
@@ -90,15 +93,12 @@ arrow_min = aylim[1]+10/100*(aylim[1]-aylim[0])  # Add 10% of range
 
 # Need to plot median as arrows after otherwise taken into legends
 for dataset, linestyle in zip(datasets, linestyles):
-    df_dataset = df_all.loc[df_all['dataset'] == dataset]
-    # Median
-    med = df_dataset.groupby(['region'])['estimatedRP'].median()
     for region in regions:
-        plt.arrow(x=med[region], dx=0, y=arrow_min, dy=-arrow_len, linestyle=linestyle,
+        plt.arrow(x=medianRP[dataset][region], dx=0, y=arrow_min, dy=-arrow_len, linestyle=linestyle,
                   head_width=0.1, head_length=head_length, color=palette[region],
                   linewidth=1.5)
         # Trick to get the arrow head filled (replot on top with small arrow tail)
-        plt.arrow(x=med[region], dx=0, y=arrow_min-arrow_len, dy=-0.0001, linestyle="-",
+        plt.arrow(x=medianRP[dataset][region], dx=0, y=arrow_min-arrow_len, dy=-0.0001, linestyle="-",
                   head_width=0.1, head_length=head_length, color=palette[region],
                   linewidth=1.5)
 

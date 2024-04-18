@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from iblatlas import atlas
-from slidingRP.metrics import compute_rf, compute_timebins, plot_acg
+from slidingRP.metrics import compute_rf, compute_timebins, plot_acg, plotSigmoid
 from slidingRP.Figures.Fig_1_format import palette
 
 data_path = Path("/Users/gaelle/Desktop/Reports/RefractoryPeriod/Data")
@@ -109,9 +109,10 @@ for i_reg, region in enumerate(region_set):
     # Plot neurons acg
     ax = axs[i_reg]
     timeBins = compute_timebins(acg, bin_size_secs)
-    plot_acg(ax, acg, timeBins, estimatedIdx=estimatedIdx)
+    # plot_acg(ax, acg, timeBins, estimatedIdx=estimatedIdx)
+    plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP)
     ax.set_title(f'{region}, RP:%.2f ms' % estimatedRP, color=color)
-    # plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP)
+
 
 fig_acg.tight_layout()
 fig_acg.set_size_inches([9.99, 3.73])
@@ -119,5 +120,5 @@ fig_acg.set_size_inches([9.99, 3.73])
 fig_name = 'Fig_1A_brainslice'
 fig_slice.savefig(fig_path.joinpath(f'{fig_name}.pdf'))
 
-fig_name = 'Fig_1A_acgs'
+fig_name = 'Fig_1A_acgs_sig'
 fig_acg.savefig(fig_path.joinpath(f'{fig_name}.pdf'))
