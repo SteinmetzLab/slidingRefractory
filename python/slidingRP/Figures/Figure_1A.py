@@ -60,7 +60,7 @@ acgs_ibl = acgs_ibl[indx_good, :]
 
 ##
 # Take random PID and plot tilted slice
-pid = pids[2]
+pid = pids[2]  # '0b8ea3ec-e75b-41a1-9442-64f5fbc11a5a'
 
 # Keep only units within 1 pid
 indx_good = np.where(df_clusters_good['pid'] == pid)[0]
@@ -89,7 +89,8 @@ ax_slice = ax
 # Chose 3 random neurons
 bin_size_secs = 1 / 30_000
 fig_acg, axs = plt.subplots(1, len(region_set))
-indx_select = [0, 1, 0]  # select first neuron
+# Previous: [0, 1, 0], [0, 1, 6], [0, 1, 7]
+indx_select = [0, 1, 8]  # select first neuron
 
 for i_reg, region in enumerate(region_set):
     indx_good = np.where(df_clusters_good['Cosmos_acronym'] == region)[0]

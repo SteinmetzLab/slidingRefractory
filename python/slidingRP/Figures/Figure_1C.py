@@ -61,6 +61,7 @@ elif figstyle == 'kde':
     head_length = 0.01
 
 fig, ax = plt.subplots()
+fig.set_size_inches([7.7, 4.9])
 for dataset, linestyle in zip(datasets, linestyles):
     df_dataset = df_all.loc[df_all['dataset'] == dataset]
     if figstyle == 'hist':
