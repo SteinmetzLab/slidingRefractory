@@ -61,7 +61,6 @@ elif figstyle == 'kde':
     head_length = 0.01
 
 fig, ax = plt.subplots()
-fig.set_size_inches([7.7, 4.9])
 for dataset, linestyle in zip(datasets, linestyles):
     df_dataset = df_all.loc[df_all['dataset'] == dataset]
     if figstyle == 'hist':
@@ -73,7 +72,8 @@ for dataset, linestyle in zip(datasets, linestyles):
                     ax=ax, linestyle=linestyle, legend=False, palette=palette)
 # Set x min axis limit to 0
 axlim = ax.get_xlim()
-ax.set_xlim(0, axlim[1])
+# ax.set_xlim(0, axlim[1])
+ax.set_xlim(0, 7.3)  # Same for fig1D
 # Count N units + median RP per categories
 count = df_all.groupby(['dataset', 'region'])['estimatedRP'].count()
 medianRP = df_all.groupby(['dataset', 'region'])['estimatedRP'].median()
@@ -87,7 +87,7 @@ for dataset in datasets:
 # 'Estimated RP:%.2f ms' % estimatedRP
 plt.legend(title='Datasets',
            loc='upper right', labels=labels)
-
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))  # move legend outside
 # Set arrow limits based on axis limits
 aylim = ax.get_ylim()
 arrow_min = aylim[1]+10/100*(aylim[1]-aylim[0])  # Add 10% of range
@@ -103,5 +103,7 @@ for dataset, linestyle in zip(datasets, linestyles):
                   head_width=0.1, head_length=head_length, color=palette[region],
                   linewidth=1.5)
 
+fig.tight_layout()
+fig.set_size_inches([9.61, 4.32])
 # Save
 plt.savefig(fig_path.joinpath(f'{fig_name}_{fr_threshold}frmin.pdf'))
