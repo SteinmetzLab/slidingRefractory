@@ -8,7 +8,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="slidingRP",
-    version="1.1.0",
+    version="1.1.1",
     author="Noam Roth",
     description="Quality metric from spike trains",
     long_description=long_description,
