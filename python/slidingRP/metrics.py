@@ -203,14 +203,11 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
 
 
 def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
-              params=None):
-    if params is None:
-        params = {}
+              **params):
+    if not params:
+        params = dict()
         params['sampleRate'] = 30000
         params['binSizeCorr'] = 1 / params['sampleRate']
-        params['returnMatrix'] = True
-        params['verbose'] = True
-        params['cidx'] = [0]
 
     [confMatrix, cont, rp, nACG, firing_rate] = computeMatrix(spikeTimes, params)
     # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
@@ -240,7 +237,7 @@ def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
 
 def slidingRP_all(spikeTimes, spikeClusters,
                   conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
-                  params=None):
+                  **params):
     """
     :param spikeTimes:  array of spike times (s)
     :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
