@@ -266,7 +266,7 @@ def slidingRP_all(spikeTimes, spikeClusters,
          n_spikes_below2, firing_rate,
          pass_cont_thresh, pass_forced] = slidingRP(st,
                                                     conf_thresh=conf_thresh, cont_thresh=cont_thresh,
-                                                    rp_reject=rp_reject, params=params)
+                                                    rp_reject=rp_reject, **params)
 
         rpMetrics['cidx'].append(cids[cidx])
         rpMetrics['max_confidence'].append(max_confidence)
