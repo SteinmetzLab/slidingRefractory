@@ -26,5 +26,5 @@ setuptools.setup(
     package_dir={'': 'python'},
     packages=setuptools.find_packages(where="python"),
 #    package_data={'viewephys': ['raster.ui', 'nav_file.ui', 'viewephys.svg']},
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )
