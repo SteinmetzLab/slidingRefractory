@@ -8,7 +8,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="slidingRP",
-    version="1.0.0",
+    version="1.1.1",
     author="Noam Roth",
     description="Quality metric from spike trains",
     long_description=long_description,
@@ -26,5 +26,5 @@ setuptools.setup(
     package_dir={'': 'python'},
     packages=setuptools.find_packages(where="python"),
 #    package_data={'viewephys': ['raster.ui', 'nav_file.ui', 'viewephys.svg']},
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )

@@ -16,8 +16,8 @@ contPct = 0.095:0.0025:0.115;
 % baseRates = logspace(-0.3,1.3,4); 
 % contPct = 0:0.05:0.2;
 recDur = 3600; 
-rp = 0.003;
-
+rp = 0.0025;
+%%
 params = struct(); params.cont = 10;
 
 figure; 
