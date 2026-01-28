@@ -235,18 +235,18 @@ print(f, fullfile(figSaveDir, 'Fig3d.pdf'), '-dpdf');
 %% Run all simulations
 
 tic
-nSim = 10; % number of simulations
-% RPdurs = [1.5 2 3 4 5 6]/1000; % true RP duration, s
-% recDurs = [0.5 1 2 3]*3600; % recording duration, s
-% contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20]/100; % simulated proportion contamination
-% baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
-% confThreshes = [50:10:90]; % confidence we need to accept a neuron
+nSim = 1000; % number of simulations
+RPdurs = [1.5 2 3 4 5 6]/1000; % true RP duration, s
+recDurs = [0.5 1 2 3]*3600; % recording duration, s
+contProp = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20]/100; % simulated proportion contamination
+baseRates = [0.5 1 2 5 10 20]; % rate of the true neuron
+confThreshes = [50:10:90]; % confidence we need to accept a neuron
 
-RPdurs = [1.5 3 6]/1000; % true RP duration, s
-recDurs = [0.5  2 ]*3600; % recording duration, s
-contProp = [0  4   8  10  12   16  20]/100; % simulated proportion contamination
-baseRates = [0.5 1  5 ]; % rate of the true neuron
-confThreshes = [75 90]; % confidence we need to accept a neuron
+% RPdurs = [1.5 3 6]/1000; % true RP duration, s
+% recDurs = [0.5  2 ]*3600; % recording duration, s
+% contProp = [0  4   8  10  12   16  20]/100; % simulated proportion contamination
+% baseRates = [0.5 1  5 ]; % rate of the true neuron
+% confThreshes = [75 90]; % confidence we need to accept a neuron
 
 contThresh = 10; % acceptable percentage of contamination when determining pass/fail
 
@@ -265,7 +265,7 @@ passPctLlobet3 = nan(totaln,1);
 passPctHill1_5 = nan(totaln,1); 
 passPctHill2 = nan(totaln,1); 
 passPctHill3 = nan(totaln,1); 
-base_rate = nan(totaln,1); cont_prop = nan(totaln,1); RP_dur = nan(totaln,1); 
+total_rate = nan(totaln,1); cont_prop = nan(totaln,1); RP_dur = nan(totaln,1); 
 rec_dur = nan(totaln,1); conf_level = nan(totaln,1); 
 
 % - can put recDur on the inside and just select subsets of spikes.
@@ -349,7 +349,7 @@ for bidx = 1:numel(baseRates)
                     passPctHill1_5(totalidx) = sum(simRes(:,5))/nSim*100;
                     passPctHill2(totalidx) = sum(simRes(:,6))/nSim*100;
                     passPctHill3(totalidx) = sum(simRes(:,7))/nSim*100;
-                    base_rate(totalidx) = baseRate; 
+                    total_rate(totalidx) = totalRate; 
                     cont_prop(totalidx) = contProp(cidx); 
                     RP_dur(totalidx) = RPdur; 
                     rec_dur(totalidx) = recDur; 
@@ -364,16 +364,16 @@ for bidx = 1:numel(baseRates)
     end
 end
 
-simDat = table(base_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct, ...
+simDat = table(total_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct, ...
     passPctLlobet1_5, passPctLlobet2, passPctLlobet3, passPctHill1_5, ...
     passPctHill2, passPctHill3);
-% save simDat.mat simDat nSim
+save simDat.mat simDat nSim
 toc
 %% example plot from simDat -- SEE simDatFigure.m for updated/better version
 
 figure; 
 
-br = unique(simDat.base_rate);
+br = unique(simDat.total_rate);
 cont = unique(simDat.cont_prop); 
 recDurs = unique(simDat.rec_dur); 
 
@@ -382,7 +382,7 @@ colors = colors(2:end,:);
 
 clear legH
 for bidx = 1:numel(br)
-    incl = simDat.base_rate==br(bidx) & simDat.RP_dur == 0.003 & simDat.rec_dur==7200 & simDat.conf_level==90;
+    incl = simDat.total_rate==br(bidx) & simDat.RP_dur == 0.003 & simDat.rec_dur==7200 & simDat.conf_level==90;
     legH(bidx) = plot(cont*100, simDat.passPct(incl), '.-', 'Color', colors(bidx,:)); hold on;
 end
 

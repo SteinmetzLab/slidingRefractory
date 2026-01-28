@@ -19,6 +19,7 @@ function [passTest, confidence, contamination, timeOfLowestCont,...
 %   value (which would need to be contaminationThresh), but this will not
 %   allow a useful estimate of the contamination level, i.e. the returned
 %   variable 'confidence' will be correct but 'contamination' will not. 
+%   - rpReject
 %
 %
 % Outputs:
@@ -54,11 +55,16 @@ else
     confThresh = 90;
 end
 
+if isfield(params, 'rpReject')
+    rpReject = params.rpReject;
+else
+    rpReject = 0.0005;
+end
 
 [confMatrix, cont, rp, nACG] = computeMatrix(spikeTimes, params); 
 % matrix is [nCont x nRP]
 
-testTimes = rp>0.0005; % don't consider any times below this for analysis
+testTimes = rp>rpReject; % don't consider any times below this for analysis
 
 confidence = max(confMatrix(find(cont>=contThresh,1), testTimes)); 
 
@@ -67,6 +73,7 @@ confidence = max(confMatrix(find(cont>=contThresh,1), testTimes));
 contamination = cont(minI);  
 if isempty(contamination); contamination = NaN; end
 
+% TODO comment 
 [~,minRP] = max(confMatrix(minI,testTimes)); 
 timeOfLowestCont = rp(minRP+find(testTimes,1)-1);
 if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
