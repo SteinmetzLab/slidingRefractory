@@ -85,6 +85,8 @@ b) Analytical solution (compute_min_contam_props_analytical): uses the identity
 Functions
 ---------
 calc_ccgs                           : Efficient pairwise cross-correlogram computation.
+calc_local_firing_rate              : Fast local (ACG-weighted) firing rate via searchsorted.
+calc_rp_violations                  : Fast cumulative violation counts via k-th order ISIs.
 refractory_violation_likelihood     : Poisson CDF likelihood for a contamination level.
 compute_min_contam_props            : Binary search for minimum rejected contamination.
 compute_min_contam_props_analytical : Analytical (exact) solution for the same quantity.
@@ -340,6 +342,92 @@ def refractory_violation_likelihood(
 
     return likelihood
 
+def calc_local_firing_rate(spike_times, fr_est_dur=1.0):
+    """
+    Compute the local (autocorrelation-weighted) firing rate of a spike train.
+
+    Produces the same result as
+    ``calc_ccgs(spike_times, [0, fr_est_dur]).squeeze() / fr_est_dur / n_spikes``
+    but entirely via vectorised NumPy, without the CCG histogram overhead.
+
+    For each spike i, count the number of spikes j > i with
+    ``spike_times[j] - spike_times[i] < fr_est_dur``.  Summing those counts
+    and dividing by ``n_spikes * fr_est_dur`` gives the same ACG-density
+    estimate, which correctly tracks the *local* firing rate:  a neuron active
+    for only 10 min of a 2-hour recording returns its true ~20 Hz rate, not the
+    global time-averaged ~1.6 Hz.
+
+    Parameters
+    ----------
+    spike_times : np.ndarray (n_spikes,)
+        Sorted spike times in seconds.
+    fr_est_dur : float
+        Half-window duration in seconds (default 1.0).
+
+    Returns
+    -------
+    firing_rate : float
+        Local firing rate in Hz.
+    """
+    n_spikes = len(spike_times)
+    if n_spikes == 0:
+        return 0.0
+    window_ends = np.searchsorted(spike_times, spike_times + fr_est_dur, side='right')
+    spikes_in_window = window_ends - np.arange(n_spikes) - 1
+    return np.sum(spikes_in_window) / (n_spikes * fr_est_dur)
+
+
+def calc_rp_violations(spike_times, refractory_periods, ref_acg_t_start):
+    """
+    Compute cumulative refractory period violation counts using k-th order ISIs.
+
+    Produces the same result as ``np.cumsum(calc_ccgs(st, np.r_[ref_acg_t_start,
+    refractory_periods]).squeeze())``, but without the 3-D histogram overhead of
+    calc_ccgs.  The ACG at lag τ equals the sum of all k-th order ISIs falling in
+    [0, τ]:
+
+        ACG(τ) = Σ_{k=1}^{∞} ISI_k(τ)
+
+    For a 10 ms window, k rarely exceeds 2–3, so the outer loop terminates
+    quickly.  Cumulative counts are then read off in O(n log n) via np.searchsorted
+    rather than by binning.
+
+    Parameters
+    ----------
+    spike_times : np.ndarray (n_spikes,)
+        Sorted spike times in seconds.
+    refractory_periods : np.ndarray (n_refractory_periods,)
+        Refractory period upper bounds in seconds (monotonically increasing).
+    ref_acg_t_start : float
+        Lower bound of the violation window in seconds.
+
+    Returns
+    -------
+    n_violations : np.ndarray (n_refractory_periods,) int
+        Cumulative count of spike pairs with lag in [ref_acg_t_start, τ_r]
+        for each τ_r.
+    """
+    max_tau = refractory_periods[-1]
+    all_dts = []
+
+    shift = 1
+    while True:
+        dts = spike_times[shift:] - spike_times[:-shift]
+        valid_dts = dts[dts <= max_tau]
+        if len(valid_dts) == 0:
+            break
+        all_dts.append(valid_dts)
+        shift += 1
+
+    if not all_dts:
+        return np.zeros(len(refractory_periods), dtype=np.intp)
+
+    all_dts = np.concatenate(all_dts)
+    valid_dts = all_dts[all_dts >= ref_acg_t_start]
+    valid_dts.sort()
+    return np.searchsorted(valid_dts, refractory_periods, side='right')
+
+
 def compute_min_contam_props(spike_times, spike_clusters=None, cids=None,
                        refractory_periods=np.exp(np.linspace(np.log(0.5e-3), np.log(10e-3), 100)),
                        max_contam_prop=1,
@@ -419,10 +507,9 @@ def compute_min_contam_props(spike_times, spike_clusters=None, cids=None,
         cid = cids[iC]
         st_clu = spike_times[spike_clusters == cid]
         n_spikes = len(st_clu)
-        firing_rate = calc_ccgs(st_clu, [0, fr_est_dur]).squeeze() / fr_est_dur / n_spikes
+        firing_rate = calc_local_firing_rate(st_clu, fr_est_dur)
         firing_rates[iC] = firing_rate
-        acg = calc_ccgs(st_clu, np.r_[ref_acg_t_start, refractory_periods]).squeeze()
-        n_violations = np.cumsum(acg) # number of refractory violations for each refractory period
+        n_violations = calc_rp_violations(st_clu, refractory_periods, ref_acg_t_start)
         adj_ref_periods = refractory_periods - ref_acg_t_start
 
         # Vectorized binary search across all refractory periods simultaneously
@@ -541,10 +628,9 @@ def compute_min_contam_props_analytical(spike_times, spike_clusters=None, cids=N
         cid = cids[iC]
         st_clu = spike_times[spike_clusters == cid]
         n_spikes = len(st_clu)
-        firing_rate = calc_ccgs(st_clu, [0, fr_est_dur]).squeeze() / fr_est_dur / n_spikes
+        firing_rate = calc_local_firing_rate(st_clu, fr_est_dur)
         firing_rates[iC] = firing_rate
-        acg = calc_ccgs(st_clu, np.r_[ref_acg_t_start, refractory_periods]).squeeze()
-        n_violations = np.cumsum(acg)
+        n_violations = calc_rp_violations(st_clu, refractory_periods, ref_acg_t_start)
 
         # Analytical solution: invert C*(2-C) * F_r * tau * N_s = lambda_critical
         # lambda_critical = chi2.ppf(confidence, 2*(r+1)) / 2
@@ -664,9 +750,8 @@ def compute_rvl_tensor(spike_times, spike_clusters=None, cids=None,
         cid = cids[iC]
         cluster_spikes = spike_times[spike_clusters == cid]
         n_spikes = len(cluster_spikes)
-        firing_rate = calc_ccgs(cluster_spikes, [0, fr_est_dur]).squeeze() / fr_est_dur / n_spikes
-        acg = calc_ccgs(cluster_spikes, np.r_[ref_acg_t_start, refractory_periods]).squeeze()
-        refractory_violations = np.cumsum(acg)
+        firing_rate = calc_local_firing_rate(cluster_spikes, fr_est_dur)
+        refractory_violations = calc_rp_violations(cluster_spikes, refractory_periods, ref_acg_t_start)
 
         rvl_tensor[iC] = refractory_violation_likelihood(
                             refractory_violations[None,:], 
@@ -804,19 +889,54 @@ if __name__ == "__main__":
     tol = 10e-4
     max_iter = 100
 
-    print("\n--- Precomputing CCG data for all clusters ---")
+    # --- Firing rate computation: calc_ccgs vs calc_local_firing_rate ---
+    print("\n--- Firing rate computation: calc_ccgs vs calc_local_firing_rate ---")
+    t0 = time.perf_counter()
+    for iC in range(len(cids)):
+        st_clu = spike_times[spike_clusters == cids[iC]]
+        _ = calc_ccgs(st_clu, [0, fr_est_dur]).squeeze() / fr_est_dur / len(st_clu)
+    t_ccgs_fr = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    for iC in range(len(cids)):
+        st_clu = spike_times[spike_clusters == cids[iC]]
+        _ = calc_local_firing_rate(st_clu, fr_est_dur)
+    t_local_fr = time.perf_counter() - t0
+
+    print(f"calc_ccgs (FR):          {t_ccgs_fr:.3f} s")
+    print(f"calc_local_firing_rate:  {t_local_fr:.3f} s")
+    print(f"FR speedup:              {t_ccgs_fr / t_local_fr:.1f}x")
+
+    # --- Violations computation: calc_ccgs vs calc_rp_violations ---
+    print("\n--- Violations computation: calc_ccgs vs calc_rp_violations ---")
+    t0 = time.perf_counter()
+    for iC in range(len(cids)):
+        st_clu = spike_times[spike_clusters == cids[iC]]
+        _ = np.cumsum(calc_ccgs(st_clu, np.r_[ref_acg_t_start, refractory_periods]).squeeze())
+    t_ccgs_viol = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    for iC in range(len(cids)):
+        st_clu = spike_times[spike_clusters == cids[iC]]
+        _ = calc_rp_violations(st_clu, refractory_periods, ref_acg_t_start)
+    t_rp_viol = time.perf_counter() - t0
+
+    print(f"calc_ccgs + cumsum:  {t_ccgs_viol:.3f} s")
+    print(f"calc_rp_violations:  {t_rp_viol:.3f} s")
+    print(f"Violations speedup:  {t_ccgs_viol / t_rp_viol:.1f}x")
+
+    print("\n--- Precomputing data for core timing (FR via calc_ccgs, violations via calc_rp_violations) ---")
     t0 = time.perf_counter()
     precomputed = []  # list of (n_spikes, firing_rate, n_violations) per cluster
-    for iC in tqdm(range(len(cids)), desc="Precomputing CCGs"):
+    for iC in tqdm(range(len(cids)), desc="Precomputing"):
         cid = cids[iC]
         st_clu = spike_times[spike_clusters == cid]
         n_spikes = len(st_clu)
-        firing_rate = calc_ccgs(st_clu, [0, fr_est_dur]).squeeze() / fr_est_dur / n_spikes
-        acg = calc_ccgs(st_clu, np.r_[ref_acg_t_start, refractory_periods]).squeeze()
-        n_violations = np.cumsum(acg)
+        firing_rate = calc_local_firing_rate(st_clu, fr_est_dur)
+        n_violations = calc_rp_violations(st_clu, refractory_periods, ref_acg_t_start)
         precomputed.append((n_spikes, firing_rate, n_violations))
-    t_ccgs = time.perf_counter() - t0
-    print(f"CCG precomputation: {t_ccgs:.3f} s")
+    t_precompute = time.perf_counter() - t0
+    print(f"Precomputation: {t_precompute:.3f} s")
 
     # Core of analytical method (no CCGs)
     t0 = time.perf_counter()
@@ -859,13 +979,13 @@ if __name__ == "__main__":
             n_spikes)
     t_tensor_core = time.perf_counter() - t0
 
-    print(f"\n--- Core computation times (CCGs excluded, {t_ccgs:.2f} s shared) ---")
+    print(f"\n--- Core computation times (precompute excluded, {t_precompute:.2f} s shared) ---")
     print(f"Analytical core:       {t_analytical_core*1000:.2f} ms")
     print(f"Binary search core:    {t_binary_core*1000:.2f} ms  ({t_binary_core/t_analytical_core:.1f}x vs analytical)")
     print(f"RVL tensor core:       {t_tensor_core*1000:.2f} ms  ({t_tensor_core/t_analytical_core:.1f}x vs analytical)")
-    print(f"\nCCG fraction of total: analytical {t_ccgs/(t_ccgs+t_analytical_core)*100:.1f}%"
-          f", binary {t_ccgs/(t_ccgs+t_binary_core)*100:.1f}%"
-          f", tensor {t_ccgs/(t_ccgs+t_tensor_core)*100:.1f}%")
+    print(f"\nPrecompute fraction of total: analytical {t_precompute/(t_precompute+t_analytical_core)*100:.1f}%"
+          f", binary {t_precompute/(t_precompute+t_binary_core)*100:.1f}%"
+          f", tensor {t_precompute/(t_precompute+t_tensor_core)*100:.1f}%")
 
     # Derive min_contam_props from rvl_tensor for comparison
     rvl = rvl_tensor[0]  # (n_contam, n_refrac)
@@ -882,7 +1002,7 @@ if __name__ == "__main__":
     unit_label = (
         f"Unit 0  (real: {real_rates[0]:.1f} Hz, RP: {rp*1000:.1f} ms, "
         f"{contam_fracs[0]*100:.1f}% contam)  |  {n_units} units total\n"
-        f"calc_ccgs (shared): {t_ccgs:.2f} s   |   "
+        f"precompute (shared): {t_precompute:.2f} s   |   "
         f"Analytical solution: {t_analytical_core*1000:.1f} ms   |   "
         f"Binary search: {t_binary_core*1000:.1f} ms ({t_binary_core/t_analytical_core:.1f}\u00d7)   |   "
         f"RVL Tensor: {t_tensor_core*1000:.1f} ms ({t_tensor_core/t_analytical_core:.1f}\u00d7)\n"
@@ -904,17 +1024,17 @@ if __name__ == "__main__":
     # Top-right: RVL tensor min contam curve
     plot_min_contam_prop(unit_spike_times[0], min_contam_from_tensor, refractory_periods,
                          max_contam_prop=1.0, axs=axs[0, 1])
-    axs[0, 1].set_title(f"RVL tensor (min contam curve)\nCCGs {t_ccgs:.2f} s + core {t_tensor_core*1000:.1f} ms = {t_tensor:.2f} s total")
+    axs[0, 1].set_title(f"RVL tensor (min contam curve)\nprecompute {t_precompute:.2f} s + core {t_tensor_core*1000:.1f} ms = {t_tensor:.2f} s total")
 
     # Bottom-left: Binary search
     plot_min_contam_prop(unit_spike_times[0], min_contam_binary[0], refractory_periods,
                          max_contam_prop=1.0, axs=axs[1, 0])
-    axs[1, 0].set_title(f"Binary search\nCCGs {t_ccgs:.2f} s + core {t_binary_core*1000:.1f} ms = {t_binary:.2f} s total")
+    axs[1, 0].set_title(f"Binary search\nprecompute {t_precompute:.2f} s + core {t_binary_core*1000:.1f} ms = {t_binary:.2f} s total")
 
     # Bottom-right: Analytical
     plot_min_contam_prop(unit_spike_times[0], min_contam_analytical[0], refractory_periods,
                          max_contam_prop=1.0, axs=axs[1, 1])
-    axs[1, 1].set_title(f"Analytical\nCCGs {t_ccgs:.2f} s + core {t_analytical_core*1000:.1f} ms = {t_analytical:.2f} s total")
+    axs[1, 1].set_title(f"Analytical\nprecompute {t_precompute:.2f} s + core {t_analytical_core*1000:.1f} ms = {t_analytical:.2f} s total")
 
     plt.tight_layout()
     plt.savefig("analytical_vs_binary_vs_tensor.png", dpi=150)
