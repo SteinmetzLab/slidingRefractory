@@ -1,7 +1,67 @@
 
-function [rpMetrics, cont, rp] = slidingRP_all(spikeTimes, spikeClusters, params)
-% compute the metric for each cluster in a recording
+function rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params)
+% SLIDINGRP_ALL  Compute the Sliding Refractory Period quality metric for
+%   every cluster in a recording.
+%
+%   rpMetrics = slidingRP_all(spikeTimes, spikeClusters)
+%   rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params)
+%
+%   For each unique cluster ID in spikeClusters, this function extracts the
+%   corresponding spike times and passes them to slidingRP(), which
+%   estimates contamination without assuming a fixed refractory period
+%   duration. See Roth, Chapuis, Winter et al. (2026) for details.
+%
+%   INPUTS
+%     spikeTimes    - [N x 1] vector of spike times in seconds for all
+%                     clusters, where N is the total number of spikes.
+%     spikeClusters - [N x 1] vector of cluster IDs, same length as
+%                     spikeTimes. Each element identifies which cluster
+%                     the corresponding spike belongs to.
+%     params        - (optional) scalar struct of parameters. Any fields
+%                     not specified will use their default values. Fields:
+%
+%       .contaminationThresh - Maximum acceptable contamination proportion.
+%                              Passed to slidingRP(). Default: 0.1 (10%).
+%       .confidenceThresh    - Minimum confidence required to accept a
+%                              unit. Passed to slidingRP(). Default: 90.
+%       .tauMin              - Minimum RP duration to consider (seconds).
+%                              Passed to slidingRP(). Default: 0.0005.
+%       .returnMatrix        - Logical. If true, the full confidence matrix
+%                              from slidingRP() is stored in each element
+%                              of rpMetrics. Default: false.
+%       .verbose             - Logical. If true, print progress to the
+%                              command window. Default: true.
+%       .useParallel         - Logical. If true, use parfor when a parallel
+%                              pool is already running. If no pool exists,
+%                              the loop runs serially regardless. Set to
+%                              false to force serial execution even when a
+%                              pool is available. Default: true.
+%
+%   OUTPUTS
+%     rpMetrics - [1 x nClusters] struct array with fields:
+%       .cid              - Cluster ID.
+%       .confidence       - Maximum confidence (%) that contamination is
+%                           below the threshold, across all tested RP
+%                           durations.
+%       .contamination    - Minimum contamination level (%) that can be
+%                           confirmed at the specified confidence level.
+%       .timeOfLowestCont - RP duration (seconds) at which the minimum
+%                           confirmed contamination was achieved.
+%       .confMatrix       - Full confidence matrix (only populated when
+%                           params.returnMatrix is true; empty otherwise).
+%
+%   EXAMPLES
+%     % Basic usage with default parameters
+%     rpMetrics = slidingRP_all(spikeTimes, spikeClusters);
+%
+%     % Custom thresholds, serial execution, with confidence matrices
+%     params.contaminationThresh = 0.05;
+%     params.confidenceThresh    = 95;
+%     params.returnMatrix        = true;
+%     params.useParallel         = false;
+%     rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params);
 
+% ---- Parse optional parameters with defaults ----------------------------
 if nargin<3
     params = struct();
 end
@@ -12,84 +72,73 @@ else
     returnMatrix = false;
 end
 
-if ~isempty(params) && isfield(params, '2msNoSpikesCondition')
-    2msNoSpikesCondition = params.2msNoSpikesCondition;
-    if ~isempty(params) && isfield(params, 'FRthresh')
-        FRthresh = params.FRthresh;
-    else
-        FRthresh = 0.5; %default FR thresh 
-    end   
-else
-    2msNoSpikesCondition = false;
-end
-
 if ~isempty(params) && isfield(params, 'verbose')
     verbose = params.verbose; 
 else
     verbose = true;
 end
 
+if ~isfield(params, 'useParallel')
+    params.useParallel = true;  % default: allow parallel
+end
+
+% ---- Determine parallel execution mode ----------------------------------
+%   parfor with nWorkers=0 runs as a plain for loop, so we only need one
+%   copy of the loop body.
+if params.useParallel
+    p = gcp('nocreate');  % check for existing pool, don't start one
+    if isempty(p)
+        nWorkers = 0;     % no pool running → run serial
+    else
+        nWorkers = p.NumWorkers;
+    end
+else
+    nWorkers = 0;
+end
+
+% ---- Identify clusters and preallocate output ----------------------------
 cids = unique(spikeClusters); 
 
-rpMetrics = struct();
+rpMetrics(1:numel(cids)) = struct('cid',[], 'confidence',[], ...
+    'contamination',[], 'timeOfLowestCont',[], 'confMatrix',[]);
 
 if verbose
     fprintf(1, 'Computing metrics for %d clusters\n', numel(cids)); 
 end
+
+% ---- Pre-slice spike times by cluster ------------------------------------
+%   Indexing into the full spikeTimes/spikeClusters arrays inside a parfor
+%   would broadcast the entire arrays to every worker. Pre-slicing into a
+%   cell array makes each element a proper sliced variable.stCell = cell(numel(cids), 1);
 for cidx = 1:numel(cids)
-    st = spikeTimes(spikeClusters==cids(cidx)); 
+    stCell{cidx} = spikeTimes(spikeClusters == cids(cidx));
+end
+
+% ---- Main loop -----------------------------------------------------------
+parfor (cidx = 1:numel(cids), nWorkers)
+    st = stCell{cidx};   
     
-    [maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
-        nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
+    [passTest, confidence, contamination, timeOfLowestCont,...
+        nViolShort, confMatrix, cont, rp, nACG] ...
         = slidingRP(st, params);
-
-    rpMetrics(cidx).cid = cids(cidx); 
-    rpMetrics(cidx).maxConfidenceAt10Cont = maxConfidenceAt10Cont;
-    rpMetrics(cidx).minContWith90Confidence = minContWith90Confidence;
-    rpMetrics(cidx).timeOfLowestCont = timeOfLowestCont;
-    rpMetrics(cidx).nSpikesBelow2 = nSpikesBelow2;
     
+    s = struct();
+    s.cid = cids(cidx);
+    s.confidence = confidence;
+    s.contamination = contamination;
+    s.timeOfLowestCont = timeOfLowestCont;
 
-
-    %Add returned value of metric (pass or fail)
-    if params['2msNoSpikesCondition']
-        %In this case, reject neurons below FRthresh and accept if no
-        %spikes below 2 (otherwise follow the regular behavior of the
-        %metric)
-        
-            if firingRate < FRthresh
-                rpMetrics(cidx).value = 0;
-            else
-                if nSpikesBelow2 == 0
-                    rpMetrics(cidx).value = 1;
-                else
-                    if minContWith90Confidence <= 10
-                        rpMetrics(cidx).value = 1;
-                    else
-                         rpMetrics(cidx).value = 0;
-                    end
-                end
-            end
-    else 
-        %regular behavior of the metric, disregarding whether neurons have
-        %spikes below 2ms  
-        if minContWith90Confidence <=10
-            rpMetrics(cidx).value = 1;
-        else
-            rpMetrics(cidx).value = 0;
-        end
-    end
-
-    
-    
-    
+    s.confMatrix = [];
     if returnMatrix
-        rpMetrics(cidx).confMatrix = confMatrix;
+        s.confMatrix = confMatrix;
     end
+    
+    rpMetrics(cidx) = s;   
+    
     if verbose
-        if minContWith90Confidence<=10; pfstring = 'PASS'; else pfstring = 'FAIL'; end;
-        fprintf(1, '  %d: contamination = %.1f%%, %s max conf = %.2f%%, time = %.2f ms, n below 2 ms = %d\n', ...
-            cids(cidx), pfstring, minContWith90Confidence, maxConfidenceAt10Cont, ...
-             timeOfLowestCont*1000, nSpikesBelow2);
+        if passTest; pfstring = 'PASS'; else pfstring = 'FAIL'; end;
+        fprintf(1, '  %d: %s - contamination = %.1f%%, max conf = %.2f%%, time = %.2f ms\n', ...
+            cids(cidx), pfstring, contamination, confidence, ...
+             timeOfLowestCont*1000);
     end
 end

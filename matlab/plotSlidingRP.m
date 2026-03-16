@@ -8,9 +8,12 @@ else
     if ~isfield(params, 'cidx'); params.cidx = []; end
 end
 
-[maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
-    nSpikesBelow2, confMatrix, cont, rp, nACG, firingRate] ...
+[passTest, maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont,...
+    nSpikesBelow2, confMatrix, cont, rp, nACG] ...
     = slidingRP(spikeTimes, params);
+
+if isfield(params, 'recDur'); recDur = params.recDur; else; recDur = max(spikeTimes); end;
+firingRate = numel(spikeTimes)/recDur; 
 
 f = figure; f.Color = 'w';
 fp = f.Position;

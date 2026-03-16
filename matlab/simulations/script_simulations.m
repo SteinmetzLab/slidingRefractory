@@ -383,7 +383,8 @@ colors = colors(2:end,:);
 clear legH
 for bidx = 1:numel(br)
     incl = simDat.total_rate==br(bidx) & simDat.RP_dur == 0.003 & simDat.rec_dur==7200 & simDat.conf_level==90;
-    legH(bidx) = plot(cont*100, simDat.passPct(incl), '.-', 'Color', colors(bidx,:)); hold on;
+    %legH(bidx) = plot(cont*100, simDat.passPct(incl), '.-', 'Color', colors(bidx,:)); hold on;
+    legH(bidx) = plot(cont*100, simDat.passPctLlobet2(incl), '.-', 'Color', colors(bidx,:)); hold on;
 end
 
 xlabel('Contamination (%)'); 
@@ -514,3 +515,38 @@ if saveFig
     print(f, fullfile(figSaveDir, 'FigLlobetCompare.pdf'), '-dpdf');
 end
 
+%% quick sim test
+
+
+RPdur = 2/1000; % true RP duration, s
+recDur = [2]*3600; % recording duration, s
+contProp = 95/100; % simulated proportion contamination
+totalRate = 5; % rate of the true neuron
+confThresh = 90; % confidence we need to accept a neuron
+contThresh = 10; % acceptable percentage of contamination when determining pass/fail
+
+
+params = struct(); 
+%params.cont = contThresh;
+params.contaminationThresh = contThresh;
+params.confidenceThresh = confThresh;
+params.recDur = recDur;
+
+baseRate = (1-contProp)*totalRate;
+contRate = contProp*totalRate;
+
+
+st = genST(baseRate, recDur, RPdur); % true spikes
+contST = genST(contRate,recDur, 0); % contaminating spikes
+combST = sort([st; contST]); % combined spike train
+
+[passTest, confidence, contamination, timeOfLowestCont,...
+    nSpikesBelow2, confMatrix, cont, rp, nACG] ...
+    = slidingRP(combST, params);
+
+passTest
+confidence
+contamination
+timeOfLowestCont
+
+plotSlidingRP(combST, params);

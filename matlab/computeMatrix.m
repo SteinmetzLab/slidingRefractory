@@ -14,6 +14,8 @@ function [confMatrix, cont, rp, nACG] = computeMatrix(spikeTimes, params)
 %   value (which would need to be contaminationThresh), but this will not
 %   allow a useful estimate of the contamination level, i.e. the returned
 %   variable 'confidence' will be correct but 'contamination' will not. 
+%   - acgBinSize, s, bin size of the ACG. Default is 1/30000. 
+%   - testWindow, s, the max putative RP duration to test. Default 0.01, i.e. 10 ms 
 %
 % Outputs: 
 % - confMatrix - result of the test, dimensions [contamination levels, RP duration]
@@ -35,9 +37,18 @@ if nargin>1 && isfield(params, 'recDur')
 else
     recDur = max(spikeTimes); 
 end
-% rpEdges = (0:10*30)/30000; % 10 ms at 30kHz
-rpBinSize = 1/30000;
-rpEdges = 0:rpBinSize:10/1000;
+if nargin>1 && isfield(params, 'acgBinSize')
+    acgBinSize = params.acgBinSize;
+else
+    acgBinSize = 1/30000; % bin size of ACG
+end
+if nargin>1 && isfield(params, 'testWindow')
+    testWindow = params.testWindow;
+else
+    testWindow = 0.01; % s, max of range to test
+end
+
+rpEdges = 0:acgBinSize:testWindow;
 
 % compute firing rate and spike count
 spikeCount = numel(spikeTimes); 
