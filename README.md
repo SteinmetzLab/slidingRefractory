@@ -58,6 +58,13 @@ addpath(genpath(fullfile(githubDir, 'spikes')))       % cortex-lab/spikes
 addpath(genpath(fullfile(githubDir, 'npy-matlab')))   % kwikteam/npy-matlab
 ```
 
+`githubDir` should be a function on your MATLAB path that returns the path to the folder containing your cloned repositories (including `spikes`, `npy-matlab`, and `slidingRefractory` itself). For example, create a file `githubDir.m` somewhere on your path:
+```matlab
+function d = githubDir()
+d = 'C:/Users/you/github';  % folder that contains spikes/, npy-matlab/, slidingRefractory/
+end
+```
+
 ### Minimal working example
 
 ```matlab
@@ -98,3 +105,15 @@ The test suite is organised by tag:
 - `slidingRP` — synthetic spike train pass/fail; requires `histdiff`
 - `slidingRP_all` — batch consistency; requires `histdiff`
 - `regression` — real IBL test data; requires `histdiff` + `readNPY`
+
+---
+
+## Use of AI in building this repository
+
+Claude Code (Anthropic) was used to:
+- Refine and expand documentation across MATLAB functions and the README
+- Search for and repair small bugs (e.g. an undefined variable in `computeMatrix.m`, an undefined variable in `plotFig3AndS2.m`)
+- Produce the MATLAB unit test suite
+- Create the simulation runner function and script (`runSimulations.m`, `script_runAndPlotSimulations.m`)
+
+All code has been reviewed and verified by Nick Steinmetz, who takes responsibility for the content of the code.
