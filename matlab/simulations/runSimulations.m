@@ -11,8 +11,9 @@ function simDat = runSimulations(nSim, savePath)
 %   evaluated by slidingRP() and by RPmetric_Classic() at three fixed RP
 %   durations (1.5, 2, 3 ms) for both the Llobet and Hill formulations.
 %
-%   The inner nSim loop is parallelised with parfor (requires Parallel
-%   Computing Toolbox; falls back to a serial for-loop otherwise).
+%   A single parfor block over all parameter combinations is used (rather
+%   than parfor on the inner nSim loop) to avoid repeated parfor startup
+%   overhead and to maximise worker utilisation.
 %
 %   INPUTS
 %     nSim      - Number of simulations per parameter combination.
@@ -37,125 +38,106 @@ if nargin < 2 || isempty(savePath)
 end
 
 %% Simulation parameters
-RPdurs      = [1.5 2 3 4 5 6] / 1000;   % true RP duration (s)
-recDurs     = [0.5 1 2 3] * 3600;        % recording duration (s)
-contProp    = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20] / 100;
-baseRates   = [0.5 1 2 5 10 20];         % total spike rate (sp/s)
-confThreshes = 50:10:90;                 % confidence threshold (%)
-contThresh  = 10;                        % contamination threshold (%)
+RPdurs       = [1.5 2 3 4 5 6] / 1000;   % true RP duration (s)
+recDurs      = [0.5 1 2 3] * 3600;        % recording duration (s)
+contProp     = [0 2 4 6 7 8 8.5 9 9.5 10 10.5 11 11.5 12 13 14 16 18 20] / 100;
+baseRates    = [0.5 1 2 5 10 20];         % total spike rate (sp/s)
+confThreshes = 50:10:90;                  % confidence threshold (%)
+contThresh   = 10;                        % contamination threshold (%)
 
-totaln = numel(baseRates) * numel(contProp) * numel(RPdurs) * ...
-         numel(recDurs) * numel(confThreshes);
+%% Flatten all parameter combinations into index vectors
+[bidxV, cidxV, RPidxV, ridxV, confIdxV] = ndgrid( ...
+    1:numel(baseRates), 1:numel(contProp), 1:numel(RPdurs), ...
+    1:numel(recDurs),   1:numel(confThreshes));
+bidxV    = bidxV(:);
+cidxV    = cidxV(:);
+RPidxV   = RPidxV(:);
+ridxV    = ridxV(:);
+confIdxV = confIdxV(:);
+totaln   = numel(bidxV);
 
-% Pre-allocate result vectors
-passPct         = nan(totaln, 1);
-passPctLlobet1_5 = nan(totaln, 1);
-passPctLlobet2  = nan(totaln, 1);
-passPctLlobet3  = nan(totaln, 1);
-passPctHill1_5  = nan(totaln, 1);
-passPctHill2    = nan(totaln, 1);
-passPctHill3    = nan(totaln, 1);
-total_rate = nan(totaln, 1);
-cont_prop  = nan(totaln, 1);
-RP_dur     = nan(totaln, 1);
-rec_dur    = nan(totaln, 1);
-conf_level = nan(totaln, 1);
+fprintf('Running %d parameter combinations × %d sims = %d total simulations\n', ...
+    totaln, nSim, totaln * nSim);
 
-%% Parameter base structs (fields set inside loops)
-params0 = struct();
-params0.cont                = contThresh;
-params0.contaminationThresh = contThresh;
+%% Base parameter structs
+params0 = struct('cont', contThresh, 'contaminationThresh', contThresh);
+paramsCompare0 = struct('contaminationThresh', contThresh);
 
-paramsCompare0 = struct();
-paramsCompare0.contaminationThresh = contThresh;
+%% Pre-allocate result arrays (rows = parameter combos)
+pctAll   = zeros(totaln, 7);  % [passPct, Llobet1.5/2/3, Hill1.5/2/3]
+paramOut = zeros(totaln, 5);  % [total_rate, cont_prop, RP_dur, rec_dur, conf_level]
 
-%% Sweep
-totalidx = 1;
-tic
+%% Progress tracking via DataQueue
+t0 = tic;
+initProgress(totaln, t0);
+q = parallel.pool.DataQueue;
+afterEach(q, @printProgress);
 
-for bidx = 1:numel(baseRates)
-    totalRate = baseRates(bidx);
+%% Single parfor over all parameter combinations
+parfor idx = 1:totaln
+    bI  = bidxV(idx);    cI  = cidxV(idx);
+    rpI = RPidxV(idx);   rI  = ridxV(idx);   cfI = confIdxV(idx);
 
-    for cidx = 1:numel(contProp)
-        baseRate = (1 - contProp(cidx)) * totalRate;
-        contRate =      contProp(cidx)  * totalRate;
+    totalRate  = baseRates(bI);
+    baseRate   = (1 - contProp(cI)) * totalRate;
+    contRate   =      contProp(cI)  * totalRate;
+    RPdur      = RPdurs(rpI);
+    recDur     = recDurs(rI);
+    confThresh = confThreshes(cfI);
 
-        for RPidx = 1:numel(RPdurs)
-            RPdur = RPdurs(RPidx);
-            fprintf('br %d/%d  cp %d/%d  rp %d/%d\n', ...
-                bidx, numel(baseRates), cidx, numel(contProp), RPidx, numel(RPdurs));
+    p = params0;
+    p.recDur           = recDur;
+    p.confidenceThresh = confThresh;
 
-            for ridx = 1:numel(recDurs)
-                recDur = recDurs(ridx);
+    simRes = zeros(nSim, 7);
+    for n = 1:nSim
+        st     = genST(baseRate, recDur, RPdur);
+        contST = genST(contRate,  recDur, 0);
+        combST = sort([st; contST]);
 
-                for confIdx = 1:numel(confThreshes)
-                    confThresh = confThreshes(confIdx);
+        [passTest, ~, ~, ~, ~, ~, ~, rp, nACG] = slidingRP(combST, p);
 
-                    params = params0;
-                    params.recDur           = recDur;
-                    params.confidenceThresh = confThresh;
+        pc            = paramsCompare0;
+        pc.recDur     = recDur;
+        pc.rp         = rp;
+        pc.nACG       = nACG;
+        pc.spikeCount = numel(combST);
 
-                    simRes = zeros(nSim, 7);
+        pc.metricType = 'Llobet';
+        pc.RPdur = 0.0015; r2 = RPmetric_Classic([], pc);
+        pc.RPdur = 0.002;  r3 = RPmetric_Classic([], pc);
+        pc.RPdur = 0.003;  r4 = RPmetric_Classic([], pc);
 
-                    % --- parallelised inner loop ---
-                    parfor n = 1:nSim
-                        st      = genST(baseRate, recDur, RPdur);
-                        contST  = genST(contRate,  recDur, 0);
-                        combST  = sort([st; contST]);
+        pc.metricType = 'Hill';
+        pc.RPdur = 0.0015; r5 = RPmetric_Classic([], pc);
+        pc.RPdur = 0.002;  r6 = RPmetric_Classic([], pc);
+        pc.RPdur = 0.003;  r7 = RPmetric_Classic([], pc);
 
-                        [passTest, ~, ~, ~, ~, ~, ~, rp, nACG] = slidingRP(combST, params);
-
-                        % Local copy avoids parfor broadcast-modification issues
-                        pc = paramsCompare0;
-                        pc.recDur      = recDur;
-                        pc.rp          = rp;
-                        pc.nACG        = nACG;
-                        pc.spikeCount  = numel(combST);
-
-                        pc.metricType = 'Llobet';
-                        pc.RPdur = 0.0015;
-                        r2 = RPmetric_Classic([], pc);
-
-                        pc.RPdur = 0.002;
-                        r3 = RPmetric_Classic([], pc);
-
-                        pc.RPdur = 0.003;
-                        r4 = RPmetric_Classic([], pc);
-
-                        pc.metricType = 'Hill';
-                        pc.RPdur = 0.0015;
-                        r5 = RPmetric_Classic([], pc);
-
-                        pc.RPdur = 0.002;
-                        r6 = RPmetric_Classic([], pc);
-
-                        pc.RPdur = 0.003;
-                        r7 = RPmetric_Classic([], pc);
-
-                        % Assign whole row so parfor sees a single subscript pattern
-                        simRes(n, :) = [passTest, r2, r3, r4, r5, r6, r7];
-                    end
-
-                    passPct(totalidx)          = sum(simRes(:,1)) / nSim * 100;
-                    passPctLlobet1_5(totalidx) = sum(simRes(:,2)) / nSim * 100;
-                    passPctLlobet2(totalidx)   = sum(simRes(:,3)) / nSim * 100;
-                    passPctLlobet3(totalidx)   = sum(simRes(:,4)) / nSim * 100;
-                    passPctHill1_5(totalidx)   = sum(simRes(:,5)) / nSim * 100;
-                    passPctHill2(totalidx)     = sum(simRes(:,6)) / nSim * 100;
-                    passPctHill3(totalidx)     = sum(simRes(:,7)) / nSim * 100;
-                    total_rate(totalidx) = totalRate;
-                    cont_prop(totalidx)  = contProp(cidx);
-                    RP_dur(totalidx)     = RPdur;
-                    rec_dur(totalidx)    = recDur;
-                    conf_level(totalidx) = confThresh;
-                    totalidx = totalidx + 1;
-                end
-            end
-        end
+        simRes(n, :) = [passTest, r2, r3, r4, r5, r6, r7];
     end
+
+    pctAll(idx, :)   = sum(simRes) / nSim * 100;
+    paramOut(idx, :) = [totalRate, contProp(cI), RPdur, recDur, confThresh];
+
+    send(q, idx);
 end
 
-toc
+elapsed = toc(t0);
+fprintf('Done. Total time: %.0f s (%.1f min)\n', elapsed, elapsed/60);
+
+%% Assemble output table
+total_rate       = paramOut(:,1);
+cont_prop        = paramOut(:,2);
+RP_dur           = paramOut(:,3);
+rec_dur          = paramOut(:,4);
+conf_level       = paramOut(:,5);
+passPct          = pctAll(:,1);
+passPctLlobet1_5 = pctAll(:,2);
+passPctLlobet2   = pctAll(:,3);
+passPctLlobet3   = pctAll(:,4);
+passPctHill1_5   = pctAll(:,5);
+passPctHill2     = pctAll(:,6);
+passPctHill3     = pctAll(:,7);
 
 simDat = table(total_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct, ...
     passPctLlobet1_5, passPctLlobet2, passPctLlobet3, ...
@@ -163,3 +145,29 @@ simDat = table(total_rate, cont_prop, RP_dur, rec_dur, conf_level, passPct, ...
 
 save(savePath, 'simDat', 'nSim');
 fprintf('Saved results to %s\n', savePath);
+
+end % main function
+
+
+%% --- Local helper functions ---
+
+function initProgress(totaln, t0)
+% Initialise persistent state for printProgress.
+persistent pTotaln pT0 pCount pReportEvery
+pTotaln     = totaln;
+pT0         = t0;
+pCount      = 0;
+pReportEvery = max(1, floor(totaln / 50));  % report ~every 2%
+end
+
+function printProgress(~)
+% Called by DataQueue afterEach; uses persistent state set by initProgress.
+persistent pTotaln pT0 pCount pReportEvery
+pCount = pCount + 1;
+if mod(pCount, pReportEvery) == 0 || pCount == pTotaln
+    elapsed = toc(pT0);
+    eta     = elapsed / pCount * (pTotaln - pCount);
+    fprintf('[%5.1f%%] %d/%d combos | %4.0f s elapsed | ETA ~%4.0f s (~%.1f min)\n', ...
+        pCount/pTotaln*100, pCount, pTotaln, elapsed, eta, eta/60);
+end
+end

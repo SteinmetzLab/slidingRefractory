@@ -20,7 +20,7 @@ addpath(genpath(simFigDir));
 addpath(genpath(fullfile(githubDir, 'spikes'))); % cortex-lab/spikes (histdiff)
 
 %% Parameters
-nSim     = 10;    % set to 1000 for publication results
+nSim     = 1000;  % set to 10 for a quick functional check
 savePath = fullfile(thisDir, 'simDat.mat');
 
 %% 1. Run simulations
