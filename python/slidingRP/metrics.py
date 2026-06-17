@@ -8,7 +8,6 @@ compute the metric for a single cluster (neuron) in a recording
 """
 import warnings
 from scipy.optimize import OptimizeWarning
-from phylib.stats import correlograms
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
@@ -202,12 +201,18 @@ def pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh=90, cont_thresh=10,
     return pass_cont_thresh, min_cont, rp_min_val  # Legacy: value, minContWith90Confidence, timeOfLowestCont
 
 
-def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
-              **params):
-    if not params:
-        params = dict()
-        params['sampleRate'] = 30000
-        params['binSizeCorr'] = 1 / params['sampleRate']
+def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject=0.0005):
+    """Compute the Sliding RP metric for a single cluster.
+
+    Mirrors the MATLAB slidingRP.m. Pass options in the ``params`` dict
+    (e.g. ``params={'recDur': 3600}``); recDur is the recording duration in
+    seconds and defaults to ``max(spikeTimes)`` if not given (recommended to
+    set explicitly). The ACG and expected-violation (Llobet) calculation are
+    identical to the MATLAB implementation.
+    """
+    params = dict(params) if params else {}
+    params.setdefault('sampleRate', 30000)
+    params.setdefault('binSizeCorr', 1 / params['sampleRate'])
 
     [confMatrix, cont, rp, nACG, firing_rate] = computeMatrix(spikeTimes, params)
     # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
@@ -235,13 +240,12 @@ def slidingRP(spikeTimes, conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
         pass_cont_thresh, pass_forced
 
 
-def slidingRP_all(spikeTimes, spikeClusters,
-                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005,
-                  **params):
+def slidingRP_all(spikeTimes, spikeClusters, params=None,
+                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005):
     """
     :param spikeTimes:  array of spike times (s)
     :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
-    :param params:
+    :param params:  dict of options passed to slidingRP (e.g. {'recDur': ...})
     :return: dictionary of values
     """
 
@@ -264,9 +268,9 @@ def slidingRP_all(spikeTimes, spikeClusters,
 
         [max_confidence, min_contamination, rp_min_val,
          n_spikes_below2, firing_rate,
-         pass_cont_thresh, pass_forced] = slidingRP(st,
+         pass_cont_thresh, pass_forced] = slidingRP(st, params=params,
                                                     conf_thresh=conf_thresh, cont_thresh=cont_thresh,
-                                                    rp_reject=rp_reject, **params)
+                                                    rp_reject=rp_reject)
 
         rpMetrics['cidx'].append(cids[cidx])
         rpMetrics['max_confidence'].append(max_confidence)
@@ -284,82 +288,130 @@ def slidingRP_all(spikeTimes, spikeClusters,
 ## Code from OW
 
 
-def computeMatrix(spikeTimes, params):
-    """
+def computeACG(spikeTimes, rpBinSize, nBins):
+    """Autocorrelogram by histogramming pairwise spike-time differences.
+
+    This replicates cortex-lab `histdiff` (used by the MATLAB implementation)
+    exactly: bin index = floor((t_i - t_j) / rpBinSize), counting each ordered
+    pair (j < i) whose difference lies in (0, rpBinSize*nBins). Exact
+    coincidences (diff == 0) are excluded. Implemented with the shifted-train
+    trick so only nearby pairs are examined.
+
     Parameters
     ----------
     spikeTimes : numpy.ndarray
-        array of spike times (ms)
-    params : dict
-        params.binSizeCorr : bin size for ACG, usually set to 1/sampleRate (s)    TODO: set this up somewhere as same as refDur binsize?
-        params.sampleRate : sample rate of the recording (Hz)
+        Spike times in seconds (need not be sorted).
+    rpBinSize : float
+        ACG bin width in seconds (the recording sample period, 1/sampleRate).
+    nBins : int
+        Number of ACG bins (the window is rpBinSize * nBins seconds).
 
     Returns
     -------
-    None.
+    nACG : numpy.ndarray (nBins,)
+        Integer count of spike pairs with ISI in each bin.
     """
+    st = np.sort(np.asarray(spikeTimes, dtype=np.float64))
+    max_lag = rpBinSize * nBins
+    counts = np.zeros(nBins, dtype=np.int64)
+    n = st.size
+    shift = 1
+    # Differences grow with shift, so once none fall within the window we stop.
+    while shift < n:
+        dt = st[shift:] - st[:-shift]
+        m = (dt > 0) & (dt < max_lag)
+        if not np.any(m):
+            break
+        bins = np.floor(dt[m] / rpBinSize).astype(np.int64)
+        counts += np.bincount(bins, minlength=nBins)[:nBins]
+        shift += 1
+    return counts
 
-    cont = np.arange(0.5, 35, 0.5)  # vector of contamination values to test
-    rpBinSize = 1 / 30000
+
+def computeMatrix(spikeTimes, params):
+    """Build the [nCont x nRP] confidence matrix for one cluster.
+
+    Mirrors matlab/computeMatrix.m. The ACG is computed by computeACG (a
+    histdiff-equivalent), and expected violations use the Llobet formula with
+    an explicit recording duration.
+
+    Parameters
+    ----------
+    spikeTimes : numpy.ndarray
+        array of spike times (s)
+    params : dict
+        - recDur : recording duration (s). Defaults to max(spikeTimes);
+          recommended to set explicitly.
+        - binSizeCorr : ACG bin size (s), default 1/sampleRate.
+        - sampleRate : sample rate (Hz), default 30000.
+        - cont : vector of contamination levels (%) to test, default 0.5:0.5:35.
+
+    Returns
+    -------
+    confMatrix : [nCont x nRP] confidence (%) that contamination < cont(i) at rp(j)
+    cont : tested contamination levels (%)
+    rp : tested refractory-period durations (s, bin centres)
+    nACG : ACG counts per bin
+    firingRate : spike count / recDur (spks/s)
+    """
+    sampleRate = params.get('sampleRate', 30000)
+    rpBinSize = params.get('binSizeCorr', 1 / sampleRate)
+    recDur = params.get('recDur', None)
+    if recDur is None:
+        recDur = np.max(spikeTimes)
+    cont = params.get('cont', np.arange(0.5, 35, 0.5))  # contamination levels (%)
+
     rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
-    rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2  # vector of refractory period durations to test
+    rp = rpEdges + rpBinSize / 2  # refractory period durations to test (bin centres)
 
-    # compute firing rate and spike count
     n_spikes = spikeTimes.size
-    # setup for acg
-    clustersIds = [0]  # call the cluster id 0 (not used, but required input for correlograms)
-    spikeClustersACG = np.zeros(n_spikes, dtype=np.int8)  # each spike time gets cluster id 0
+    firingRate = n_spikes / recDur
 
-    # compute an acg in 1s bins to compute the firing rate
-    nACG = \
-    correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=1, sample_rate=params['sampleRate'],
-                 window_size=2, symmetrize=False)[0][0]  # compute acg
-    firingRate = nACG[1] / n_spikes
+    nACG = computeACG(spikeTimes, rpBinSize, rp.size)
 
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'],
-                        sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
-
-    # confMatrix = np.zeros((cont.size, rp.size)) * np.nan
-    # for ir in np.arange(confMatrix.shape[1]):
-    #     # compute observed violations
-    #     obsViol = np.sum(nACG[0:ir + 1])  # TODO this is off slightly (half-bin) from matlab...
-    #     for cidx in np.arange(confMatrix.shape[0]):
-    #         confMatrix[cidx, ir] = 100 * computeViol(obsViol, firingRate, n_spikes, rp[ir] + rpBinSize / 2, cont[cidx] / 100)  # TODO FIX RP BIN
-
-    confMatrix = 100 * computeViol(np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes,
-                                   rp[np.newaxis, :] + rpBinSize / 2, cont[:, np.newaxis] / 100)
+    confMatrix = 100 * computeViol(
+        np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes,
+        rp[np.newaxis, :] + rpBinSize / 2, cont[:, np.newaxis] / 100, recDur)
 
     return confMatrix, cont, rp, nACG, firingRate
 
 
-def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp):
-    '''
+def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recDur):
+    '''Poisson confidence score for a single (refDur, contamination) hypothesis.
 
+    Matches matlab/computeViol.m. Expected violations follow the Llobet et al.
+    (2022) formulation, in which contaminating spikes produce violations both
+    with base-neuron spikes and with each other:
+
+        Ve = 2 * refDur / recDur * Nc * (Nb + (Nc - 1) / 2)
+
+    where Nc = C * N_total and Nb = (1 - C) * N_total.
 
     Parameters
     ----------
-    obsViol : int
-        the number of spikes observed within the refractory period duration.
+    obsViol : int or array
+        observed number of violations (cumulative ACG count up to refDur).
     firingRate : float
-        firing rate of the cluster (estimated from ACG) in spks/s
+        accepted for API parity with the MATLAB signature; not used (recDur
+        is used directly). Pass None.
     spikeCount : int
-        total spike count of cluster
-    refDur : float
-        refractory period duration in seconds
-    contaminationProp : float
-        the allowed contamination (proportion) i.e. 0.1 for 10% contamination
+        total spike count of the cluster (N_total).
+    refDur : float or array
+        refractory period duration tested, tau_r (seconds).
+    contaminationProp : float or array
+        hypothesised contamination as a proportion in [0, 1].
+    recDur : float
+        recording duration D (seconds).
 
     Returns
     -------
-    confidenceScore : float
-        how confident we are that the cluster is less than contaminationProp
-        contaminated, given the observed violations and refractory period for
-        this cluster, under a Poisson assumption
-
+    confidenceScore : float or array
+        probability that true contamination is below contaminationProp given
+        the observed violations, under a Poisson assumption. 1 - Poisson_CDF.
     '''
-
-    contaminationRate = firingRate * contaminationProp
-    expectedViol = contaminationRate * refDur * 2 * spikeCount
+    Nc = spikeCount * contaminationProp
+    Nb = spikeCount * (1 - contaminationProp)
+    expectedViol = 2 * refDur / recDur * Nc * (Nb + (Nc - 1) / 2)
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 
     return confidenceScore

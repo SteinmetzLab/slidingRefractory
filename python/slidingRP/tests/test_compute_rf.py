@@ -1,3 +1,12 @@
+import pytest
+# This module is an IBL ephys-atlas integration script (requires one.api,
+# ephys_atlas, IBL credentials and local data with hardcoded paths). It is not a
+# self-contained CI unit test; skip cleanly when those optional deps are absent
+# so the rest of the suite can be collected. See todo #24 (prune/replace with a
+# synthetic-ACG unit test for compute_rf).
+pytest.importorskip("one.api")
+pytest.importorskip("ephys_atlas")
+
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
