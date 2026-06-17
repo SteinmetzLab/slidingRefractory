@@ -374,6 +374,161 @@ classdef test_slidingRP < matlab.unittest.TestCase
     end % regression tests
 
     % =====================================================================
+    %  6. genST – simulated spike train generator (no external dependencies)
+    % =====================================================================
+    methods (Test, TestTags={'genST'})
+
+        function test_genST_realised_rate(testCase)
+            % The rate correction should make the realised rate match the
+            % requested rate despite the imposed refractory period.
+            rng(7);
+            st = genST(10, 2000, 0.003);   % 10 sp/s, long recording, 3 ms RP
+            realised = numel(st) / 2000;
+            testCase.verifyEqual(realised, 10, 'RelTol', 0.05, ...
+                'Realised rate should be within 5%% of requested rate');
+        end
+
+        function test_genST_respects_refractory_period(testCase)
+            % Every ISI is refractoryPeriod + Exponential, so no ISI may be
+            % shorter than the refractory period.
+            rng(7);
+            rp = 0.004;
+            st = genST(20, 1000, rp);
+            testCase.verifyGreaterThanOrEqual(min(diff(st)), rp - 1e-12, ...
+                'No ISI should be shorter than the refractory period');
+        end
+
+        function test_genST_zero_rp_allows_short_isis(testCase)
+            % With no refractory period (contamination train), short ISIs occur.
+            rng(7);
+            st = genST(20, 1000, 0);
+            testCase.verifyLessThan(min(diff(st)), 0.001, ...
+                'With RP=0 some ISIs should fall below 1 ms');
+            testCase.verifyEqual(numel(st)/1000, 20, 'RelTol', 0.05);
+        end
+
+    end % genST tests
+
+    % =====================================================================
+    %  7. Corrected (multiple-comparisons) variant
+    %     Requires: histdiff (spikes toolbox)
+    % =====================================================================
+    methods (Test, TestTags={'corrected'})
+
+        function test_corrected_output_shape(testCase)
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(0);
+            st = genST(10, 600, 0.003);
+            params = struct('recDur', 600);
+            [~, confidence, ~, ~, ~, confMatrix, cont, rp, ~] = slidingRPCorrected(st, params);
+            testCase.verifyEqual(size(confMatrix), [numel(cont), numel(rp)]);
+            testCase.verifyGreaterThanOrEqual(confidence, 0);
+            testCase.verifyLessThanOrEqual(confidence, 100);
+        end
+
+        function test_corrected_not_more_lenient_than_nominal(testCase)
+            % The FWER correction is more conservative: the corrected per-row
+            % confidence (constant across tau_r) cannot exceed the best
+            % (max-over-tau_r) nominal confidence in that row, because
+            % P(cross boundary somewhere) >= P(cross at the single best bin).
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(0);
+            st = genST(8, 600, 0.003);
+            params = struct('recDur', 600);
+            [confMatrix, ~, ~, ~, nominalConfMatrix] = computeMatrixCorrected(st, params);
+            rowMaxCorrected = max(confMatrix, [], 2);
+            rowMaxNominal   = max(nominalConfMatrix, [], 2);
+            testCase.verifyLessThanOrEqual(max(rowMaxCorrected - rowMaxNominal), 1e-9, ...
+                'Corrected confidence must not exceed the best nominal confidence per contamination level');
+        end
+
+        function test_corrected_confidence_le_standard(testCase)
+            % The corrected metric's scalar confidence (at the contamination
+            % threshold) must be <= the standard metric's confidence.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(5);
+            st = genST(8, 600, 0.003);
+            params = struct('recDur', 600);
+            [~, confStd]  = slidingRP(st, params);
+            [~, confCorr] = slidingRPCorrected(st, params);
+            testCase.verifyLessThanOrEqual(confCorr, confStd + 1e-9, ...
+                'Corrected confidence should be <= standard confidence');
+        end
+
+        function test_corrected_nominal_matches_computeMatrix(testCase)
+            % The nominal (uncorrected) matrix from computeMatrixCorrected must
+            % equal the standard computeMatrix output for the same input.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(0);
+            st = genST(8, 600, 0.003);
+            params = struct('recDur', 600);
+            [~, ~, ~, ~, nominalConfMatrix] = computeMatrixCorrected(st, params);
+            stdConfMatrix = computeMatrix(st, params);
+            testCase.verifyEqual(nominalConfMatrix, stdConfMatrix, 'AbsTol', 1e-9);
+        end
+
+    end % corrected tests
+
+    % =====================================================================
+    %  8. RPmetric_Classic – Hill/Llobet point-estimate comparison metric
+    %     Requires: histdiff (spikes toolbox)
+    % =====================================================================
+    methods (Test, TestTags={'classic'})
+
+        function test_classic_llobet_clean_passes(testCase)
+            % Clean, high-rate train: few violations -> passes, low estContam.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(42);
+            st = genST(15, 3600, 0.003);
+            params = struct('recDur', 3600, 'metricType', 'Llobet', 'RPdur', 0.002);
+            [passTest, estContam] = RPmetric_Classic(st, params);
+            testCase.verifyTrue(passTest, 'Clean train should pass the classic metric');
+            testCase.verifyLessThan(estContam, 0.1, 'Estimated contamination should be small');
+        end
+
+        function test_classic_contaminated_fails(testCase)
+            % Heavily contaminated train: many violations -> fails.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(42);
+            recDur = 3600;
+            baseST = genST(15,       recDur, 0.003);
+            contST = genST(15 * 0.3, recDur);          % 30% contamination, no RP
+            combST = sort([baseST; contST]);
+            params = struct('recDur', recDur, 'metricType', 'Llobet', 'RPdur', 0.002);
+            passTest = RPmetric_Classic(combST, params);
+            testCase.verifyFalse(passTest, '30%% contaminated train should fail');
+        end
+
+        function test_classic_llobet_estContam_formula(testCase)
+            % estContam must equal the closed-form Llobet inversion
+            %   C = 1 - sqrt(1 - obsViol*D / (Nt^2 * RPdur))
+            % for a pre-computed ACG (uses the .nACG fast path).
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(3);
+            st = genST(10, 1800, 0.0025);
+            recDur = 1800; RPdur = 0.002;
+            % Provide the full 0-10 ms ACG so the RPdur bin lookup works, exactly
+            % as the metric does internally.
+            [nACG, rp] = histdiff(st, st, 0:1/30000:10/1000);
+            obsViol = sum(nACG(1:find(rp > RPdur, 1)));
+            Nt = numel(st);
+            expected = 1 - sqrt(1 - obsViol*recDur / (Nt^2 * RPdur));
+            params = struct('recDur', recDur, 'metricType', 'Llobet', 'RPdur', RPdur, ...
+                'nACG', nACG, 'rp', rp, 'spikeCount', Nt);
+            [~, estContam] = RPmetric_Classic([], params);
+            testCase.verifyEqual(estContam, expected, 'AbsTol', 1e-9);
+        end
+
+    end % classic tests
+
+    % =====================================================================
     %  Helper methods
     % =====================================================================
     methods (Access = private)

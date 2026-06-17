@@ -109,7 +109,8 @@ end
 % ---- Pre-slice spike times by cluster ------------------------------------
 %   Indexing into the full spikeTimes/spikeClusters arrays inside a parfor
 %   would broadcast the entire arrays to every worker. Pre-slicing into a
-%   cell array makes each element a proper sliced variable.stCell = cell(numel(cids), 1);
+%   cell array makes each element a proper sliced variable.
+stCell = cell(numel(cids), 1);
 for cidx = 1:numel(cids)
     stCell{cidx} = spikeTimes(spikeClusters == cids(cidx));
 end

@@ -1,4 +1,39 @@
-function[confMatrix, cont, rp, nACG, nominalConfMatrix] = computeMatrixCorrected(spikeTimes, params)
+function [confMatrix, cont, rp, nACG, nominalConfMatrix] = computeMatrixCorrected(spikeTimes, params)
+% COMPUTEMATRIXCORRECTED  Confidence matrix with a multiple-comparisons correction.
+%
+%   [confMatrix, cont, rp, nACG, nominalConfMatrix] = ...
+%       computeMatrixCorrected(spikeTimes, params)
+%
+%   Like computeMatrix(), but corrects for the fact that the Sliding RP test
+%   evaluates the passing criterion across many tau_r values (a multiple-
+%   comparisons problem). Because the tests are highly correlated (nested,
+%   monotonically growing ACG windows), a Bonferroni-style correction would
+%   be far too conservative. Instead this computes the EXACT family-wise
+%   error rate via a Poisson first-passage calculation (a 1-D Markov-chain /
+%   dynamic-programming sweep over tau_r), so the false-passing rate is held
+%   to (1 - confidenceThresh) when the true RP spans the full tested window.
+%   See Methods, "False acceptance rate in the Sliding RP metric" (Fig. S3).
+%
+%   Used only for Fig. S3; not part of the standard metric (see
+%   slidingRPCorrected for why). Requires histdiff (cortex-lab/spikes).
+%
+%   INPUTS
+%     spikeTimes - [N x 1] spike times in seconds.
+%     params     - (optional) struct:
+%       .cont     - Contamination levels (%) to test. Default 0.5:0.5:35.
+%       .recDur   - Recording duration (s). Default max(spikeTimes).
+%       .rpReject - Min tau_r (s) used in the correction. Default 0.0005.
+%
+%   OUTPUTS
+%     confMatrix        - [nCont x nRP] family-wise-corrected confidence (%).
+%     cont              - [1 x nCont] contamination levels tested (%).
+%     rp                - [1 x nRP] tau_r bin centres (s) from histdiff.
+%     nACG              - [1 x nRP] ACG counts per bin.
+%     nominalConfMatrix - [nCont x nRP] uncorrected (pointwise) confidence (%),
+%                         i.e. what computeMatrix() would return, for comparison.
+%
+%   SEE ALSO
+%     computeMatrix, slidingRPCorrected, computeViol
 
 if nargin>1 && isfield(params, 'cont')
     cont = params.cont;
