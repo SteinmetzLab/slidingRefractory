@@ -100,11 +100,9 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   (2026-06-16): split `stCell = cell(numel(cids), 1);` onto its own line so the
   parfor preallocation is restored. Tests still 19/19.
 
-- [ ] **9. `genST` last-spike off-by-one between languages.** Python
-  `simulations.py:genST` does `st = st[0:np.where(st<duration)[0][-1]]`
-  (exclusive end → drops the last in-window spike); MATLAB
-  `genST` uses `st(1:find(st<duration,1,'last'))` (keeps it). Negligible for long
-  trains but an avoidable inconsistency.
+- [x] **9. `genST` last-spike off-by-one between languages.** FIXED (2026-06-17):
+  Python `simulations.py:genST` now keeps the last in-window spike (`...[-1] + 1`),
+  matching MATLAB `st(1:find(st<duration,1,'last'))`.
 
 - [x] **10. `compute_rf` flips a process-global warning filter.**
   `warnings.simplefilter("error", OptimizeWarning)` mutates global state as a

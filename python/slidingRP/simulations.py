@@ -51,7 +51,9 @@ def genST(rate, duration, rp = 0, params=None):
 
     st = np.cumsum(isi) #convert from isi's to spike times
     if len(np.where(st < duration)[0]) > 0:
-        st = st[0:np.where(st < duration)[0][(-1)]] #cut spike times after the recording duration
+        # keep all spikes before duration (inclusive of the last), matching
+        # matlab/simulations/genST.m: st(1:find(st<duration,1,'last'))
+        st = st[0:np.where(st < duration)[0][(-1)] + 1] #cut spike times after the recording duration
     else:
         st = []
 
