@@ -1055,6 +1055,111 @@ def plotSigmoid(ax, acg, timeBins, ySigmoid, estimatedIdx, estimatedRP):
     ax.plot(timeBins[estimatedIdx] * 1000, ySigmoid[estimatedIdx], 'rx')
     ax.set_title('Estimated RP:%.2f ms' % estimatedRP)
 
+
+def plotSlidingRP(spikeTimes, params=None, plotXs=None, inputAxes=None,
+                  plotExtraContours=False):
+    """Visualise the Sliding RP result for one cluster (Python twin of
+    matlab/plotSlidingRP.m). Produces three panels:
+      1. ACG (0-5 ms),
+      2. confidence matrix (contamination x tau_r) with the 90% iso-contour and
+         the minimum-contamination time,
+      3. confidence trace at the contamination threshold (10%), optionally also
+         at 7.5% and 15% (plotExtraContours).
+
+    Parameters
+    ----------
+    spikeTimes : array of spike times (s).
+    params : dict, optional. Recognised keys: sampleRate, binSizeCorr, recDur,
+        contaminationThresh (default 10), confidenceThresh (default 90),
+        savefig (bool), figpath (str, no extension).
+    plotXs : [taus_ms, colors] optional. Vertical markers at the given tau_r
+        values (ms) in the matching colors, drawn on panels 1 and 3.
+    inputAxes : (fig, axs) optional, where axs has at least 3 axes; otherwise a
+        new 1x3 figure is created.
+    plotExtraContours : bool. Also draw the 7.5% and 15% confidence traces.
+
+    Returns the (fig, axs) used.
+    """
+    import matplotlib.pyplot as plt
+
+    params = dict(params) if params else {}
+    contThresh = params.get('contaminationThresh', 10)
+    confThresh = params.get('confidenceThresh', 90)
+
+    confMatrix, cont, rp, nACG, firingRate = computeMatrix(np.asarray(spikeTimes), params)
+    _, _, rp_min_val, _, _, _, _ = slidingRP(
+        spikeTimes, params=params, conf_thresh=confThresh, cont_thresh=contThresh)
+
+    if inputAxes is not None:
+        fig, axs = inputAxes
+    else:
+        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+
+    rp_ms = rp * 1000
+
+    # --- Panel 1: ACG ---
+    ax = axs[0]
+    ax.bar(rp_ms, nACG[0:len(rp)], width=np.diff(rp_ms)[0], color='k')
+    ax.set_xlim([0, 5])
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_ylabel('ACG count (spks)')
+    ax.fill(np.array([0, 1, 1, 0]) * 0.5, np.array([0, 0, 1, 1]) * ax.get_ylim()[1],
+            'k', alpha=0.2)
+    if plotXs is not None:
+        for tau_ms, c in zip(plotXs[0], plotXs[1]):
+            ax.axvline(tau_ms, color=c, linewidth=1)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    # --- Panel 2: confidence matrix ---
+    ax = axs[1]
+    im = ax.imshow(confMatrix, extent=[rp_ms[0], rp_ms[-1], cont[0], cont[-1]],
+                   aspect='auto', vmin=0, vmax=100, origin='lower')
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label('Confidence (%)')
+    ax.plot([rp_ms[0], rp_ms[-1]], [contThresh, contThresh], 'r', linewidth=1)
+    if not np.isnan(rp_min_val):
+        ax.plot([rp_min_val * 1000] * 2, [cont[0], cont[-1]], 'r', linewidth=1)
+        # 90% iso-contour
+        z = np.vstack([np.zeros((1, confMatrix.shape[1])), confMatrix])
+        ii = np.argmax(z > confThresh, axis=0).astype(float)
+        ii[ii == 0] = np.nan
+        contContour = np.full(ii.shape, np.nan)
+        good = ~np.isnan(ii)
+        contContour[good] = cont[(ii[good] - 1).astype(int)]
+        ax.plot(rp_ms, contContour, 'r', linewidth=2)
+    ax.set_xlim([0, 5])
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_ylabel('Contamination (%)')
+    ax.invert_yaxis()
+
+    # --- Panel 3: confidence trace(s) ---
+    ax = axs[2]
+    def _trace(level, **kw):
+        idx = np.argmin(np.abs(cont - level))
+        ax.plot(rp_ms, confMatrix[idx, :], **kw)
+    if plotExtraContours:
+        _trace(7.5, color='lightcoral', linewidth=1, label='7.5%')
+        _trace(15, color='darkred', linewidth=1, label='15%')
+    _trace(contThresh, color='r', linewidth=2, label='%g%%' % contThresh)
+    ax.plot([0, 5], [confThresh, confThresh], 'k', linewidth=1)
+    if plotXs is not None:
+        for tau_ms, c in zip(plotXs[0], plotXs[1]):
+            ax.axvline(tau_ms, color=c, linewidth=1)
+    ax.set_xlim([0, 5])
+    ax.set_ylim([0, 100])
+    ax.set_xlabel('Time from spike (ms)')
+    ax.set_ylabel('Confidence of <=%g%% contamination (%%)' % contThresh)
+    ax.legend(frameon=False, fontsize=8)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    fig.tight_layout()
+    if params.get('savefig', False) and 'figpath' in params:
+        fig.savefig(params['figpath'] + '.svg', dpi=300)
+        fig.savefig(params['figpath'] + '.png', dpi=300)
+    return fig, axs
+
 #     return acg
 #
 #     # helper functions

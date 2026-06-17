@@ -338,11 +338,13 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
     metric ≈10% pass at 10% contam for RP=10 ms; over-corrects to ~5% for RP=1.5
     ms). Full `nSim=1000` is slow (~2 h serial; the corrected/Markov metric
     dominates — that's why the script uses `parfor`).
-  - ❌ **Fig 2** — `Fig2_metricExplanation.py` is **broken against current code**:
-    it does `from slidingRP.metrics import slidingRP, plotSlidingRP` but
-    `plotSlidingRP` is in the commented-out legacy block (item 13), and it
-    `from slidingRP.simulations import *` (broken module, item 6). Must be fixed
-    as part of the Python work (restore/relocate `plotSlidingRP`, fix sims).
+  - [x] **Fig 2** — FIXED (2026-06-17): added a working Python `plotSlidingRP`
+    to `metrics.py` (3 panels: ACG, confidence matrix + 90% iso-contour, and
+    confidence traces; supports `plotXs`/`inputAxes`/`plotExtraContours`), and
+    modernised `Fig2_metricExplanation.py` (`plotFig2` now uses `computeACG`/
+    Llobet `Ve`, no phylib; imports `genST` explicitly; `os.path.join` paths).
+    `runSaveFig2` runs end-to-end and produces a Fig-2-like figure (schematic +
+    trace/matrix), verified visually.
   - Not locally reproducible (missing data, expected): Fig 1a/macaque, Fig 4g/h/i.
 
 - [ ] **22. Documentation completeness.** Ensure each public function (both

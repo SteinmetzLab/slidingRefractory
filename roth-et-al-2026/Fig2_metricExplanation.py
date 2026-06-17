@@ -1,10 +1,11 @@
 #imports
-from slidingRP.metrics import slidingRP, plotSlidingRP
-from slidingRP.simulations import *
+import os
+import numpy as np
+import matplotlib.pyplot as plt
 from scipy import stats
 import pickle
-import phylib
-from phylib.stats import correlograms
+from slidingRP.metrics import slidingRP, plotSlidingRP, computeACG, computeViol
+from slidingRP.simulations import genST
 
 
 
@@ -65,9 +66,9 @@ def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
     fig.show()
 
     print(figsavepath)
-    print(fig)
-    fig.savefig(figsavepath + '\shiftSchematic.svg', dpi=300)
-    fig.savefig(figsavepath + '\shiftSchematic.pdf', dpi=300)
+    fig.savefig(os.path.join(figsavepath, 'shiftSchematic.svg'), dpi=300)
+    fig.savefig(os.path.join(figsavepath, 'shiftSchematic.pdf'), dpi=300)
+    fig.savefig(os.path.join(figsavepath, 'shiftSchematic.png'), dpi=300)
 
 
     #add subplots b,c, run on this same simulated neuron
@@ -80,7 +81,7 @@ def runSaveFig2(figsavepath,resultsBasePath,savedSimNeuronFlag=False):
     #generate a figure object and format inputs to plotSlidingRP to save the figure
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize = (10,4))
     params['savefig']= True
-    params['figpath'] = figsavepath + '\\traceAndMatrix'
+    params['figpath'] = os.path.join(figsavepath, 'traceAndMatrix')
 
     plotSlidingRP(combST,params,plotXs = plotXs,inputAxes=(fig,axs),plotExtraContours=True)
 
@@ -98,45 +99,33 @@ def plotFig2(spikeTimes, tauR,axs,params,columnValue=0,color = 'b',color2 = 'dar
     #verbose indicates whether to have extra text and labels, or make this figure formally for the paper
 
     refDur = tauR / 1000 #convert to seconds
-    xparam = 100
+    spikeTimes = np.asarray(spikeTimes)
     n_spikes = len(spikeTimes)
-    clustersIds = [0]
-
-    from phylib.stats import correlograms
-
-    # compute an acg in 1s bins to compute the firing rate
-    spikeClustersACG = np.zeros(n_spikes, dtype=np.int8)  # each spike time gets cluster id 0
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=1, sample_rate=params['sampleRate'],
-                        window_size=2, symmetrize=False)[0][0]  # compute acg
-    firingRate = nACG[1] / n_spikes
-    nACG = correlograms(spikeTimes, spikeClustersACG, cluster_ids=clustersIds, bin_size=params['binSizeCorr'],
-                        sample_rate=params['sampleRate'], window_size=2, symmetrize=False)[0][0]  # compute acg
-
-    # compute values for plot labels:
-    # the number of violations (spikes) we expect to see under this contamination rate (expectedViol)
-    # the number of violations (spikes) we observe in the ACG of this neuron
 
     recDur = params['recDur']
-    contaminationProp = params['contaminationThresh']/100 #convert from percent to fractional contamination threshold
-    contaminationRate = firingRate * contaminationProp
-    N_t = firingRate * recDur  # total number of spikes
-    N_c = contaminationRate * recDur  # total number of contaminating spikes you would expect under the inputted CR
-    N_b = N_t - N_c  # the "base" number of spikes under the inputted CR
-    refDur = tauR/1000
+    rpBinSize = params['binSizeCorr']
 
-    rpEdges = np.arange(0, 10 / 1000, params['binSizeCorr'])  # in s
-    rp = rpEdges + np.mean(np.diff(rpEdges)[0]) / 2  # vector of refractory period durations to test
+    # ACG via the same histdiff-equivalent the metric uses (no phylib needed);
+    # firing rate from the explicit recording duration.
+    rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
+    rp = rpEdges + rpBinSize / 2  # refractory period durations to test (bin centres)
+    nACG = computeACG(spikeTimes, rpBinSize, rp.size)
+    firingRate = n_spikes / recDur
+
+    # values for plot labels: expected violations under the contamination
+    # threshold (Llobet), and the observed violations in the ACG up to tauR.
+    contaminationProp = params['contaminationThresh'] / 100
+    N_t = n_spikes
+    N_c = contaminationProp * N_t           # contaminating spikes under the threshold
+    N_b = N_t - N_c                         # base-neuron spikes
 
     #find rp closest to tauR
-    rpInd = np.argmin(abs(rp-tauR/1000))
-    if rpInd == len(rp)-1 : #edge case: last rp tested
-        rpInd = rpInd-1
-    print(rp[rpInd])
+    rpInd = np.argmin(abs(rp - tauR / 1000))
+    if rpInd == len(rp) - 1:  # edge case: last rp tested
+        rpInd = rpInd - 1
 
-    expectedViol = 2 * refDur * 1 / recDur * N_c * (
-                N_b + N_c / 2)  # number of expected violations, as defined in Llobet et al.
-
-    obsViol = np.cumsum(nACG[0:rpInd])[-1]
+    expectedViol = 2 * refDur / recDur * N_c * (N_b + (N_c - 1) / 2)  # Llobet et al.
+    obsViol = int(np.sum(nACG[rp < refDur]))
 
 
     #plot this in two plots (forming one column of the axes):
