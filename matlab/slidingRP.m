@@ -106,7 +106,7 @@ if useCorrection
 
     confidence = max(confMatrix(find(cont >= contThresh, 1), testTimes));
 
-    [ii, ~] = find(confMatrix(:, testTimes) > confThresh);
+    [ii, ~] = find(confMatrix(:, testTimes) >= confThresh);
     [minI, ~] = min(ii);
     contamination = cont(minI);
     if isempty(contamination); contamination = NaN; end
@@ -116,7 +116,7 @@ if useCorrection
     if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
 
     nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
-    passTest = confidence > confThresh;
+    passTest = confidence >= confThresh;
     return;
 end
 
@@ -148,7 +148,7 @@ confidence = max(confAtThresh(testTimes));
 % Count short-ISI spikes (diagnostic for low-rate units)
 nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
 
-passTest = confidence > confThresh;
+passTest = confidence >= confThresh;
 
 % Full confidence matrix is only built when the caller requests it (outputs
 % 6-7). The scalar metrics above never need it.

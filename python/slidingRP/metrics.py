@@ -268,7 +268,7 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     min_cont, rp_min_val = compute_min_contamination(
         obsViol, n_spikes, refDur, rp, recDur, conf_thresh, rp_reject)
 
-    pass_cont_thresh = bool(max_conf > conf_thresh)
+    pass_cont_thresh = bool(max_conf >= conf_thresh)
 
     n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
 

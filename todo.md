@@ -45,7 +45,14 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   (`simulations.py` still has the old API + the `confLlobet` NameError — covered
   by item 6; it's deprecated legacy.)
 
-- [ ] **3. `matlab/RPmetric_Classic.m` 'Hill' branch is internally inconsistent.**
+- [x] **3. `matlab/RPmetric_Classic.m` 'Hill' branch is internally inconsistent.**
+  FIXED (2026-06-17): Hill `expectedViol` now uses `Nc*Nb` (was `Nc*(Nb+Nc)`),
+  matching the manuscript and the estContam inversion. No test uses the 'Hill'
+  path, and the paper figures plot only the Llobet comparison (`passPctLlobet*`),
+  so figures are unaffected (the `passPctHill*` columns only change if
+  runSimulations is re-run, and they are not plotted). Original finding below.
+
+  ~~ORIGINAL:~~
   `passTest` uses `expectedViol = 2*RPdur/recDur * Nc.*(Nb + Nc)` (= `Nc·Nt`),
   but `estContam` in the same branch inverts `Ve = Nc·Nb` (the standard Hill
   quadratic), and the manuscript defines Hill as `Ve = 2τr·Nc·Nb/D`. The pass
@@ -79,12 +86,11 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   runSimulations.m`. Either repair this module or clearly mark it deprecated and
   point readers to the MATLAB runner.
 
-- [ ] **7. Pass/threshold comparison operator differs across implementations.**
-  Python `pass_slidingRP_confmat` uses `confMatrix >= conf_thresh`; MATLAB
-  `slidingRP` uses `confMatrix(:,testTimes) > confThresh` and
-  `passTest = confidence > confThresh`. The manuscript's output definition says
-  "at least equal to" (i.e. `>=`). Pick one convention and align both (matters
-  only at exact-equality, but it's a real divergence).
+- [x] **7. Pass/threshold comparison operator.** FIXED (2026-06-17): standardised
+  on `>=` (per manuscript Outputs "at least equal to", and user decision). MATLAB
+  `slidingRP` passTest and the corrected contamination find now use `>=`; Python
+  fast-path pass uses `>=` (the corrected path's `pass_slidingRP_confmat` already
+  did). Boundary-only effect; tests unaffected.
 
 ---
 

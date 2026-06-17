@@ -23,7 +23,7 @@ function [passTest, estContam, rp, nACG] = RPmetric_Classic(spikeTimes, params)
 %       .metricType         - 'Llobet' (default) or 'Hill'. Selects which
 %                             expected-violations formula to use:
 %                               'Llobet': Ve = 2P/D * Nc*(Nb + (Nc-1)/2)
-%                               'Hill':   Ve = 2P/D * Nc*(Nb + Nc)
+%                               'Hill':   Ve = 2P/D * Nc*Nb
 %       .contaminationThresh - Contamination threshold (%). Default: 10.
 %       .RPdur              - Fixed assumed RP duration (seconds).
 %                             Default: 0.002 (2 ms).
@@ -102,10 +102,12 @@ switch metricType
         estContam    = 1 - sqrt(1 - obsViol * recDur / (spikeCount^2 * RPdur));
 
     case 'Hill'
-        % Hill & Kleinfeld (2011): contamination from a single other neuron.
-        %   Ve = 2P/D * Nc * (Nb + Nc)
+        % Hill, Mehta & Kleinfeld (2011): contamination from a single other
+        % neuron, which produces violations only with the base neuron (not with
+        % itself), so Ve uses Nb (not Nb + Nc). Matches the manuscript Methods.
+        %   Ve = 2P/D * Nc * Nb
         %   C  = 1/2 * (1 - sqrt(1 - 2*Nv*D / (Nt^2 * P)))
-        expectedViol = 2 * RPdur / recDur * expectedNc .* (expectedNb + expectedNc);
+        expectedViol = 2 * RPdur / recDur * expectedNc .* expectedNb;
         estContam    = 1/2 * (1 - sqrt(1 - 2 * obsViol * recDur / spikeCount^2 / RPdur));
 
 end
