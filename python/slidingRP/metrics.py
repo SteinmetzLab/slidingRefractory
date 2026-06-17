@@ -231,6 +231,20 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     rpBinSize = params.setdefault('binSizeCorr', 1 / sampleRate)
 
     spikeTimes = np.asarray(spikeTimes, dtype=np.float64)
+
+    if params.get('correction', False):
+        # FWER-corrected variant (Fig. S3): derive the scalar metrics from the
+        # corrected confidence matrix (grid-based; no analytical shortcut for the
+        # corrected confidence). Expensive, non-default path.
+        confMatrix, cont, rp, nACG, firing_rate = computeMatrix(spikeTimes, params)
+        pass_cont_thresh, min_cont, rp_min_val = pass_slidingRP_confmat(
+            confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
+        max_conf, _, _ = confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
+        n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
+        pass_forced = (n_spikes_below2 == 0) and (firing_rate > 0.5) and (not pass_cont_thresh)
+        return max_conf, min_cont, rp_min_val, n_spikes_below2, firing_rate, \
+            pass_cont_thresh, pass_forced
+
     n_spikes = spikeTimes.size
     recDur = params.get('recDur', None)
     if recDur is None:
@@ -372,6 +386,11 @@ def computeMatrix(spikeTimes, params):
         - binSizeCorr : ACG bin size (s), default 1/sampleRate.
         - sampleRate : sample rate (Hz), default 30000.
         - cont : vector of contamination levels (%) to test, default 0.5:0.5:35.
+        - correction : bool, default False. If True, apply the family-wise
+          multiple-comparisons correction across tau_r (exact Poisson
+          first-passage; Fig. S3). Slow and over-conservative for short-RP
+          units; intended for Fig. S3 only.
+        - rpReject : min tau_r (s) included in the correction, default 0.0005.
 
     Returns
     -------
@@ -386,7 +405,11 @@ def computeMatrix(spikeTimes, params):
     recDur = params.get('recDur', None)
     if recDur is None:
         recDur = np.max(spikeTimes)
-    cont = params.get('cont', np.arange(0.5, 35, 0.5))  # contamination levels (%)
+    # contamination levels (%): 0.5,1,...,35 (70 levels), matching MATLAB
+    # 0.5:0.5:35 and the manuscript (Python previously stopped at 34.5).
+    cont = params.get('cont', np.arange(0.5, 35.5, 0.5))
+    correction = params.get('correction', False)
+    rp_reject = params.get('rpReject', 0.0005)
 
     rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
     rp = rpEdges + rpBinSize / 2  # refractory period durations to test (bin centres)
@@ -395,12 +418,79 @@ def computeMatrix(spikeTimes, params):
     firingRate = n_spikes / recDur
 
     nACG = computeACG(spikeTimes, rpBinSize, rp.size)
+    obsViol = np.cumsum(nACG[0:rp.size])
+    refDur = rp + rpBinSize / 2
 
-    confMatrix = 100 * computeViol(
-        np.cumsum(nACG[0:rp.size])[np.newaxis, :], firingRate, n_spikes,
-        rp[np.newaxis, :] + rpBinSize / 2, cont[:, np.newaxis] / 100, recDur)
+    # Pointwise (nominal) confidence matrix
+    Nc = n_spikes * (cont[:, np.newaxis] / 100)
+    Nb = n_spikes * (1 - cont[:, np.newaxis] / 100)
+    expectedViolMatrix = 2 * refDur[np.newaxis, :] / recDur * Nc * (Nb + (Nc - 1) / 2)
+    nominalConfMatrix = 100 * (1 - stats.poisson.cdf(obsViol[np.newaxis, :], expectedViolMatrix))
+
+    if not correction:
+        confMatrix = nominalConfMatrix
+    else:
+        confMatrix = _fwer_correct(nominalConfMatrix, expectedViolMatrix,
+                                   obsViol, rp, rp_reject)
 
     return confMatrix, cont, rp, nACG, firingRate
+
+
+def _fwer_correct(nominalConfMatrix, expectedViolMatrix, obsViol, rp, rp_reject):
+    """Family-wise-error-rate correction across tau_r (exact Poisson
+    first-passage / Markov-chain DP). Port of matlab/computeMatrix.m's
+    correction branch. Returns the corrected confidence matrix (%)."""
+    nCont, nRP = nominalConfMatrix.shape
+    corrected = np.full((nCont, nRP), np.nan)
+    validIdx = np.where(rp > rp_reject)[0]
+    if validIdx.size == 0:
+        corrected[:] = 0
+        return corrected
+
+    for cidx in range(nCont):
+        expectedViol = expectedViolMatrix[cidx, :]
+        nomPvals = 1 - nominalConfMatrix[cidx, :] / 100
+        minPval = np.min(nomPvals[validIdx])
+
+        # Shortcut: the corrected confidence cannot exceed (1 - minPval)
+        if minPval > 0.5:
+            corrected[cidx, :] = (1 - minPval) * 100
+            continue
+
+        # Per-bin passing boundary: max observed count with pointwise p <= minPval
+        c = -np.ones(nRP, dtype=np.int64)
+        expV_valid = expectedViol[validIdx]
+        obsV_valid = obsViol[validIdx]
+        max_obs = int(np.max(obsV_valid))
+        if max_obs == 0:
+            c[validIdx] = (np.exp(-expV_valid) <= minPval + 1e-10).astype(np.int64) - 1
+        else:
+            v_vec = np.arange(max_obs + 1)[:, np.newaxis]
+            cdf = stats.poisson.cdf(v_vec, expV_valid[np.newaxis, :])
+            valid_mask = (v_vec <= obsV_valid[np.newaxis, :]) & (cdf <= minPval + 1e-10)
+            c[validIdx] = valid_mask.sum(axis=0) - 1
+        max_c = int(np.max(c[validIdx]))
+
+        # Markov-chain DP for the first-passage probability
+        if max_c < 0:
+            correctedConf = 1.0
+        else:
+            P_state = np.zeros(max_c + 1)
+            P_state[0] = 1.0
+            P_false = 0.0
+            lambda_all = np.concatenate(([expectedViol[0]], np.diff(expectedViol)))
+            for k in range(nRP):
+                lam = lambda_all[k]
+                if lam > 0:
+                    pmf = stats.poisson.pmf(np.arange(max_c + 1), lam)
+                    P_state = np.convolve(P_state, pmf)[:max_c + 1]
+                if c[k] >= 0:
+                    P_false += P_state[:c[k] + 1].sum()
+                    P_state[:c[k] + 1] = 0
+            correctedConf = 1 - P_false
+
+        corrected[cidx, :] = correctedConf * 100
+    return corrected
 
 
 def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recDur):

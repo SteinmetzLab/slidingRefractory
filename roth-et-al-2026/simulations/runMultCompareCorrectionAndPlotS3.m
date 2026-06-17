@@ -74,8 +74,9 @@ for bidx = 1:numel(baseRates)
                         combST = sort([st; contST]); 
 
                         % Only request the first output (passTest) to save IPC overhead
-                        pass1 = slidingRP(combST, params);
-                        pass2 = slidingRPCorrected(combST, params);
+                        paramsCorr = params; paramsCorr.correction = true;
+                        pass1 = slidingRP(combST, params);            % standard
+                        pass2 = slidingRP(combST, paramsCorr);        % FWER-corrected
 
                         simRes1(n) = pass1;
                         simRes2(n) = pass2;

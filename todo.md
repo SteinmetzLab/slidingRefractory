@@ -276,15 +276,27 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   MATLAB: when `nargout < confMatrix` / matrix not requested), then re-baseline
   both regression suites to the continuous C_min and cross-check Python==MATLAB.
 
+  **DONE (2026-06-17):** Wired into `slidingRP` in both languages
+  (`computeMinContamination.m` / `compute_min_contamination`); confidence/pass
+  unchanged, `contamination`/`timeOfLowestCont` now analytical/continuous. The
+  full matrix is built only on demand (MATLAB `nargout>=6`; Python via
+  `computeMatrix`). MATLAB and Python agree bit-for-bit (274: 0.455893%, 275:
+  18.791268%). Regression suites re-baselined; MATLAB 32 tests + Python 3 pass.
+  Committed (689d05c).
+
 ---
 
 ## 🟠 Requested 2026-06-17
 
-- [ ] **25. Fold the correction into `slidingRP` as an option (off by default).**
-  Remove the separate `slidingRPCorrected.m` / `computeMatrixCorrected.m`; instead
-  add a `correction` (FWER multiple-comparisons) flag to the single
-  `slidingRP`/`computeMatrix` (default off → current behaviour). Do this in both
-  MATLAB and Python (parity). Update the Fig-S3 script and tests accordingly.
+- [x] **25. Fold the correction into `slidingRP` as an option (off by default).**
+  DONE (2026-06-17): removed `slidingRPCorrected.m` / `computeMatrixCorrected.m`;
+  `computeMatrix`/`slidingRP` now take a `correction` flag (default off) in BOTH
+  languages (the FWER Markov DP was ported to Python). Fig-S3 script + tests
+  updated. Verified Python==MATLAB bit-for-bit with correction on (corrected
+  confMatrix for cluster 275 matches to 3e-13; 275 corrected: conf 27.43%,
+  cont 25%). Also aligned the Python `cont` grid to 0.5:0.5:35 (70 levels;
+  Python previously stopped at 34.5, missing the 35% level). MATLAB 32 + Python
+  4 tests pass.
 
 ## 🟢 Broader review dimensions (requested 2026-06-16)
 

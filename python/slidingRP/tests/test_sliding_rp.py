@@ -87,3 +87,17 @@ def test_analytical_matches_grid_and_matrix():
     rows = np.where(confMatrix[:, test] > 90)[0]
     grid_min_cont = cont[rows.min()]
     assert abs(min_cont - grid_min_cont) <= 0.5
+
+
+def test_correction_option():
+    # The FWER correction is available as a flag (off by default) and is more
+    # conservative: corrected confidence <= standard confidence.
+    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+    st = spikes_times[spikes_clusters == 275]
+    conf_std = metrics.slidingRP(st)[0]
+    conf_corr = metrics.slidingRP(st, params={'correction': True})[0]
+    assert conf_corr <= conf_std + 1e-9
+    confMatrix, cont, rp, _, _ = metrics.computeMatrix(
+        st, {'sampleRate': 30000, 'correction': True})
+    assert confMatrix.shape == (len(cont), len(rp))

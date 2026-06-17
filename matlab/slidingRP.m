@@ -37,6 +37,11 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %                              Default: 0.5:0.5:35.
 %       .nViolShortThresh    - Threshold for nViolShort output (s).
 %                              Default: 0.002 (2 ms).
+%       .correction          - Logical. If true, apply the family-wise
+%                              multiple-comparisons correction across tau_r
+%                              (exact Poisson first-passage; Fig. S3). Slow and
+%                              over-conservative for short-RP units; intended for
+%                              Fig. S3 only. Default: false (standard metric).
 %       Additional fields are passed through to computeMatrix().
 %
 %   OUTPUTS
@@ -89,7 +94,33 @@ else
     rpReject = 0.0005;
 end
 
-% ---- Recording duration and ACG parameters ------------------------------
+useCorrection = isfield(params, 'correction') && params.correction;
+
+if useCorrection
+    % ---- FWER-corrected variant (Fig. S3) -------------------------------
+    % Build the family-wise-corrected confidence matrix and derive the scalar
+    % metrics from it (grid-based; there is no analytical shortcut for the
+    % corrected confidence). This is the expensive, non-default path.
+    [confMatrix, cont, rp, nACG] = computeMatrix(spikeTimes, params);
+    testTimes = rp > rpReject;
+
+    confidence = max(confMatrix(find(cont >= contThresh, 1), testTimes));
+
+    [ii, ~] = find(confMatrix(:, testTimes) > confThresh);
+    [minI, ~] = min(ii);
+    contamination = cont(minI);
+    if isempty(contamination); contamination = NaN; end
+
+    [~, minRP] = max(confMatrix(minI, testTimes));
+    timeOfLowestCont = rp(minRP + find(testTimes, 1) - 1);
+    if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
+
+    nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
+    passTest = confidence > confThresh;
+    return;
+end
+
+% ---- Standard (analytical fast) path ------------------------------------
 if isfield(params, 'recDur');     recDur     = params.recDur;     else; recDur     = max(spikeTimes); end
 if isfield(params, 'acgBinSize'); acgBinSize = params.acgBinSize; else; acgBinSize = 1/30000;          end
 if isfield(params, 'testWindow'); testWindow = params.testWindow; else; testWindow = 0.01;             end

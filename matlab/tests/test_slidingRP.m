@@ -420,8 +420,8 @@ classdef test_slidingRP < matlab.unittest.TestCase
                 'Skipped: histdiff not on path (add cortex-lab/spikes)');
             rng(0);
             st = genST(10, 600, 0.003);
-            params = struct('recDur', 600);
-            [~, confidence, ~, ~, ~, confMatrix, cont, rp, ~] = slidingRPCorrected(st, params);
+            params = struct('recDur', 600, 'correction', true);
+            [~, confidence, ~, ~, ~, confMatrix, cont, rp, ~] = slidingRP(st, params);
             testCase.verifyEqual(size(confMatrix), [numel(cont), numel(rp)]);
             testCase.verifyGreaterThanOrEqual(confidence, 0);
             testCase.verifyLessThanOrEqual(confidence, 100);
@@ -436,8 +436,8 @@ classdef test_slidingRP < matlab.unittest.TestCase
                 'Skipped: histdiff not on path (add cortex-lab/spikes)');
             rng(0);
             st = genST(8, 600, 0.003);
-            params = struct('recDur', 600);
-            [confMatrix, ~, ~, ~, nominalConfMatrix] = computeMatrixCorrected(st, params);
+            params = struct('recDur', 600, 'correction', true);
+            [confMatrix, ~, ~, ~, nominalConfMatrix] = computeMatrix(st, params);
             rowMaxCorrected = max(confMatrix, [], 2);
             rowMaxNominal   = max(nominalConfMatrix, [], 2);
             testCase.verifyLessThanOrEqual(max(rowMaxCorrected - rowMaxNominal), 1e-9, ...
@@ -453,21 +453,20 @@ classdef test_slidingRP < matlab.unittest.TestCase
             st = genST(8, 600, 0.003);
             params = struct('recDur', 600);
             [~, confStd]  = slidingRP(st, params);
-            [~, confCorr] = slidingRPCorrected(st, params);
+            [~, confCorr] = slidingRP(st, struct('recDur', 600, 'correction', true));
             testCase.verifyLessThanOrEqual(confCorr, confStd + 1e-9, ...
                 'Corrected confidence should be <= standard confidence');
         end
 
         function test_corrected_nominal_matches_computeMatrix(testCase)
-            % The nominal (uncorrected) matrix from computeMatrixCorrected must
-            % equal the standard computeMatrix output for the same input.
+            % The nominal (uncorrected) matrix returned alongside the corrected
+            % one must equal the standard (correction-off) computeMatrix output.
             testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
                 'Skipped: histdiff not on path (add cortex-lab/spikes)');
             rng(0);
             st = genST(8, 600, 0.003);
-            params = struct('recDur', 600);
-            [~, ~, ~, ~, nominalConfMatrix] = computeMatrixCorrected(st, params);
-            stdConfMatrix = computeMatrix(st, params);
+            [~, ~, ~, ~, nominalConfMatrix] = computeMatrix(st, struct('recDur', 600, 'correction', true));
+            stdConfMatrix = computeMatrix(st, struct('recDur', 600));
             testCase.verifyEqual(nominalConfMatrix, stdConfMatrix, 'AbsTol', 1e-9);
         end
 
