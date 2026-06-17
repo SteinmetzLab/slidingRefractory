@@ -76,7 +76,7 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   IBL ~1 h recordings. This silently changes behavior for non-IBL data. Make it
   an opt-in parameter (off by default) and document it.
 
-- [ ] **6. Build a Python simulation that matches the MATLAB one and reproduces
+- [x] **6. Build a Python simulation that matches the MATLAB one and reproduces
   the figures (DECISION 2026-06-17).** Rather than just deprecating the broken
   `simulations.py`, port `roth-et-al-2026/simulations/runSimulations.m` to Python
   (using the now-matching `slidingRP` + a Python `RPmetric_Classic` Hill/Llobet)
