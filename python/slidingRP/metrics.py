@@ -297,39 +297,50 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
         pass_cont_thresh, pass_forced
 
 
+def _slidingRP_worker(args):
+    """Module-level worker so slidingRP_all can parallelise with a process pool
+    (the callable and its args must be picklable)."""
+    st, params, conf_thresh, cont_thresh, rp_reject = args
+    return slidingRP(st, params=params, conf_thresh=conf_thresh,
+                     cont_thresh=cont_thresh, rp_reject=rp_reject)
+
+
 def slidingRP_all(spikeTimes, spikeClusters, params=None,
-                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005):
-    """
+                  conf_thresh=90, cont_thresh=10, rp_reject=0.0005, n_jobs=1):
+    """Compute the Sliding RP metric for every cluster in a recording.
+
     :param spikeTimes:  array of spike times (s)
     :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
     :param params:  dict of options passed to slidingRP (e.g. {'recDur': ...})
-    :return: dictionary of values
+    :param n_jobs:  number of parallel processes over clusters. 1 (default) runs
+                    serially; >1 uses that many processes; <0 uses all cores.
+                    (Process-based, like the MATLAB parfor; on Windows the caller
+                    must be under ``if __name__ == '__main__'``.)
+    :return: dictionary of per-cluster metrics
     """
 
     cids = np.unique(spikeClusters)
+    # Pre-slice spikes per cluster (avoids re-scanning the full arrays per task).
+    sts = [spikeTimes[spikeClusters == c] for c in cids]
 
-    # initialize rpMetrics as dict
-    rpMetrics = {}
-    rpMetrics['cidx'] = []
-    rpMetrics['max_confidence'] = []
-    rpMetrics['min_contamination'] = []
-    rpMetrics['rp_min_val'] = []
-    rpMetrics['n_spikes_below2'] = []
-    rpMetrics['firing_rate'] = []
-    rpMetrics['value'] = []
-    rpMetrics['value_forced'] = []
+    if n_jobs is not None and n_jobs != 1 and len(cids) > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        max_workers = None if n_jobs < 0 else n_jobs
+        args = [(st, params, conf_thresh, cont_thresh, rp_reject) for st in sts]
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            results = list(ex.map(_slidingRP_worker, args))
+    else:
+        results = [slidingRP(st, params=params, conf_thresh=conf_thresh,
+                             cont_thresh=cont_thresh, rp_reject=rp_reject)
+                   for st in sts]
 
-    # Loop over clusters
-    for cidx in range(len(cids)):
-        st = spikeTimes[spikeClusters == cids[cidx]]
-
-        [max_confidence, min_contamination, rp_min_val,
-         n_spikes_below2, firing_rate,
-         pass_cont_thresh, pass_forced] = slidingRP(st, params=params,
-                                                    conf_thresh=conf_thresh, cont_thresh=cont_thresh,
-                                                    rp_reject=rp_reject)
-
-        rpMetrics['cidx'].append(cids[cidx])
+    rpMetrics = {k: [] for k in ('cidx', 'max_confidence', 'min_contamination',
+                                 'rp_min_val', 'n_spikes_below2', 'firing_rate',
+                                 'value', 'value_forced')}
+    for cid, res in zip(cids, results):
+        (max_confidence, min_contamination, rp_min_val, n_spikes_below2,
+         firing_rate, pass_cont_thresh, pass_forced) = res
+        rpMetrics['cidx'].append(cid)
         rpMetrics['max_confidence'].append(max_confidence)
         rpMetrics['min_contamination'].append(min_contamination)
         rpMetrics['rp_min_val'].append(rp_min_val)

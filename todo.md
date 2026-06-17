@@ -306,13 +306,13 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
 
 ## 🟢 Broader review dimensions (requested 2026-06-16)
 
-- [ ] **19. Performance / parallelization.** (a) Adopt PR #6's analytical
-  critical-contamination to replace the per-cell `computeViol` loop / full matrix
-  where only pass/fail or `C_min` is needed (item 18). (b) Python `slidingRP_all`
-  is a serial Python `for` over clusters — no parallelism (MATLAB has `parfor` via
-  `slidingRP_all.m`); consider `joblib`/multiprocessing and/or vectorizing the ACG.
-  (c) Profile: PR #6 notes ACG computation dominates, so the high-value win is a
-  fast sample-space ACG, not micro-optimizing the confidence step.
+- [x] **19. Performance / parallelization.** DONE (2026-06-17): (a) the
+  analytical critical-contamination already replaced the matrix sweep on the hot
+  path (item 18) — `slidingRP` no longer builds the 70×300 matrix unless asked.
+  (b) `slidingRP_all` now takes `n_jobs` (process pool over clusters, default 1 =
+  serial; verified parallel == serial). (c) Remaining future win noted in item 15
+  (sample-space ACG); the ACG (`computeACG`) is already the dominant cost and is
+  vectorised per shift.
 
 - [~] **20. MATLAB ↔ Python usage parity.** PARTLY DONE (2026-06-16): Python now
   takes a `params` dict (like the MATLAB struct) with explicit `recDur`; the ACG
@@ -347,10 +347,11 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
     trace/matrix), verified visually.
   - Not locally reproducible (missing data, expected): Fig 1a/macaque, Fig 4g/h/i.
 
-- [ ] **22. Documentation completeness.** Ensure each public function (both
-  languages) has a complete docstring/help with params, returns, units, and a
-  usage example; add/refresh a top-level README + a short "how to run the metric"
-  example for Python and MATLAB; document defaults and the IBL-specific behaviors.
+- [x] **22. Documentation.** DONE (2026-06-17): README Python example fixed (it
+  used the stale `**params` API → would `TypeError`) and expanded with the output
+  list, `params` options (recDur/correction/forcePass), `n_jobs`, the bit-for-bit
+  MATLAB-match note, and the corrected `pytest python/slidingRP/tests/` path. Core
+  functions in both languages now have complete docstrings/help (items 23/2).
 
 - [~] **23. Commenting clarity.** MATLAB library pass DONE (2026-06-16):
   `slidingRPCorrected.m` (added full help + fixed the function-name bug: was
@@ -364,13 +365,20 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   rationale; and the research scripts in `roth-et-al-2026/` / `matlab/simulations`
   are only lightly commented.
 
-- [ ] **24. Prune deprecated/useless Python.** Beyond item 13 (the ~400 commented
-  lines in `metrics.py`) and item 6 (`simulations.py`): audit `python/plotSimsTest.py`,
-  `python/simulationsFunctions.py`, `python/examples/`, and the many one-off
-  `scripts/` (e.g. `explore_90conf_issues.py`, `scratch_ampFrACGFit.py`,
-  `compare2msVersionIBLdata.py`) — move genuinely-needed analysis into
-  `roth-et-al-2026/` and delete dead scratch. Clarify what is library vs paper vs
-  throwaway.
+- [~] **24. Prune deprecated/useless Python.** PARTLY DONE (2026-06-17): deleted
+  12 dead/superseded scratch files (the `scriptTestSimulations*`,
+  `testDriftSimulations`, `scriptTestLlobetHillSlidingComp`,
+  `plotDriftComparisonPaper`, `explore_90conf_issues`, `scratch_ampFrACGFit`,
+  `script_testSlidingRP` dev scripts; `python/plotSimsTest.py`,
+  `python/simulationsFunctions.py`, `python/examples/testingRepeatedSite.py`); and
+  `test_parfor.py` (item 6). KEPT for your decision (paper/IBL-relevant): 
+  `scripts/minimum_passing_FR.py` (generates **Fig 4g**), `scripts/computeEstimatedRPs.py`
+  + `scripts/plotEstimatedRPs.py` (Fig 1 RP-quantification, Python), `scripts/
+  exampleScriptIBL.py` + `example_IBL_verify_confidence.py` (IBL usage examples),
+  `scripts/compare2msVersionIBLdata.py` (IBL analysis). These use the old API /
+  IBL deps; decide: migrate to `roth-et-al-2026/` and fix, or delete. Also
+  `python/slidingRP/scriptSavePaperFigs.py` imports a nonexistent
+  `slidingRP.Fig3_simulations` (pre-existing breakage).
 
 ---
 

@@ -25,15 +25,38 @@ import numpy as np
 import pandas as pd
 from slidingRP import metrics
 
-TEST_DATA_PATH = Path('test-data/integration')
-params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-spikes = pd.read_parquet(TEST_DATA_PATH / 'spikes.pqt')
-table = metrics.slidingRP_all(spikes.times, spikes.clusters, **params)
+# All clusters at once. Options go in a `params` dict; recDur (recording
+# duration, s) is recommended — it defaults to max(spikeTimes).
+spikes = pd.read_parquet(Path('test-data/integration') / 'spikes.pqt')
+params = {'sampleRate': 30000, 'recDur': float(spikes.times.max())}
+table = metrics.slidingRP_all(spikes.times.values, spikes.clusters.values,
+                              params=params, n_jobs=1)   # n_jobs>1 parallelises
+
+# One cluster
+st = spikes.times.values[spikes.clusters.values == 0]
+(max_conf, min_cont, rp_min_val, n_spikes_below2,
+ firing_rate, passes, pass_forced) = metrics.slidingRP(st, params=params)
 ```
+
+Per-cluster outputs (in both `slidingRP` and the `slidingRP_all` table):
+- `max_confidence` / `max_conf` — max confidence (%) that contamination is below
+  `cont_thresh` (default 10%).
+- `value` / `passes` — pass/fail (`max_conf >= conf_thresh`, default 90%).
+- `min_contamination` / `min_cont` — minimum confirmable contamination (%),
+  computed analytically; NaN if > 35%.
+- `rp_min_val` — tau_r (s) at which that minimum is reached (an RP estimate).
+- `firing_rate` — spikes / recDur.
+
+Options (via `params`): `recDur`, `sampleRate`, `binSizeCorr`, `correction`
+(FWER multiple-comparisons correction, default off; Fig. S3), `forcePass`
+(IBL-specific force-pass of low-rate units with zero violations, default off).
+The Python results match the authoritative MATLAB implementation bit-for-bit on
+identical spike trains. (The output *names/order* differ between languages — see
+the `slidingRP` docstring for the mapping.)
 
 ### Run unit tests
 ```commandline
-pytest python/test_*
+pytest python/slidingRP/tests/
 ```
 
 ### Upload package to PyPI
