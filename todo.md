@@ -106,29 +106,29 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   `genST` uses `st(1:find(st<duration,1,'last'))` (keeps it). Negligible for long
   trains but an avoidable inconsistency.
 
-- [ ] **10. `compute_rf` flips a process-global warning filter.**
+- [x] **10. `compute_rf` flips a process-global warning filter.**
   `warnings.simplefilter("error", OptimizeWarning)` mutates global state as a
   side effect of calling the function. Wrap in a
   `with warnings.catch_warnings():` block instead.
 
-- [ ] **11. Resolve the `rp_min_val` / `timeOfLowestCont` status.** `metrics.py:193`
+- [x] **11. Resolve the `rp_min_val` / `timeOfLowestCont` status.** `metrics.py:193`
   has `# TODO this code could be deleted as rp_min_val is not informative`, but
   the manuscript (Outputs / Step 6) returns it as an RP-duration estimate. Decide
   whether it stays (and drop the comment) or goes (and update the manuscript).
 
-- [ ] **12. `computeMatrixCorrected.m` / `slidingRPCorrected.m` (Markov
-  correction) are untested and Python-less.** No unit tests cover them, and there
-  is no Python equivalent. Also verify the boundary definition: the code uses an
-  adaptive `minPval` (min nominal p across valid bins) rather than the fixed
-  `α = 1−γthresh` written in the Methods eq for `c_k`. This is paper-only
-  (Fig. S3) so low priority, but add at least one regression test and a note on
-  the boundary choice.
+- [x] **12. Corrected (Markov) variant untested and Python-less.** RESOLVED via
+  item 25: the correction is now a `correction` flag on `computeMatrix`/`slidingRP`
+  in BOTH languages (Python port verified bit-for-bit against MATLAB), and the
+  MATLAB test suite has a `corrected` group. NOTE (still worth a manuscript
+  cross-check): the boundary uses an adaptive `minPval` (min nominal p across
+  valid bins) rather than the fixed `α = 1−γthresh` in the Methods eq for `c_k`;
+  ported as-is from the original. Flag for the authors to confirm.
 
-- [ ] **13. metrics.py carries ~400 lines of commented-out legacy code.** The old
+- [x] **13. metrics.py carries ~400 lines of commented-out legacy code.** The old
   `slidingRP_all`, `slidingRP`, `plotSlidingRP`, `fit_sigmoid`, `fitSigmoidACG`
   blocks are dead weight; git history preserves them. Remove for readability.
 
-- [ ] **14. Minor packaging:** `python/slidingRP/__init__.py` is empty — consider
+- [x] **14. Minor packaging:** `python/slidingRP/__init__.py` is empty — consider
   exposing `__version__` (setup.py is at 1.1.1) and the public API
   (`slidingRP`, `slidingRP_all`) for `from slidingRP import slidingRP`.
 
