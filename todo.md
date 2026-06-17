@@ -70,21 +70,23 @@ Legend: 🔴 correctness / cross-implementation · 🟠 API / behavior · 🟢 c
   as MATLAB) and uses it directly in the Llobet `Ve`; `firingRate = n/recDur`.
   The old ACG-bin[1] rate estimate is gone.
 
-- [ ] **5. IBL-specific "force pass" hack is baked into the general
+- [x] **5. IBL-specific "force pass" hack is baked into the general
   `slidingRP`.** `metrics.py:225` hardcodes `(n_spikes_below2 == 0) and
   (firing_rate > 0.5)` → `pass_forced = True`, with a comment that it's tuned for
   IBL ~1 h recordings. This silently changes behavior for non-IBL data. Make it
   an opt-in parameter (off by default) and document it.
 
-- [ ] **6. `python/slidingRP/simulations.py` is stale/broken legacy.** Besides
-  the API mismatch (item 2): `genST` calls `firing_rate(...)` which is never
-  defined/imported (NameError if `params['checkFR']` is set); and the
-  `confLlobet15/2/3` pass-rate block (lines ~331–344) sits *outside* the
-  `if runLlobet:` guard that defines those variables → NameError whenever
-  `runLlobet` is False, and it is never guarded by `runLlobetPoiss`. The current
-  canonical simulation path appears to be `roth-et-al-2026/simulations/
-  runSimulations.m`. Either repair this module or clearly mark it deprecated and
-  point readers to the MATLAB runner.
+- [ ] **6. Build a Python simulation that matches the MATLAB one and reproduces
+  the figures (DECISION 2026-06-17).** Rather than just deprecating the broken
+  `simulations.py`, port `roth-et-al-2026/simulations/runSimulations.m` to Python
+  (using the now-matching `slidingRP` + a Python `RPmetric_Classic` Hill/Llobet)
+  and reproduce Fig 3 / S2 / Fig 4 from the Python output — an important extra
+  cross-validation that the two sides agree. Plan: (a) clean Python `genST`
+  (sample-consistent with MATLAB); (b) Python `RPmetric_Classic`; (c) a Python
+  `runSimulations` writing the same table columns as `simDat.mat`; (d) Python
+  figure scripts; (e) compare Python vs MATLAB pass-percentages on a shared
+  parameter set. Replace the old broken `simulations.py`/`test_parfor.py` in the
+  process.
 
 - [x] **7. Pass/threshold comparison operator.** FIXED (2026-06-17): standardised
   on `>=` (per manuscript Outputs "at least equal to", and user decision). MATLAB

@@ -219,6 +219,11 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     (``min_cont``) is computed analytically (closed-form, no contamination grid).
     For the full confidence matrix, call computeMatrix() directly.
 
+    params options include: recDur, sampleRate, binSizeCorr, cont, correction
+    (FWER multiple-comparisons; default off), and forcePass (IBL-specific; default
+    off) — when True, units with zero <2 ms violations and firing_rate > 0.5 are
+    flagged via pass_forced.
+
     Returns
     -------
     max_conf : float      maximum confidence (%) that contamination < cont_thresh
@@ -227,8 +232,14 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     rp_min_val : float    tau_r (s) at which min_cont is achieved
     n_spikes_below2 : int ACG count with ISI < 2 ms
     firing_rate : float   n_spikes / recDur
-    pass_cont_thresh : bool   max_conf > conf_thresh
-    pass_forced : bool    IBL-specific: force-pass low-rate units with 0 violations
+    pass_cont_thresh : bool   max_conf >= conf_thresh
+    pass_forced : bool    IBL force-pass flag (False unless params['forcePass'])
+
+    Mapping to MATLAB slidingRP.m outputs (which differ in order):
+        MATLAB [passTest, confidence, contamination, timeOfLowestCont, nViolShort, ...]
+        Python  pass_cont_thresh, max_conf,  min_cont,      rp_min_val,    n_spikes_below2
+    (MATLAB's confMatrix/cont/rp/nACG come from computeMatrix(); Python returns
+    firing_rate and pass_forced instead. Values match; only order/names differ.)
     """
     params = dict(params) if params else {}
     sampleRate = params.setdefault('sampleRate', 30000)
@@ -245,7 +256,8 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
             confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
         max_conf, _, _ = confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
         n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
-        pass_forced = (n_spikes_below2 == 0) and (firing_rate > 0.5) and (not pass_cont_thresh)
+        pass_forced = params.get('forcePass', False) and (n_spikes_below2 == 0) \
+            and (firing_rate > 0.5) and (not pass_cont_thresh)
         return max_conf, min_cont, rp_min_val, n_spikes_below2, firing_rate, \
             pass_cont_thresh, pass_forced
 
