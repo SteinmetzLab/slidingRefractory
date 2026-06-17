@@ -529,6 +529,63 @@ classdef test_slidingRP < matlab.unittest.TestCase
     end % classic tests
 
     % =====================================================================
+    %  9. Analytical fast path (slidingRP without the full matrix)
+    %     Requires: histdiff (spikes toolbox), chi2inv (Statistics toolbox)
+    % =====================================================================
+    methods (Test, TestTags={'analytical'})
+
+        function test_fast_confidence_matches_matrix(testCase)
+            % The fast-path confidence (output 2) must equal the confidence
+            % derived from the full matrix at the contamination-threshold row.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(11);
+            st = genST(8, 1800, 0.003);
+            params = struct('recDur', 1800);
+            [~, confFast, ~, ~, ~, confMatrix, cont, rp] = slidingRP(st, params);
+            testTimes = rp > 0.0005;
+            confFromMatrix = max(confMatrix(find(cont >= 10, 1), testTimes));
+            testCase.verifyEqual(confFast, confFromMatrix, 'AbsTol', 1e-9, ...
+                'Fast-path confidence must equal the matrix-derived confidence');
+        end
+
+        function test_analytical_contamination_matches_grid(testCase)
+            % The analytical (continuous) min contamination must agree with the
+            % grid-based value to within the 0.5%% grid resolution.
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(11);
+            st = genST(8, 1800, 0.003);
+            params = struct('recDur', 1800);
+            [~, ~, contAnalytical, ~, ~, confMatrix, cont, rp] = slidingRP(st, params);
+            testTimes = rp > 0.0005;
+            [ii, ~] = find(confMatrix(:, testTimes) > 90);
+            minI = min(ii);
+            contGrid = cont(minI);
+            testCase.assumeFalse(isnan(contAnalytical) || isempty(contGrid), ...
+                'Both contamination estimates must be defined for this comparison');
+            testCase.verifyLessThanOrEqual(abs(contAnalytical - contGrid), 0.5, ...
+                'Analytical contamination should match the grid within grid resolution');
+        end
+
+        function test_fast_path_no_matrix_when_not_requested(testCase)
+            % When the matrix output is not requested, the scalar metrics are
+            % still produced (and equal the values from a matrix-requesting call).
+            testCase.assumeTrue(exist('histdiff', 'file') > 0, ...
+                'Skipped: histdiff not on path (add cortex-lab/spikes)');
+            rng(11);
+            st = genST(8, 1800, 0.003);
+            params = struct('recDur', 1800);
+            [passFast, confFast, contFast] = slidingRP(st, params);          % fast
+            [passM, confM, contM] = slidingRP(st, params);                   % same call
+            testCase.verifyEqual(confFast, confM, 'AbsTol', 1e-12);
+            testCase.verifyEqual(contFast, contM, 'AbsTol', 1e-12);
+            testCase.verifyEqual(passFast, passM);
+        end
+
+    end % analytical tests
+
+    % =====================================================================
     %  Helper methods
     % =====================================================================
     methods (Access = private)

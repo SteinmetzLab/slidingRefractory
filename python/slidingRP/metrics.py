@@ -209,34 +209,61 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     seconds and defaults to ``max(spikeTimes)`` if not given (recommended to
     set explicitly). The ACG and expected-violation (Llobet) calculation are
     identical to the MATLAB implementation.
+
+    The maximum confidence and pass/fail come from the per-tau_r confidence at
+    the contamination threshold; the minimum confirmable contamination
+    (``min_cont``) is computed analytically (closed-form, no contamination grid).
+    For the full confidence matrix, call computeMatrix() directly.
+
+    Returns
+    -------
+    max_conf : float      maximum confidence (%) that contamination < cont_thresh
+    min_cont : float      minimum contamination (%) confirmable at conf_thresh
+                          (continuous; NaN if > 35%)
+    rp_min_val : float    tau_r (s) at which min_cont is achieved
+    n_spikes_below2 : int ACG count with ISI < 2 ms
+    firing_rate : float   n_spikes / recDur
+    pass_cont_thresh : bool   max_conf > conf_thresh
+    pass_forced : bool    IBL-specific: force-pass low-rate units with 0 violations
     """
     params = dict(params) if params else {}
-    params.setdefault('sampleRate', 30000)
-    params.setdefault('binSizeCorr', 1 / params['sampleRate'])
+    sampleRate = params.setdefault('sampleRate', 30000)
+    rpBinSize = params.setdefault('binSizeCorr', 1 / sampleRate)
 
-    [confMatrix, cont, rp, nACG, firing_rate] = computeMatrix(spikeTimes, params)
-    # Legacy: PASS, minContWith90Confidence, timeOfLowestCont
-    pass_cont_thresh, min_cont, rp_min_val = \
-        pass_slidingRP_confmat(confMatrix, cont, rp, conf_thresh, cont_thresh, rp_reject)
+    spikeTimes = np.asarray(spikeTimes, dtype=np.float64)
+    n_spikes = spikeTimes.size
+    recDur = params.get('recDur', None)
+    if recDur is None:
+        recDur = float(np.max(spikeTimes)) if n_spikes else 0.0
 
-    # Legacy 'maxConfidenceAt10Cont'
-    max_conf, _, _ = \
-        confidence_contamin(confMatrix, cont, rp, cont_thresh, rp_reject)
+    rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
+    rp = rpEdges + rpBinSize / 2                   # bin centres (s)
+    refDur = rp + rpBinSize / 2                    # right bin edge = tested tau_r
+    nACG = computeACG(spikeTimes, rpBinSize, rp.size)
+    obsViol = np.cumsum(nACG)
+    firing_rate = n_spikes / recDur if recDur > 0 else 0.0
 
-    # Legacy
-    n_spikes_below2 = sum(nACG[0:np.where(rp > 0.002)[0][0] + 1])
+    testTimes = rp > rp_reject  # exclude tau_r below rp_reject from pass/fail
 
-    # We apply this for IBL data, that has a duration of 1h on average hence the hardcoded FR>0.5:
-    if (n_spikes_below2 == 0) and (firing_rate > 0.5) and (pass_cont_thresh is False):
-        pass_forced = True
-    else:
-        pass_forced = False
+    # Max confidence at the contamination threshold (identical to the matrix path)
+    conf_at_thresh = 100 * computeViol(obsViol, firing_rate, n_spikes, refDur,
+                                       cont_thresh / 100, recDur)
+    max_conf = float(np.max(conf_at_thresh[testTimes])) if np.any(testTimes) else 0.0
 
-    # Legacy:
-    # return maxConfidenceAt10Cont, minContWith90Confidence, timeOfLowestCont, nSpikesBelow2,
-    # confMatrix, cont, rp, nACG, firingRate, secondsElapsed
+    # Minimum confirmable contamination, computed analytically (continuous)
+    min_cont, rp_min_val = compute_min_contamination(
+        obsViol, n_spikes, refDur, rp, recDur, conf_thresh, rp_reject)
+
+    pass_cont_thresh = bool(max_conf > conf_thresh)
+
+    n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
+
+    # IBL-specific: force-pass units with zero short-ISI violations and FR > 0.5
+    # (tuned for IBL ~1 h recordings).
+    pass_forced = (n_spikes_below2 == 0) and (firing_rate > 0.5) and (not pass_cont_thresh)
+
     return max_conf, min_cont, rp_min_val, \
-        n_spikes_below2, firing_rate,\
+        n_spikes_below2, firing_rate, \
         pass_cont_thresh, pass_forced
 
 
@@ -415,6 +442,64 @@ def computeViol(obsViol, firingRate, spikeCount, refDur, contaminationProp, recD
     confidenceScore = 1 - stats.poisson.cdf(obsViol, expectedViol)
 
     return confidenceScore
+
+
+def compute_min_contamination(obsViol, spikeCount, refDur, rp, recDur,
+                              conf_thresh=90, rp_reject=0.0005, max_contam=35.0):
+    """Analytical minimum contamination confirmable at the confidence threshold.
+
+    Closed-form equivalent of scanning the contamination grid (cf. Ressmeyer's
+    analytical method, PR #6), specialised to the exact Llobet Ve. For each
+    tau_r, the critical Poisson rate at which the confidence equals conf_thresh
+    is obtained via the Poisson<->chi-squared identity:
+
+        lambda_crit = chi2.ppf(conf_thresh/100, 2*(V_o + 1)) / 2
+
+    Inverting Ve(C) = lambda_crit (Ve = 2*tau/D * C*N * ((1-C)*N + (C*N-1)/2))
+    gives the smaller root
+
+        C_min(tau) = [ (N - 0.5) - sqrt((N - 0.5)^2 - lambda_crit*D/tau) ] / N.
+
+    The unit's minimum confirmable contamination is min_tau C_min(tau) over
+    tau_r > rp_reject.
+
+    Parameters
+    ----------
+    obsViol : array       cumulative observed violations V_o(tau_r).
+    spikeCount : int      total spikes N.
+    refDur : array        tested tau_r (s) = right bin edge.
+    rp : array            bin-centre tau_r (s), used for the rp_reject mask and
+                          the returned rp_min_val.
+    recDur : float        recording duration D (s).
+    conf_thresh : float   confidence threshold (%).
+    rp_reject : float     exclude tau_r at or below this (s).
+    max_contam : float    cap (%); returns NaN if the minimum exceeds it.
+
+    Returns
+    -------
+    min_cont : float      minimum confirmable contamination (%), or NaN.
+    rp_min_val : float    tau_r (s) at which it is achieved, or NaN.
+    """
+    N = spikeCount
+    if N == 0 or recDur <= 0:
+        return np.nan, np.nan
+    gamma = conf_thresh / 100
+    lam = stats.chi2.ppf(gamma, 2 * (obsViol + 1)) / 2
+    disc = (N - 0.5) ** 2 - lam * recDur / refDur
+    Cmin = np.full(refDur.shape, np.nan)
+    ok = disc >= 0
+    Cmin[ok] = ((N - 0.5) - np.sqrt(disc[ok])) / N * 100  # as a percentage
+
+    testTimes = rp > rp_reject
+    Cmin_test = Cmin[testTimes]
+    if not np.any(testTimes) or np.all(np.isnan(Cmin_test)):
+        return np.nan, np.nan
+    idx = int(np.nanargmin(Cmin_test))
+    min_cont = float(Cmin_test[idx])
+    if min_cont > max_contam:
+        return np.nan, np.nan
+    rp_min_val = float(rp[testTimes][idx])
+    return min_cont, rp_min_val
 
 # --------
 ##

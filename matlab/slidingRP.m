@@ -45,9 +45,9 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %     confidence       - Maximum confidence (%) that contamination is below
 %                        contaminationThresh, across all tested tau_r.
 %     contamination    - Minimum contamination level (%) confirmable at
-%                        confidenceThresh. NaN if no level within the tested
-%                        range (0.5–35%) reaches the required confidence
-%                        (implying contamination is likely > 35%).
+%                        confidenceThresh, computed analytically (continuous,
+%                        not grid-rounded). NaN if it exceeds 35% (implying
+%                        contamination is likely > 35%).
 %     timeOfLowestCont - tau_r (seconds) at which minimum contamination is
 %                        achieved. This is an estimate of the unit's true RP
 %                        duration. NaN when contamination is NaN.
@@ -55,7 +55,9 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %                        Useful for identifying low-firing-rate units that
 %                        failed only because of insufficient statistical
 %                        power (nViolShort == 0 means no observed violations).
-%     confMatrix       - [nCont x nRP] confidence matrix. See computeMatrix.
+%     confMatrix       - [nCont x nRP] confidence matrix, built only when this
+%                        output is requested (nargout >= 6); [] otherwise. The
+%                        scalar metrics above never require it. See computeMatrix.
 %     cont             - Vector of contamination levels tested (%).
 %     rp               - Vector of tau_r values tested (seconds).
 %     nACG             - ACG counts at each tau_r (counts per bin).
@@ -87,27 +89,40 @@ else
     rpReject = 0.0005;
 end
 
-[confMatrix, cont, rp, nACG] = computeMatrix(spikeTimes, params);
-% confMatrix is [nCont x nRP]
+% ---- Recording duration and ACG parameters ------------------------------
+if isfield(params, 'recDur');     recDur     = params.recDur;     else; recDur     = max(spikeTimes); end
+if isfield(params, 'acgBinSize'); acgBinSize = params.acgBinSize; else; acgBinSize = 1/30000;          end
+if isfield(params, 'testWindow'); testWindow = params.testWindow; else; testWindow = 0.01;             end
+
+spikeCount = numel(spikeTimes);
+rpEdges    = 0:acgBinSize:testWindow;
+[nACG, rp] = histdiff(spikeTimes, spikeTimes, rpEdges);
+obsViol    = cumsum(nACG);          % cumulative observed violations up to each tau_r
+refDur     = rp + acgBinSize/2;     % right bin edge = tested tau_r
 
 % Exclude tau_r bins below rpReject from pass/fail decisions
 testTimes = rp > rpReject;
 
-% Maximum confidence at the user-defined contamination threshold
-confidence = max(confMatrix(find(cont >= contThresh, 1), testTimes));
+% Maximum confidence at the user-defined contamination threshold. This is the
+% same quantity computeMatrix would give at the contThresh row, but computed as
+% a single vector over tau_r (no full contamination grid needed).
+confAtThresh = 100 * computeViol(obsViol, [], spikeCount, refDur, contThresh/100, recDur);
+confidence = max(confAtThresh(testTimes));
 
-% Minimum contamination that can be confirmed at confThresh
-[ii, ~] = find(confMatrix(:, testTimes) > confThresh);
-[minI, ~] = min(ii);
-contamination = cont(minI);
-if isempty(contamination); contamination = NaN; end
+% Minimum contamination confirmable at confThresh, computed analytically
+% (continuous; equivalent to the grid search to within grid resolution).
+[contamination, timeOfLowestCont] = computeMinContamination(...
+    obsViol, spikeCount, refDur, rp, recDur, confThresh, rpReject);
 
-% tau_r at which minimum contamination is achieved (RP duration estimate)
-[~, minRP] = max(confMatrix(minI, testTimes));
-timeOfLowestCont = rp(minRP + find(testTimes, 1) - 1);
-if isempty(timeOfLowestCont); timeOfLowestCont = NaN; end
-
-% Count short-ISI spikes (legacy diagnostic for low-rate units)
+% Count short-ISI spikes (diagnostic for low-rate units)
 nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
 
 passTest = confidence > confThresh;
+
+% Full confidence matrix is only built when the caller requests it (outputs
+% 6-7). The scalar metrics above never need it.
+confMatrix = [];
+cont = [];
+if nargout >= 6
+    [confMatrix, cont, rp, nACG] = computeMatrix(spikeTimes, params);
+end

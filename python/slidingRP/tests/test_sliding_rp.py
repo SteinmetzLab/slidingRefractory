@@ -6,12 +6,13 @@ from pathlib import Path
 TEST_DATA_PATH = Path(__file__).parents[3].joinpath('test-data', 'unit')
 
 # Expected (max_confidence, min_contamination, rp_min_val, n_spikes_below2).
-# These values now match the authoritative MATLAB implementation bit-for-bit
-# (verified 2026-06-16); the Python ACG and Llobet Ve were aligned to MATLAB.
+# max_confidence matches the authoritative MATLAB bit-for-bit (aligned ACG +
+# Llobet Ve). min_contamination is the analytical (continuous) value, so it is
+# slightly finer than the old grid value (e.g. 275: 18.79% vs grid 19.0%).
 EXPECTED = {
-    167: (0.5301414775441771, np.nan, np.nan, 0),                     # FAIL
-    274: (100.0, 0.5, 0.00115, 2),                                    # PASS
-    275: (27.431935653278614, 19.0, 0.0005166666666666667, 104),     # FAIL
+    167: (0.5301414775441771, np.nan, np.nan, 0),                          # FAIL
+    274: (100.0, 0.45589321559088186, 0.00115, 2),                         # PASS
+    275: (27.431935653278614, 18.791267520321732, 0.0005166666666666667, 104),  # FAIL
 }
 
 
@@ -65,3 +66,24 @@ def test_multi_clusters():
                                        table['min_contamination'][i],
                                        table['rp_min_val'][i],
                                        table['n_spikes_below2'][i]))
+
+
+def test_analytical_matches_grid_and_matrix():
+    # Cross-check the fast analytical path against the full confidence matrix:
+    # (a) max confidence equals the matrix value at the contamination-threshold
+    #     row; (b) analytical min contamination matches the grid within the
+    #     0.5% grid resolution.
+    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+    st = spikes_times[spikes_clusters == 275]
+    max_conf, min_cont = metrics.slidingRP(st)[:2]
+
+    confMatrix, cont, rp, _, _ = metrics.computeMatrix(st, {'sampleRate': 30000})
+    test = rp > 0.0005
+    # (a) confidence
+    conf_from_matrix = np.max(confMatrix[np.where(cont >= 10)[0][0], test])
+    assert max_conf == pytest.approx(conf_from_matrix, abs=1e-9)
+    # (b) contamination within grid resolution
+    rows = np.where(confMatrix[:, test] > 90)[0]
+    grid_min_cont = cont[rows.min()]
+    assert abs(min_cont - grid_min_cont) <= 0.5
