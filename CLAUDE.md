@@ -52,7 +52,6 @@ twine upload dist/*
 **Sub-packages:**
 - `data_access/` — Lab-specific loaders (IBL via `one.api`, Steinmetz lab).
 - `elts/` — Transforms from ACGs to refractory periods for low-temporal-resolution data.
-- `scripts/` — Analysis scripts for paper figures and example usage.
 - `tests/` — Unit tests; test data lives in `test-data/unit/` and `test-data/integration/`.
 
 **MATLAB implementation** in `matlab/` mirrors the Python logic. `slidingRP_all.m` is the entry point; `slidingRP.m` handles single clusters.
