@@ -289,8 +289,10 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
 
     # IBL-specific: force-pass units with zero short-ISI violations and FR > 0.5
-    # (tuned for IBL ~1 h recordings).
-    pass_forced = (n_spikes_below2 == 0) and (firing_rate > 0.5) and (not pass_cont_thresh)
+    # (tuned for IBL ~1 h recordings). Opt-in only (default off), matching the
+    # correction path and the docstring.
+    pass_forced = params.get('forcePass', False) and (n_spikes_below2 == 0) \
+        and (firing_rate > 0.5) and (not pass_cont_thresh)
 
     return max_conf, min_cont, rp_min_val, \
         n_spikes_below2, firing_rate, \

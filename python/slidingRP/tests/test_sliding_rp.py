@@ -101,3 +101,35 @@ def test_correction_option():
     confMatrix, cont, rp, _, _ = metrics.computeMatrix(
         st, {'sampleRate': 30000, 'correction': True})
     assert confMatrix.shape == (len(cont), len(rp))
+
+
+def _force_pass_candidate():
+    """Spike train that hits the force-pass branch: no ISI < 2 ms, firing_rate
+    > 0.5, and fails the standard sliding RP test (too few spikes for power).
+    Regular ~1 Hz train over 10 min, all ISIs > 3 ms."""
+    st = np.cumsum(np.full(600, 1.0))  # deterministic 1 Hz, ISI = 1 s
+    return st, {'recDur': 600.0}
+
+
+def test_force_pass_is_gated_by_param():
+    # pass_forced must be False unless params['forcePass'] is True, in both the
+    # default and the correction code paths (see docstring). The pass_forced
+    # flag is the 7th (last) return value.
+    st, params = _force_pass_candidate()
+
+    # Sanity: this train is a genuine force-pass candidate (fails, no short ISI,
+    # FR > 0.5) — otherwise the test would pass vacuously.
+    max_conf, _, _, n_below2, fr, passed, _ = metrics.slidingRP(st, params=params)
+    assert not passed and n_below2 == 0 and fr > 0.5
+
+    # Default (no forcePass key) and explicit forcePass=False: must NOT force-pass.
+    assert metrics.slidingRP(st, params=params)[6] is False
+    assert metrics.slidingRP(st, params={**params, 'forcePass': False})[6] is False
+
+    # Opt-in: forcePass=True flags the candidate.
+    assert metrics.slidingRP(st, params={**params, 'forcePass': True})[6] is True
+
+    # Same gating on the correction path.
+    assert metrics.slidingRP(st, params={**params, 'correction': True})[6] is False
+    assert metrics.slidingRP(
+        st, params={**params, 'correction': True, 'forcePass': True})[6] is True
