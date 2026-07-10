@@ -59,12 +59,15 @@ the `slidingRP` docstring for the mapping.)
 pytest python/slidingRP/tests/
 ```
 
-### Upload package to PyPI
+### Build and upload package to PyPI
+Packaging metadata lives in `pyproject.toml` (version, dependencies). Bump the
+`version` there first, then:
 ```commandline
-rm -fR dist && rm -fR build
-python setup.py sdist bdist_wheel
+rm -fR dist build
+python -m build
 twine upload dist/*
 ```
+(`python -m build` needs the `build` package: `pip install build twine`.)
 
 ---
 
