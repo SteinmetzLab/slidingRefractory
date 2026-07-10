@@ -65,7 +65,7 @@ twine upload dist/*
 **Data flow:**
 ```
 Spike times + Cluster IDs
-  → ACG via phylib.stats.correlograms (bin size 1/30000 s, window 0–10 ms)
+  → ACG via computeACG() (histdiff-equivalent, bin size 1/30000 s, window 0–10 ms)
   → For each (τ_r, C) pair in the confidence matrix:
       V_e = 2τ_r × N_c × (N_b + (N_c−1)/2) / D   [Llobet formulation]
       V_o = cumsum(ACG up to τ_r)
@@ -99,6 +99,6 @@ Used to characterize RP durations for comparison across datasets (Fig. 1), not p
 
 ### Dependencies
 
-Required: `numpy`, `scipy`, `matplotlib`, `colorcet`, `statsmodels`, `phylib` (for `phylib.stats.correlograms`)
+Required: `numpy`, `scipy`, `matplotlib`, `colorcet`, `statsmodels`
 
-Optional: `one.api`, `brainbox` (IBL-specific data access)
+Optional (`[ibl]` extra): `ONE-api`, `ibllib`, `phylib` (IBL-specific data access in `data_access/`, `loadSaveData.py`, `elts/`). The core metric computes its ACG with the in-package `computeACG()` and no longer depends on `phylib`.
