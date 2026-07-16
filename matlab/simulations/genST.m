@@ -1,10 +1,33 @@
 
 
 function st = genST(rate, duration, varargin)
-% function st = genST(rate, duration[, refractoryPeriod])
+% GENST  Generate a simulated spike train (Poisson, optionally with a hard RP).
 %
-% generates a spike train with specified rate and duration. Rate and
-% duration should have the same units. 
+%   st = genST(rate, duration)
+%   st = genST(rate, duration, refractoryPeriod)
+%
+%   Draws inter-spike intervals as refractoryPeriod + Exponential(mu) and
+%   returns their cumulative sum (spike times). The exponential mean mu is
+%   rate-corrected so that, despite the dead time imposed by the refractory
+%   period, the realised total rate still equals `rate`:
+%
+%       rSim = rate / (1 - refractoryPeriod*rate);   mu = 1/rSim
+%
+%   This matches the simulation in Roth et al. (2026), Methods ("Spike train
+%   simulations"): I = P + exprnd(mu), mu = (1 - P*R)/R. To build a
+%   contaminated train, call once for the base neuron (with its RP) and once
+%   for the contamination (refractoryPeriod = 0), then concatenate and sort.
+%
+%   INPUTS
+%     rate            - Desired total firing rate (same time units as duration).
+%     duration        - Recording duration.
+%     refractoryPeriod - (optional) Hard refractory period; default 0.
+%
+%   OUTPUT
+%     st - Column vector of spike times in [0, duration), in the same units.
+%
+%   NOTE: spike times are continuous reals, not quantised to a sample grid.
+%   See also genST.m in python/slidingRP/simulations.py for the Python twin.
 
 if nargin<3
     refPeriod = 0;
@@ -33,6 +56,12 @@ st = cumsum(isi); % convert to spike times
 st = st(1:find(st<duration,1,'last')); %cut all the ones that we don't need
 
 return;
+
+% ------------------------------------------------------------------------
+% The cells below are unreachable (after the return above). They are kept as
+% manual sanity checks: copy a cell into the command window to confirm the
+% realised rate matches the requested rate and the ISI/ACG look correct.
+% ------------------------------------------------------------------------
 
 %% test code
 

@@ -109,29 +109,32 @@ end
 % ---- Pre-slice spike times by cluster ------------------------------------
 %   Indexing into the full spikeTimes/spikeClusters arrays inside a parfor
 %   would broadcast the entire arrays to every worker. Pre-slicing into a
-%   cell array makes each element a proper sliced variable.stCell = cell(numel(cids), 1);
+%   cell array makes each element a proper sliced variable.
+stCell = cell(numel(cids), 1);
 for cidx = 1:numel(cids)
     stCell{cidx} = spikeTimes(spikeClusters == cids(cidx));
 end
 
 % ---- Main loop -----------------------------------------------------------
 parfor (cidx = 1:numel(cids), nWorkers)
-    st = stCell{cidx};   
-    
-    [passTest, confidence, contamination, timeOfLowestCont,...
-        nViolShort, confMatrix, cont, rp, nACG] ...
-        = slidingRP(st, params);
-    
+    st = stCell{cidx};
+
+    % Request the confidence matrix (output 6) only when needed, so slidingRP
+    % uses its fast analytical path otherwise.
+    if returnMatrix
+        [passTest, confidence, contamination, timeOfLowestCont, ~, confMatrix] ...
+            = slidingRP(st, params);
+    else
+        [passTest, confidence, contamination, timeOfLowestCont] = slidingRP(st, params);
+        confMatrix = [];
+    end
+
     s = struct();
     s.cid = cids(cidx);
     s.confidence = confidence;
     s.contamination = contamination;
     s.timeOfLowestCont = timeOfLowestCont;
-
-    s.confMatrix = [];
-    if returnMatrix
-        s.confMatrix = confMatrix;
-    end
+    s.confMatrix = confMatrix;
     
     rpMetrics(cidx) = s;   
     

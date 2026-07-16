@@ -15,3 +15,10 @@ dist/
 *.png
 *.ai
 *.zip
+
+# review scratch / verification artifacts
+scratch.py
+_figcheck/
+*.tmp.*
+_manuscript_text.txt
+_*.npy

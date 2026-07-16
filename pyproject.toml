@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slidingRP"
+version = "2.0.0"
+description = "Quality metric from spike trains"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Noam Roth" },
+    { name = "Gaelle Chapuis" },
+    { name = "Olivier Winter" },
+    { name = "Steinmetz Lab" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+# Core algorithm (metrics.py) needs only numpy + scipy; matplotlib/colorcet
+# power the plotting helpers and statsmodels the simulation confidence bands.
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "colorcet",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+# IBL-specific data access (loadSaveData.py, spike_sorting_benchmark.py).
+ibl = ["ONE-api", "ibllib", "phylib"]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/SteinmetzLab/slidingRefractory"
+"Bug Tracker" = "https://github.com/SteinmetzLab/slidingRefractory/issues"
+
+[tool.setuptools]
+package-dir = { "" = "python" }
+
+[tool.setuptools.packages.find]
+where = ["python"]

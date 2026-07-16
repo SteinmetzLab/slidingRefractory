@@ -1,20 +1,42 @@
 import numpy as np
+import pytest
 from slidingRP import metrics
 from pathlib import Path
 
 TEST_DATA_PATH = Path(__file__).parents[3].joinpath('test-data', 'unit')
 
+# Expected (max_confidence, min_contamination, rp_min_val, n_spikes_below2).
+# max_confidence matches the authoritative MATLAB bit-for-bit (aligned ACG +
+# Llobet Ve). min_contamination is the analytical (continuous) value, so it is
+# slightly finer than the old grid value (e.g. 275: 18.79% vs grid 19.0%).
 EXPECTED = {
-    167: (0.7968085162939342, np.nan, np.nan, 0),  # FAIL
-    274: (100.0, 0.5, 0.0011833333333333333, 2),   # PASS
-    275: (53.88397133550098, 15.0, 0.0005166666666666667, 99),  # FAIL
+    167: (0.5301414775441771, np.nan, np.nan, 0),                          # FAIL
+    274: (100.0, 0.45589321559088186, 0.00115, 2),                         # PASS
+    275: (27.431935653278614, 18.791267520321732, 0.0005166666666666667, 104),  # FAIL
 }
 
 
+def _assert_matches_expected(clu, out4):
+    """Compare a (max_conf, min_cont, rp_min_val, n_below2) tuple to EXPECTED,
+    handling NaNs and floating-point tolerance."""
+    exp = EXPECTED[clu]
+    max_conf, min_cont, rp_min_val, n_below2 = out4
+    assert max_conf == pytest.approx(exp[0], abs=1e-9)
+    if np.isnan(exp[1]):
+        assert np.isnan(min_cont)
+    else:
+        assert min_cont == pytest.approx(exp[1], abs=1e-9)
+    if np.isnan(exp[2]):
+        assert np.isnan(rp_min_val)
+    else:
+        assert rp_min_val == pytest.approx(exp[2], abs=1e-9)
+    assert int(n_below2) == exp[3]
+
+
 def generate_test_data():
-    #  167: FAIL max conf = 0.80%, min cont = nan%, time = nan ms, n below 2 ms = 0
-    #  274: PASS max conf = 100.00%, min cont = 0.5%, time = 1.22 ms, n below 2 ms = 2
-    #  275: FAIL max conf = 53.88%, min cont = 15.0%, time = 0.55 ms, n below 2 ms = 99
+    #  167: FAIL max conf = 0.53%, min cont = nan%, time = nan ms, n below 2 ms = 0
+    #  274: PASS max conf = 100.00%, min cont = 0.5%, time = 1.15 ms, n below 2 ms = 2
+    #  275: FAIL max conf = 27.43%, min cont = 19.0%, time = 0.52 ms, n below 2 ms = 104
     from brainbox.io.one import SpikeSortingLoader
     from one.api import ONE
     pid = 'ce397420-3cd2-4a55-8fd1-5e28321981f4'
@@ -29,20 +51,85 @@ def generate_test_data():
 def test_single_cluster():
     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
-    params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
     for clu in np.unique(spikes_clusters):
         sel = spikes_clusters == clu
-        out = metrics.slidingRP(spikes_times[sel], params=params)
-        assert EXPECTED[clu] == out[:4]
+        out = metrics.slidingRP(spikes_times[sel])
+        _assert_matches_expected(clu, out[:4])
 
 
 def test_multi_clusters():
     spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
     spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
-    params = {'sampleRate': 30000, 'binSizeCorr': 1 / 30000}
-    table = metrics.slidingRP_all(spikes_times, spikes_clusters, params=params)
+    table = metrics.slidingRP_all(spikes_times, spikes_clusters)
     for i, clu in enumerate(table['cidx']):
-        assert EXPECTED[clu] == (table['max_confidence'][i],
-                                 table['min_contamination'][i],
-                                 table['rp_min_val'][i],
-                                 table['n_spikes_below2'][i])
+        _assert_matches_expected(clu, (table['max_confidence'][i],
+                                       table['min_contamination'][i],
+                                       table['rp_min_val'][i],
+                                       table['n_spikes_below2'][i]))
+
+
+def test_analytical_matches_grid_and_matrix():
+    # Cross-check the fast analytical path against the full confidence matrix:
+    # (a) max confidence equals the matrix value at the contamination-threshold
+    #     row; (b) analytical min contamination matches the grid within the
+    #     0.5% grid resolution.
+    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+    st = spikes_times[spikes_clusters == 275]
+    max_conf, min_cont = metrics.slidingRP(st)[:2]
+
+    confMatrix, cont, rp, _, _ = metrics.computeMatrix(st, {'sampleRate': 30000})
+    test = rp > 0.0005
+    # (a) confidence
+    conf_from_matrix = np.max(confMatrix[np.where(cont >= 10)[0][0], test])
+    assert max_conf == pytest.approx(conf_from_matrix, abs=1e-9)
+    # (b) contamination within grid resolution
+    rows = np.where(confMatrix[:, test] > 90)[0]
+    grid_min_cont = cont[rows.min()]
+    assert abs(min_cont - grid_min_cont) <= 0.5
+
+
+def test_correction_option():
+    # The FWER correction is available as a flag (off by default) and is more
+    # conservative: corrected confidence <= standard confidence.
+    spikes_times = np.load(TEST_DATA_PATH.joinpath('spikes.times.npy'))
+    spikes_clusters = np.load(TEST_DATA_PATH.joinpath('spikes.clusters.npy'))
+    st = spikes_times[spikes_clusters == 275]
+    conf_std = metrics.slidingRP(st)[0]
+    conf_corr = metrics.slidingRP(st, params={'correction': True})[0]
+    assert conf_corr <= conf_std + 1e-9
+    confMatrix, cont, rp, _, _ = metrics.computeMatrix(
+        st, {'sampleRate': 30000, 'correction': True})
+    assert confMatrix.shape == (len(cont), len(rp))
+
+
+def _force_pass_candidate():
+    """Spike train that hits the force-pass branch: no ISI < 2 ms, firing_rate
+    > 0.5, and fails the standard sliding RP test (too few spikes for power).
+    Regular ~1 Hz train over 10 min, all ISIs > 3 ms."""
+    st = np.cumsum(np.full(600, 1.0))  # deterministic 1 Hz, ISI = 1 s
+    return st, {'recDur': 600.0}
+
+
+def test_force_pass_is_gated_by_param():
+    # pass_forced must be False unless params['forcePass'] is True, in both the
+    # default and the correction code paths (see docstring). The pass_forced
+    # flag is the 7th (last) return value.
+    st, params = _force_pass_candidate()
+
+    # Sanity: this train is a genuine force-pass candidate (fails, no short ISI,
+    # FR > 0.5) — otherwise the test would pass vacuously.
+    max_conf, _, _, n_below2, fr, passed, _ = metrics.slidingRP(st, params=params)
+    assert not passed and n_below2 == 0 and fr > 0.5
+
+    # Default (no forcePass key) and explicit forcePass=False: must NOT force-pass.
+    assert metrics.slidingRP(st, params=params)[6] is False
+    assert metrics.slidingRP(st, params={**params, 'forcePass': False})[6] is False
+
+    # Opt-in: forcePass=True flags the candidate.
+    assert metrics.slidingRP(st, params={**params, 'forcePass': True})[6] is True
+
+    # Same gating on the correction path.
+    assert metrics.slidingRP(st, params={**params, 'correction': True})[6] is False
+    assert metrics.slidingRP(
+        st, params={**params, 'correction': True, 'forcePass': True})[6] is True

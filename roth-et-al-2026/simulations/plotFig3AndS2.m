@@ -323,7 +323,7 @@ for rr = 1:numel(theseFR)
     end
 end
 
-colors = myCopper(0.1, numel(allFR)+1);
+colors = myCopper(0.1, numel(theseFR)+1);
 colors = colors(2:end,:);
 
 passPct = zeros(numel(theseCont),1); passCI = zeros(numel(theseCont),2); 
