@@ -307,6 +307,29 @@ def _slidingRP_worker(args):
                      cont_thresh=cont_thresh, rp_reject=rp_reject)
 
 
+def _group_by_cluster(spikeTimes, spikeClusters):
+    """Split spike times into one sorted array per cluster.
+
+    A comprehension of boolean masks (``[spikeTimes[spikeClusters == c] for c in cids]``)
+    walks the whole recording once per cluster, so the cost grows as
+    n_clusters x n_spikes: on a 630-cluster, 8-million-spike Neuropixels shank that is
+    ~5e9 element comparisons before any metric is computed. Sorting once and slicing is
+    O(n log n) regardless of cluster count.
+
+    :param spikeTimes: array of spike times (s)
+    :param spikeClusters: array of cluster ids, same length as spikeTimes
+    :return: (cids, list of per-cluster spike-time arrays, each ascending)
+    """
+    order = np.argsort(spikeClusters, kind='stable')
+    clusters_sorted = spikeClusters[order]
+    times_sorted = spikeTimes[order]
+    cids, starts = np.unique(clusters_sorted, return_index=True)
+    ends = np.append(starts[1:], len(clusters_sorted))
+    # spikeTimes is normally already ascending, but a stable argsort on the cluster ids
+    # only guarantees that within a cluster if it was; sort each slice to be safe.
+    return cids, [np.sort(times_sorted[a:b]) for a, b in zip(starts, ends)]
+
+
 def slidingRP_all(spikeTimes, spikeClusters, params=None,
                   conf_thresh=90, cont_thresh=10, rp_reject=0.0005, n_jobs=1):
     """Compute the Sliding RP metric for every cluster in a recording.
@@ -321,9 +344,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params=None,
     :return: dictionary of per-cluster metrics
     """
 
-    cids = np.unique(spikeClusters)
-    # Pre-slice spikes per cluster (avoids re-scanning the full arrays per task).
-    sts = [spikeTimes[spikeClusters == c] for c in cids]
+    cids, sts = _group_by_cluster(spikeTimes, spikeClusters)
 
     if n_jobs is not None and n_jobs != 1 and len(cids) > 1:
         from concurrent.futures import ProcessPoolExecutor
