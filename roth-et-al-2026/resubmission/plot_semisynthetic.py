@@ -49,7 +49,7 @@ def main():
         ax.plot(f, np.array(y) * 100, "o-", color=c, ms=4, label=lab)
     ax.axvline(10, color="0.6", ls="--", lw=1)
     ax.set_xlabel("Injected contamination (%)")
-    ax.set_ylabel("Units passing (%)")
+    ax.set_ylabel("Units accepted (%)")
     ax.set_title("a  Semi-synthetic injection", loc="left")
     ax.legend()
 
@@ -99,7 +99,7 @@ def main():
                     xytext=(0, 7), ha="center", fontsize=6.5)
     ax.axvline(0, color="0.6", ls=":", lw=1)
     ax.set_xlabel("Rate correlation, 100 ms bins")
-    ax.set_ylabel("Units passing (%) at 10% injected")
+    ax.set_ylabel("Units accepted (%) at 10% injected")
     ax.set_title("d  Correlation shifts the decision", loc="left")
 
     fig.tight_layout()
@@ -110,11 +110,11 @@ def main():
              "=" * 60, "",
              f"{d.recipient.nunique()} recipient units over {d.pid.nunique()} probe "
              f"insertions; {len(d):,} injected trains.",
-             "Recipients were required to pass Sliding RP at a strict setting",
+             "Recipients were required to be accepted by Sliding RP at a strict setting",
              "(5% contamination, 99% confidence) and fire at least 2 spikes/s,",
              "so they are clean by construction with a quantified baseline",
              f"(median C_min {base:.2f}%).", "",
-             "Pass rate against injected contamination:", ""]
+             "Acceptance rate against injected contamination:", ""]
     lines.append(f"{'injected':>9} {'Sliding RP':>11} {'HL 2 ms':>9} {'HL 3 ms':>9} "
                  f"{'C_min median':>13}")
     for v in f:
@@ -125,7 +125,7 @@ def main():
     z = d[d.f_injected == 0]
     lines += ["",
               "The uncontaminated row is the striking one: on units that are clean",
-              f"by construction, Sliding RP passes {z.passes.mean():.0%} while",
+              f"by construction, Sliding RP accepts {z.passes.mean():.0%} while",
               f"Hill-Llobet rejects {1-z.hl2_pass.mean():.0%} of them at 2 ms and",
               f"{1-z.hl3_pass.mean():.0%} at 3 ms. Their median firing rate is",
               f"{z.fr_recipient.median():.1f} spikes/s, so this is not a low-power effect:",
@@ -144,13 +144,13 @@ def main():
     lines += ["",
               "Effect of that correlation at 10% injected contamination:", ""]
     for b, g in at.groupby("bin", observed=True):
-        lines.append(f"  r in {str(b):16s} n={len(g):4d}  passing "
+        lines.append(f"  r in {str(b):16s} n={len(g):4d}  accepted "
                      f"{g.passes.mean()*100:5.1f}%  C_min median {g.min_cont.median():5.2f}%")
     lines += ["",
               "This is the assumption of uncorrelated rates being tested directly on",
               "real data, and it matters: over a correlation range of only about",
               "-0.1 to +0.2, which is entirely ordinary for neighbouring neurons,",
-              "the pass rate for identically contaminated units runs from 69% down",
+              "the acceptance rate for identically contaminated units runs from 69% down",
               "to 21%, and the contamination estimate from 8.4% to 13.9%. Negative",
               "correlation hides contamination and positive correlation makes the",
               "test conservative, exactly as the Discussion predicts, but the effect",

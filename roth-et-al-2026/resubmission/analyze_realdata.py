@@ -44,7 +44,7 @@ def main():
     lines.append(f"All units {len(df):,}; sorter-accepted {len(acc):,}")
 
     # --- 1. pass rates by dataset x region --------------------------------
-    lines += ["", "Pass rates by dataset and region (sorter-accepted units)", ""]
+    lines += ["", "Acceptance rates by dataset and region (sorter-accepted units)", ""]
     rows = []
     for (ds, reg), g in acc[acc.cosmos.isin(REGIONS)].groupby(["dataset", "cosmos"]):
         if len(g) < 50:
@@ -62,7 +62,7 @@ def main():
     pr.to_csv(OUTDIR / "pass_rates.csv", index=False)
 
     # --- 2. distribution of the selected tau_r ----------------------------
-    lines += ["", "Selected tau_r for passing units (ms)", ""]
+    lines += ["", "Selected tau_r for accepted units (ms)", ""]
     p = acc[acc.passes]
     for (ds, reg), g in p[p.cosmos.isin(REGIONS)].groupby(["dataset", "cosmos"]):
         if len(g) < 50:
@@ -85,17 +85,17 @@ def main():
         fz = g.first_nonzero_bin.replace(-1, np.nan) / 30.0   # ms
         lines.append(f"  {ds:10s} first nonzero ACG bin: median {fz.median():.3f} ms, "
                      f"{np.mean(fz > 0.5):.1%} of units above 0.5 ms")
-    lines += ["", "Pass rate as tau_min is raised (sorter-accepted units)", ""]
+    lines += ["", "Acceptance rate as tau_min is raised (sorter-accepted units)", ""]
     hdr = f"  {'dataset':10s} " + " ".join(f"{t:>6.2f}ms" for _, t in TAU_MIN_COLS)
     lines.append(hdr)
     for ds, g in acc.groupby("dataset"):
         vals = [g[c].mean() if c in g else np.nan for c, _ in TAU_MIN_COLS]
         lines.append(f"  {ds:10s} " + " ".join(f"{v:>8.3f}" for v in vals))
-    lines.append("  (a large drop from 0.5 to 1.0 ms would mean many passes rely on "
+    lines.append("  (a large drop from 0.5 to 1.0 ms would mean many acceptances rely on "
                  "the 0.5-1 ms window, where sorter duplicate-removal acts)")
 
     # --- 4. selection bias by firing rate (Reviewer 1) --------------------
-    lines += ["", "Who gets excluded: failures with vs without observed violations", ""]
+    lines += ["", "Who gets excluded: rejections with vs without observed violations", ""]
     for (ds, reg), g in acc[acc.cosmos.isin(REGIONS)].groupby(["dataset", "cosmos"]):
         if len(g) < 50:
             continue
@@ -105,7 +105,7 @@ def main():
         lines.append(
             f"  {ds:10s} {reg:10s} fail {len(fail):6,}/{len(g):6,} "
             f"({len(fail)/len(g):.1%}); of failures, {clean_fail:.1%} had no "
-            f"violation below 2 ms and {underpowered:.1%} could not have passed "
+            f"violation below 2 ms and {underpowered:.1%} could not have been accepted "
             f"at any tau_r")
 
     # --- figure ------------------------------------------------------------
@@ -121,8 +121,8 @@ def main():
         ax.set_xticks(x)
         ax.set_xticklabels([f"{r.dataset}\n{r.region}" for r in pr.itertuples()],
                            fontsize=6.5)
-        ax.set_ylabel("Proportion of units passing")
-        ax.set_title("a  Pass rates by dataset and region", loc="left")
+        ax.set_ylabel("Proportion of units accepted")
+        ax.set_title("a  Acceptance rates by dataset and region", loc="left")
         ax.legend()
 
     ax = axs[0, 1]
@@ -137,7 +137,7 @@ def main():
     ax.axvline(0.5, color="0.5", ls=":", lw=1)
     ax.set_xscale("log")
     ax.set_xlabel("Selected refractory duration, tau_Cmin (ms)")
-    ax.set_ylabel("Proportion of passing units")
+    ax.set_ylabel("Proportion of accepted units")
     ax.set_title("b  Where the metric finds its best window", loc="left")
     ax.legend()
 
@@ -146,7 +146,7 @@ def main():
         vals = [g[c].mean() if c in g else np.nan for c, _ in TAU_MIN_COLS]
         ax.plot([t for _, t in TAU_MIN_COLS], vals, "o-", ms=4, label=ds)
     ax.set_xlabel("tau_min (ms)")
-    ax.set_ylabel("Proportion of units passing")
+    ax.set_ylabel("Proportion of units accepted")
     ax.set_title("c  Sensitivity to the short-lag exclusion", loc="left")
     ax.legend()
 
@@ -166,8 +166,8 @@ def main():
         ax.plot(xs, ys, "o-", ms=3.5, color=plotstyle.REGION_COLORS[reg], label=reg)
     ax.set_xscale("log")
     ax.set_xlabel("Firing rate (spikes/s)")
-    ax.set_ylabel("Proportion passing")
-    ax.set_title("d  Pass rate depends strongly on firing rate", loc="left")
+    ax.set_ylabel("Proportion accepted")
+    ax.set_title("d  Acceptance rate depends strongly on firing rate", loc="left")
     ax.legend()
 
     fig.tight_layout()

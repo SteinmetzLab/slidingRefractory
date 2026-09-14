@@ -220,7 +220,7 @@ def main():
     inc.to_parquet(OUT_TABLE)
 
     lines += ["", "Median estimated ACG recovery time by dataset and region",
-              "(common inclusion rule, Sliding RP pass)", ""]
+              "(common inclusion rule, accepted by Sliding RP)", ""]
     st = group_stats(inc)
     st = st[st.cosmos.isin(REGIONS)].sort_values(["dataset", "cosmos"])
     lines.append(st.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
@@ -245,8 +245,8 @@ def main():
 
     lines += ["", "Diagnostic 3: do the conclusions survive a common inclusion rule?"]
     for name, sel in (("submitted mouse rule", sel_mouse_rule),
-                      ("common rule, no pass filter", sel_common),
-                      ("common rule + pass filter", sel_common_pass)):
+                      ("common rule, no acceptance filter", sel_common),
+                      ("common rule + acceptance filter", sel_common_pass)):
         g = df[sel]
         meds = g[g.cosmos.isin(REGIONS)].groupby("cosmos").rp_ms_10.median()
         lines.append(f"  {name:28s} " +

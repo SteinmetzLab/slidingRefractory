@@ -146,10 +146,15 @@ def main():
         ax.set_title("f  Power cost of the correction", loc="left")
         ax.legend()
     else:
-        for i, msg in ((1, "corrected.pqt not yet written"), (2, "")):
-            ax = fig.add_subplot(gs[1, i])
-            ax.text(0.5, 0.5, msg, ha="center", va="center", fontsize=8)
-            ax.axis("off")
+        ax = fig.add_subplot(gs[1, 1:])
+        ax.text(0.5, 0.5,
+                "e, f  FWER-corrected test\n(simulation still running)",
+                ha="center", va="center", fontsize=9, color="0.45")
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_visible(True)
+            sp.set_color("0.85")
+            sp.set_linestyle((0, (4, 4)))
 
     plotstyle.save(fig, FIGS / "calibration")
 

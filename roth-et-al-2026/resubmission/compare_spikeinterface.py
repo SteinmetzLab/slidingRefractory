@@ -120,10 +120,10 @@ def main():
              "re-binning the same autocorrelograms so only the bin width differs.",
              ""]
     agree = (df.ours_pass == df.si_pass).mean()
-    lines.append(f"Pass/fail agreement: {agree:.3%} "
+    lines.append(f"Accept/reject agreement: {agree:.3%} "
                  f"({(df.ours_pass != df.si_pass).sum():,} of {len(df):,} differ)")
-    lines.append(f"  ours passes, SI fails : {((df.ours_pass) & (~df.si_pass)).sum():,}")
-    lines.append(f"  SI passes, ours fails : {((~df.ours_pass) & (df.si_pass)).sum():,}")
+    lines.append(f"  ours accepts, SI rejects : {((df.ours_pass) & (~df.si_pass)).sum():,}")
+    lines.append(f"  SI accepts, ours rejects : {((~df.ours_pass) & (df.si_pass)).sum():,}")
     both = df.ours_cont.notna() & df.si_cont.notna()
     if both.any():
         d_ = df.loc[both, "si_cont"] - df.loc[both, "ours_cont"]
@@ -136,7 +136,7 @@ def main():
     lines += ["", "By dataset:", ""]
     for ds, g in df.groupby("dataset"):
         lines.append(f"  {ds:10s} n={len(g):5,}  agreement {(g.ours_pass==g.si_pass).mean():.3%}  "
-                     f"ours pass {g.ours_pass.mean():.3f}  SI pass {g.si_pass.mean():.3f}")
+                     f"ours accepts {g.ours_pass.mean():.3f}  SI accepts {g.si_pass.mean():.3f}")
     lines += ["", "Reading: a coarser bin cannot resolve short refractory windows,",
               "so it tends to lump genuine clean windows together with the bins",
               "just past the refractory period. The direction and size of the",

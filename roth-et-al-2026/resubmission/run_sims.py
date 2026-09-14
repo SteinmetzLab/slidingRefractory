@@ -187,6 +187,28 @@ def run_mismatch(n_sim=1000):
     return sweep("mismatch", conds, n_sim, dict(oracle=False))
 
 
+def run_fig4g_validation(n_sim=600):
+    """Simulation to overlay on the analytical Fig 4g (work package 06).
+
+    The analytical curve gives the minimum firing rate at which a unit with no
+    observed refractory period violations is accepted. To check it, simulate
+    *uncontaminated* trains (contamination 0) on a fine firing-rate grid and
+    measure the realised acceptance rate; the analytical threshold should sit
+    at the 50% crossing.
+
+    The transition is sharp but not a step: for a hard refractory period the
+    violation count below tau_true is exactly zero, so acceptance is decided by
+    the spike count, which is itself random, and by whatever the ACG does just
+    past tau_true.
+    """
+    rates = [round(float(x), 3) for x in np.concatenate([
+        np.arange(0.2, 1.6, 0.05), np.arange(1.6, 3.05, 0.1)])]
+    conds = grid(model=["standard"], total_rate=rates,
+                 rp_dur=[0.002, 0.003], rec_dur=[1800.0, 3600.0, 7200.0, 14400.0],
+                 cont_prop=[0.0])
+    return sweep("fig4g_validation", conds, n_sim, dict(oracle=False))
+
+
 JOBS = {
     "calibration": run_calibration,
     "searchspace": run_searchspace,
@@ -194,6 +216,7 @@ JOBS = {
     "decomposition": run_decomposition,
     "decomposition_realistic": run_decomposition_realistic,
     "mismatch": run_mismatch,
+    "fig4g_validation": run_fig4g_validation,
 }
 
 if __name__ == "__main__":
