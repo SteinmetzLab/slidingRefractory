@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import zlib
 import time
 from pathlib import Path
 
@@ -48,7 +49,11 @@ MIN_SPIKES_FOR_RP = 500
 MIN_FR_FOR_RP = 0.5
 
 
-def enrich_one(npy_path, estimate=True):
+def enrich_one(npy_path, estimate=True, sens_frac=0.12, seed=20260913):
+    """Enrich one file. The 5%/20% recovery-fraction sensitivity is computed on
+    a deterministic random subsample (`sens_frac`) rather than every unit: the
+    estimator dominates the cost and the sensitivity analysis only needs a
+    sample. rp_ms_10 is computed for every eligible unit."""
     pqt = npy_path.with_suffix(".pqt")
     acgs = np.load(npy_path)
     tbl = pd.read_parquet(pqt)
@@ -70,6 +75,10 @@ def enrich_one(npy_path, estimate=True):
     out["first_nonzero_bin"] = np.full(len(tbl), -1, dtype=np.int64)
     out["acg_0_0p5ms"] = np.zeros(len(tbl), dtype=np.int64)
     out["acg_0p5_1ms"] = np.zeros(len(tbl), dtype=np.int64)
+
+    # zlib.crc32, not hash(): Python's string hash is randomised per process
+    rng = np.random.default_rng(zlib.crc32(npy_path.stem.encode()) + seed)
+    sens_pick = rng.random(len(tbl)) < sens_frac
 
     i1 = int(np.argmax(RP_CENTERS > 0.001)) + 1
     i3 = int(np.argmax(RP_CENTERS > 0.003)) + 1
@@ -108,8 +117,9 @@ def enrich_one(npy_path, estimate=True):
             out["rp_ms_10"][i] = f10.rp_ms
             out["rp_floor"][i] = f10.floor_applied
             out["rp_r2"][i] = f10.rsquared
-            out["rp_ms_05"][i] = estimate_rp(a, bin_centers, BIN_SIZE, 0.05).rp_ms
-            out["rp_ms_20"][i] = estimate_rp(a, bin_centers, BIN_SIZE, 0.20).rp_ms
+            if sens_pick[i]:
+                out["rp_ms_05"][i] = estimate_rp(a, bin_centers, BIN_SIZE, 0.05).rp_ms
+                out["rp_ms_20"][i] = estimate_rp(a, bin_centers, BIN_SIZE, 0.20).rp_ms
             if np.isfinite(f10.rp_ms) and f10.rp_ms > 0:
                 p, est, _ = hill_llobet_from_acg(a, n, d, f10.rp_ms / 1000)
                 out["hl_est_pass"][i] = p
@@ -120,15 +130,15 @@ def enrich_one(npy_path, estimate=True):
     return tbl
 
 
-def _worker(p, estimate):
+def _worker(p, estimate, sens_frac=0.12):
     try:
-        t = enrich_one(p, estimate)
+        t = enrich_one(p, estimate, sens_frac)
         return p.stem, t, None
     except Exception as e:  # noqa: BLE001
         return p.stem, None, f"{type(e).__name__}: {e}"
 
 
-def run(dataset, n_jobs=11, estimate=True):
+def run(dataset, n_jobs=11, estimate=True, sens_frac=0.12):
     src = TABLES / dataset
     dst = OUT / dataset
     dst.mkdir(parents=True, exist_ok=True)
@@ -139,7 +149,7 @@ def run(dataset, n_jobs=11, estimate=True):
         return
     t0 = time.time()
     for res in Parallel(n_jobs=n_jobs, verbose=5, return_as="generator_unordered")(
-            delayed(_worker)(p, estimate) for p in files):
+            delayed(_worker)(p, estimate, sens_frac) for p in files):
         stem, tbl, err = res
         if err:
             print(f"  {stem} FAILED {err}", flush=True)
@@ -153,7 +163,9 @@ if __name__ == "__main__":
     ap.add_argument("dataset", choices=["ibl", "allen", "steinmetz", "macaque", "all"])
     ap.add_argument("--n-jobs", type=int, default=11)
     ap.add_argument("--no-estimate", action="store_true")
+    ap.add_argument("--sens-frac", type=float, default=0.12,
+                    help="fraction of units given the 5%/20% recovery sensitivity")
     a = ap.parse_args()
     sets = ["macaque", "steinmetz", "allen", "ibl"] if a.dataset == "all" else [a.dataset]
     for s in sets:
-        run(s, a.n_jobs, not a.no_estimate)
+        run(s, a.n_jobs, not a.no_estimate, a.sens_frac)
