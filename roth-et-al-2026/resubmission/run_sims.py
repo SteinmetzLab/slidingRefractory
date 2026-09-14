@@ -138,9 +138,13 @@ def run_corrected(n_sim=1500):
 def run_decomposition(n_sim=600):
     """04: separate 'avoiding a misspecified RP' from 'sliding' and from
     'treating the count statistically'."""
-    conds = grid(model=["standard"], total_rate=[0.5, 1.0, 2.0, 5.0, 10.0],
-                 rp_dur=[0.0015, 0.002, 0.003, 0.005],
-                 rec_dur=[7200.0], cont_prop=list(CONT_GRID))
+    # Trimmed grid: the decomposition is about the decision rules, not about
+    # fine parameter coverage, and the estimator arm costs ~0.15 s per train.
+    cont = [c for c in CONT_GRID if c in (0, 0.04, 0.06, 0.08, 0.09, 0.10,
+                                          0.11, 0.12, 0.14, 0.16, 0.20)]
+    conds = grid(model=["standard"], total_rate=[1.0, 2.0, 5.0],
+                 rp_dur=[0.0015, 0.003, 0.005],
+                 rec_dur=[7200.0], cont_prop=cont)
     return sweep("decomposition", conds, n_sim,
                  dict(oracle=True, estimator=True))
 

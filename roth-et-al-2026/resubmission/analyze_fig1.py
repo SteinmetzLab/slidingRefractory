@@ -210,11 +210,22 @@ def main():
     # --- inclusion rules ---------------------------------------------------
     sel_common = rule_common(df, require_pass=False)
     sel_common_pass = rule_common(df, require_pass=True)
+    sel_nolabel = rule_common(df, require_pass=True, require_sorter_good=False)
     sel_mouse_rule = rule_mouse(df)
     lines += ["", "Inclusion rules:",
-              f"  common rule (no Sliding RP filter): {sel_common.sum():,} units",
-              f"  common rule + Sliding RP pass     : {sel_common_pass.sum():,} units",
-              f"  submitted mouse rule (>=2 sp/s)   : {sel_mouse_rule.sum():,} units"]
+              f"  common rule, sorter-good, no Sliding RP filter: {sel_common.sum():,} units",
+              f"  common rule, sorter-good + Sliding RP accept  : {sel_common_pass.sum():,} units",
+              f"  same but WITHOUT the sorter label             : {sel_nolabel.sum():,} units",
+              f"  submitted mouse rule (>=2 spikes/s)           : {sel_mouse_rule.sum():,} units",
+              "",
+              "  Sorter label vs metric acceptance (median estimate, ms):"]
+    for nm, sl in (("sorter-good + accepted", sel_common_pass),
+                   ("accepted only, no label", sel_nolabel),
+                   ("sorter-good only", sel_common)):
+        for ds, g in df[sl].groupby("dataset"):
+            if len(g) > 200:
+                lines.append(f"    {nm:24s} {ds:10s} n={len(g):7,} "
+                             f"median {g.rp_ms_10.median():.3f}")
 
     inc = df[sel_common_pass].copy()
     inc.to_parquet(OUT_TABLE)

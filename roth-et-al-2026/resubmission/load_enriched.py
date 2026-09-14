@@ -118,16 +118,30 @@ def rule_macaque(df, filt_col="acg_0p5_1ms"):
     return (post > 5 * pre) & (df.rp_ms_10 > 1) & df.rp_ms_10.notna()
 
 
-def rule_common(df, min_fr=2.0, min_spikes=5000, min_r2=0.5, require_pass=True):
+def rule_common(df, min_fr=2.0, min_spikes=5000, min_r2=0.5, require_pass=True,
+                require_sorter_good=True):
     """A single rule applied to every dataset (the reviewer's request).
 
     Deliberately does not condition on the shape of the ACG being measured,
-    other than requiring the fit to have succeeded. The Sliding RP requirement
-    is optional and reported both ways, since the submitted IBL sample was
-    conditioned on an earlier version of the metric.
+    other than requiring the fit to have succeeded.
+
+    ``require_sorter_good`` keeps only units the dataset's own sorting pipeline
+    considers well isolated (IBL label == 1, Allen quality == 'good', Steinmetz
+    _phy_annotation >= 2; the macaque data carries no label and is always
+    kept). This matters more than one might expect: on the IBL release, which
+    contains every cluster rather than only the curated ones, dropping it takes
+    the median estimate from 2.35 ms to 1.44 ms, because poorly isolated units
+    have filled-in refractory periods and therefore short apparent recovery.
+
+    ``require_pass`` additionally requires acceptance by Sliding RP. Note that
+    it is NOT a substitute for the sorter label: on the same data it moves the
+    median by only 0.07 ms, since a contaminated unit can still find some short
+    window in which few violations happen to fall.
     """
     m = ((df.firing_rate >= min_fr) & (df.n_spikes >= min_spikes)
          & (df.rp_ms_10 > 1) & df.rp_ms_10.notna() & (df.rp_r2 >= min_r2))
+    if require_sorter_good:
+        m &= df.sorter_label.isna() | (df.sorter_label >= 1)
     if require_pass:
         m &= df.passes
     return m
