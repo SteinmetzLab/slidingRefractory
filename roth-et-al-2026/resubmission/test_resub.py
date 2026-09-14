@@ -186,3 +186,20 @@ def test_evaluate_arms_is_self_consistent():
     assert not (out["sliding_pass_95"] and not out["sliding_pass_90"])
     assert out["corrected_conf"] <= out["sliding_max_conf"] + 1e-9
     assert np.isfinite(out["tau_pass0"])
+
+
+def test_rp_reject_argument_is_honoured():
+    """Regression: slidingRP_from_acg once ignored rp_reject and used the module
+    default, which silently turned the tau_min sensitivity sweep into a no-op."""
+    dur = 3600.0
+    st, _ = make_train("standard", 5.0, 0.08, dur, 0.0015, rng=RNG)
+    nACG = metrics.computeACG(st, BIN_SIZE, N_BINS)
+    confs = [slidingRP_from_acg(nACG, st.size, dur, rp_reject=t)["max_conf"]
+             for t in (0.00025, 0.0005, 0.001, 0.002, 0.004)]
+    # raising tau_min can only remove candidate windows, so confidence is
+    # non-increasing, and over this range it must actually change
+    assert all(a >= b - 1e-9 for a, b in zip(confs, confs[1:])), confs
+    assert confs[0] - confs[-1] > 1e-6, confs
+    # and it must still agree with the package at the package's default
+    assert slidingRP_from_acg(nACG, st.size, dur)["max_conf"] == pytest.approx(
+        metrics.slidingRP(st, params={"recDur": dur})[0], rel=1e-10)

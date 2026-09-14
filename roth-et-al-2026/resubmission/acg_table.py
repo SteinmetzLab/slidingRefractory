@@ -88,13 +88,22 @@ def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
     nACG = np.asarray(nACG, dtype=np.float64)
     obs_viol = np.cumsum(nACG)
 
+    # Honour the rp_reject argument rather than the module default, so the
+    # tau_min sensitivity sweep actually varies tau_min.
+    test_times = RP_CENTERS > rp_reject
+    if not np.any(test_times):
+        return dict(max_conf=0.0, min_cont=np.nan, rp_min_val=np.nan,
+                    n_viol_short=int(np.sum(nACG[:int(np.argmax(RP_CENTERS > 0.002)) + 1])),
+                    passes=False, tau_first_pass=np.nan,
+                    tau_pass0=tau_pass0(spike_count, rec_dur, cont_thresh, conf_thresh))
+
     conf_at_thresh = 100 * computeViol(obs_viol, spike_count, REF_DUR,
                                        cont_thresh / 100, rec_dur)[0]
-    max_conf = float(np.max(conf_at_thresh[TEST_TIMES]))
+    max_conf = float(np.max(conf_at_thresh[test_times]))
     passes = bool(max_conf >= conf_thresh)
 
     # Shortest tau_r above tau_min that reaches the confidence threshold.
-    ok = TEST_TIMES & (conf_at_thresh >= conf_thresh)
+    ok = test_times & (conf_at_thresh >= conf_thresh)
     tau_first_pass = float(RP_CENTERS[np.argmax(ok)]) if np.any(ok) else np.nan
 
     # Minimum confirmable contamination, analytical (matches
@@ -104,13 +113,13 @@ def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
     cmin = np.full(REF_DUR.shape, np.nan)
     good = disc >= 0
     cmin[good] = ((spike_count - 0.5) - np.sqrt(disc[good])) / spike_count * 100
-    cmin_test = cmin[TEST_TIMES]
+    cmin_test = cmin[test_times]
     if np.all(np.isnan(cmin_test)):
         min_cont, rp_min_val = np.nan, np.nan
     else:
         i = int(np.nanargmin(cmin_test))
         min_cont = float(cmin_test[i])
-        rp_min_val = float(RP_CENTERS[TEST_TIMES][i])
+        rp_min_val = float(RP_CENTERS[test_times][i])
         if min_cont > 35:
             min_cont, rp_min_val = np.nan, np.nan
 
