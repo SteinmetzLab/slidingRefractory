@@ -119,7 +119,7 @@ def test_force_pass_is_gated_by_param():
 
     # Sanity: this train is a genuine force-pass candidate (fails, no short ISI,
     # FR > 0.5) — otherwise the test would pass vacuously.
-    max_conf, _, _, n_below2, fr, passed, _ = metrics.slidingRP(st, params=params)
+    max_conf, _, _, n_below2, fr, passed, _, _ = metrics.slidingRP(st, params=params)
     assert not passed and n_below2 == 0 and fr > 0.5
 
     # Default (no forcePass key) and explicit forcePass=False: must NOT force-pass.

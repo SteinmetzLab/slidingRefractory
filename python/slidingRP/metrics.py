@@ -13,6 +13,8 @@ from scipy import stats
 from scipy.optimize import curve_fit
 import scipy
 
+from slidingRP.power import tau_pass0
+
 
 def closest(lst, K):
     lst = np.asarray(lst)
@@ -234,6 +236,8 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     firing_rate : float   n_spikes / recDur
     pass_cont_thresh : bool   max_conf >= conf_thresh
     pass_forced : bool    IBL force-pass flag (False unless params['forcePass'])
+    tau_pass0 : float     shortest violation-free window (s) that would pass;
+                          > tau_max means the unit cannot pass for lack of data
 
     Mapping to MATLAB slidingRP.m outputs (which differ in order):
         MATLAB [passTest, confidence, contamination, timeOfLowestCont, nViolShort, ...]
@@ -258,8 +262,12 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
         n_spikes_below2 = int(np.sum(nACG[0:np.where(rp > 0.002)[0][0] + 1]))
         pass_forced = params.get('forcePass', False) and (n_spikes_below2 == 0) \
             and (firing_rate > 0.5) and (not pass_cont_thresh)
+        recDur_corr = params.get('recDur', None)
+        if recDur_corr is None:
+            recDur_corr = float(np.max(spikeTimes)) if spikeTimes.size else 0.0
         return max_conf, min_cont, rp_min_val, n_spikes_below2, firing_rate, \
-            pass_cont_thresh, pass_forced
+            pass_cont_thresh, pass_forced, \
+            tau_pass0(spikeTimes.size, recDur_corr, cont_thresh, conf_thresh)
 
     n_spikes = spikeTimes.size
     recDur = params.get('recDur', None)
@@ -296,7 +304,8 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
 
     return max_conf, min_cont, rp_min_val, \
         n_spikes_below2, firing_rate, \
-        pass_cont_thresh, pass_forced
+        pass_cont_thresh, pass_forced, \
+        tau_pass0(n_spikes, recDur, cont_thresh, conf_thresh)
 
 
 def _slidingRP_worker(args):
@@ -338,10 +347,10 @@ def slidingRP_all(spikeTimes, spikeClusters, params=None,
 
     rpMetrics = {k: [] for k in ('cidx', 'max_confidence', 'min_contamination',
                                  'rp_min_val', 'n_spikes_below2', 'firing_rate',
-                                 'value', 'value_forced')}
+                                 'value', 'value_forced', 'tau_pass0')}
     for cid, res in zip(cids, results):
         (max_confidence, min_contamination, rp_min_val, n_spikes_below2,
-         firing_rate, pass_cont_thresh, pass_forced) = res
+         firing_rate, pass_cont_thresh, pass_forced, tau_pass0_val) = res
         rpMetrics['cidx'].append(cid)
         rpMetrics['max_confidence'].append(max_confidence)
         rpMetrics['min_contamination'].append(min_contamination)
@@ -350,6 +359,7 @@ def slidingRP_all(spikeTimes, spikeClusters, params=None,
         rpMetrics['firing_rate'].append(firing_rate)
         rpMetrics['value'].append(int(pass_cont_thresh))
         rpMetrics['value_forced'].append(int(pass_forced))
+        rpMetrics['tau_pass0'].append(tau_pass0_val)
 
     return rpMetrics
 
@@ -681,7 +691,7 @@ def plotSlidingRP(spikeTimes, params=None, plotXs=None, inputAxes=None,
     confThresh = params.get('confidenceThresh', 90)
 
     confMatrix, cont, rp, nACG, firingRate = computeMatrix(np.asarray(spikeTimes), params)
-    _, _, rp_min_val, _, _, _, _ = slidingRP(
+    _, _, rp_min_val, *_ = slidingRP(
         spikeTimes, params=params, conf_thresh=confThresh, cont_thresh=contThresh)
 
     if inputAxes is not None:

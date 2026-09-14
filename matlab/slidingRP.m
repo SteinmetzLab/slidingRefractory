@@ -1,6 +1,6 @@
 
 function [passTest, confidence, contamination, timeOfLowestCont, ...
-    nViolShort, confMatrix, cont, rp, nACG] = slidingRP(spikeTimes, varargin)
+    nViolShort, confMatrix, cont, rp, nACG, tauPass0Val] = slidingRP(spikeTimes, varargin)
 % SLIDINGRP  Compute the Sliding Refractory Period quality metric for one cluster.
 %
 %   [passTest, confidence, contamination, timeOfLowestCont, nViolShort, ...
@@ -66,6 +66,12 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %     cont             - Vector of contamination levels tested (%).
 %     rp               - Vector of tau_r values tested (seconds).
 %     nACG             - ACG counts at each tau_r (counts per bin).
+%     tauPass0Val      - Shortest violation-free window (seconds) that would
+%                        let this unit pass, given its spike count and
+%                        recording duration (see tauPass0). Larger than the
+%                        tested window (10 ms) means the unit cannot pass for
+%                        lack of data rather than because violations were
+%                        observed. Diagnostic only; does not affect passTest.
 
 if nargin > 1
     params = varargin{1};
@@ -117,6 +123,8 @@ if useCorrection
 
     nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
     passTest = confidence >= confThresh;
+    if isfield(params, 'recDur'); recDurC = params.recDur; else; recDurC = max(spikeTimes); end
+    tauPass0Val = tauPass0(numel(spikeTimes), recDurC, contThresh, confThresh);
     return;
 end
 
@@ -149,6 +157,11 @@ confidence = max(confAtThresh(testTimes));
 nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
 
 passTest = confidence >= confThresh;
+
+% Diagnostic: shortest violation-free window that would have let this unit
+% pass, given only its spike count and duration (see tauPass0). Does not
+% affect passTest.
+tauPass0Val = tauPass0(spikeCount, recDur, contThresh, confThresh);
 
 % Full confidence matrix is only built when the caller requests it (outputs
 % 6-7). The scalar metrics above never need it.
