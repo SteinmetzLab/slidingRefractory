@@ -14,9 +14,9 @@ b  Correlated rates: false and true acceptance against the rate correlation
    rho between base neuron and contaminant.
 c  Non-overlapping activity: the same against the fraction of epochs in which
    both are active. This is the hippocampal place-cell failure mode.
-d  Graded refractory recovery: the same against the width of the recovery.
-   Both curves collapse, which is a different kind of failure -- the metric
-   becomes uninformative rather than wrong.
+d  Graded recovery after a hard refractory period: the same against the width
+   of the relative-refractory ramp. Acceptance is essentially unchanged, and
+   marginally higher for wide ramps.
 e  Everything at once, against the manuscript's model as reference.
 
 Run:  python plot_mismatch.py
@@ -60,6 +60,16 @@ def curve(ax, sub, label, color, ls="-"):
 def main():
     plotstyle.apply()
     d = pd.read_parquet(SIMS / "mismatch.pqt")
+    # The graded-recovery rows in mismatch.pqt were produced by the first
+    # version of gen_graded_rp, whose hazard was nonzero at every lag (27% of
+    # baseline at zero lag for a 2 ms width) so the simulated neurons had no
+    # absolute refractory period at all. Replace them with the corrected model
+    # (hard refractory period, then a linear ramp) from run_graded.py.
+    gf = SIMS / "graded_fixed.pqt"
+    if gf.exists():
+        g = pd.read_parquet(gf)
+        d = pd.concat([d[d.model != "graded"], g[g.model == "graded"]],
+                      ignore_index=True)
     for c in ("rho", "tau_s", "overlap", "width", "p_burst", "cont_rp"):
         if c in d:
             d[c] = pd.to_numeric(d[c], errors="coerce")
@@ -76,8 +86,8 @@ def main():
     curve(ax, d[(d.model == "single_neuron_contaminant") & (d.cont_rp == 0.0025)],
           "Single-neuron contaminant", "#d95f02")
     curve(ax, d[(d.model == "bursting") & (d.p_burst == 0.3)], "Bursting", "#7570b3")
-    curve(ax, d[(d.model == "graded") & (d.width == 0.0005)],
-          "Graded recovery (0.5 ms)", "#1b9e77")
+    curve(ax, d[(d.model == "graded") & (d.width == 0.002)],
+          "Graded recovery (2 ms ramp)", "#1b9e77")
     ax.axvline(10, color="0.6", ls="--", lw=1)
     ax.set_xlabel("True contamination (%)")
     ax.set_ylabel("Units accepted (%)")
@@ -123,9 +133,9 @@ def main():
             color="#1b9e77", ms=5, label="True acceptance")
     ax.axhline(far(ref), color="#d95f02", ls=":", lw=1)
     ax.axhline(tar(ref), color="#1b9e77", ls=":", lw=1)
-    ax.set_xlabel("Recovery width (ms)")
+    ax.set_xlabel("Relative-refractory ramp width (ms)")
     ax.set_ylabel("Units accepted (%)")
-    ax.set_title("d  Graded refractory recovery", loc="left")
+    ax.set_title("d  Graded recovery after a hard 2 ms period", loc="left")
     ax.legend(fontsize=7)
 
     # --- e: summary --------------------------------------------------------
@@ -194,13 +204,23 @@ def main():
           "   89.1% of units at the contamination threshold are accepted. The",
           "   transition is sharp: 63.3% at 25% overlap, 11.9% at 50%.",
           "",
-          "5. Graded refractory recovery fails differently. Both false and true",
-          "   acceptance collapse (at 1 ms recovery width, 1.5% and 3.8%), so",
-          "   the metric is not wrong but uninformative: it rejects nearly",
-          "   everything. Sliding RP assumes that SOME window is genuinely",
-          "   violation-free, and a smoothly recovering neuron has none. This is",
-          "   worth stating as a limitation, since the real ACGs in Fig 1 are",
-          "   clearly not hard-dead-time processes."]
+          "5. Graded refractory recovery is a NON-issue, once it is modelled",
+          "   correctly. With an absolute refractory period followed by a",
+          "   linear ramp to baseline, acceptance is indistinguishable from the",
+          "   hard-RP reference and if anything slightly higher: at 5 spikes/s,",
+          "   true acceptance runs 77.6% (hard) to 77.0 / 78.1 / 80.0% for ramps",
+          "   of 0.5 / 1 / 2 ms, with false acceptance flat at 26-29%. The extra",
+          "   bins between the absolute RP and full recovery carry fewer",
+          "   violations than baseline, so they give the sliding search a few",
+          "   more windows that might work, each less likely to help than the",
+          "   last -- exactly as one would predict.",
+          "",
+          "   An earlier version of this analysis reported that graded recovery",
+          "   made the metric uninformative. That was an artifact: the first",
+          "   generator used a logistic hazard centred on the refractory period,",
+          "   which leaves 27% of baseline firing at zero lag and a minimum ISI",
+          "   of zero. Those units genuinely violate at every lag, so rejecting",
+          "   them was correct behaviour and said nothing about graded recovery."]
     (OUTDIR / "mismatch_numbers.txt").write_text("\n".join(L))
     print("\n".join(L))
 

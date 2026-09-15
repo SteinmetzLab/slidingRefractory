@@ -58,18 +58,21 @@ def gen_hard_rp(rate, duration, rp=0.0, rng=None):
 
 @lru_cache(maxsize=256)
 def _graded_survival(rate, rp, width, dt=2e-5):
-    """ISI survival function for a graded-recovery renewal process.
+    """ISI survival function for absolute-then-relative refractoriness.
 
-    The hazard after a spike rises as a logistic from 0 to an asymptotic rate,
-    centred at `rp` with scale `width`; the asymptote is calibrated so the
-    realised mean rate equals `rate`. Depends only on the parameters, not on
-    the random draws, so it is cached: without this the calibration dominated
-    the whole model-mismatch sweep (3.3 s per simulated train).
+    The hazard is exactly zero below `rp` (the absolute refractory period),
+    then rises linearly to its asymptote over `width` (the relative refractory
+    period), and is flat thereafter. The asymptote is calibrated so the
+    realised mean rate equals `rate`. ``width = 0`` reduces to the hard-RP
+    renewal process used elsewhere.
+
+    Cached on the parameters, since the calibration is the expensive part and
+    does not depend on the random draws.
 
     Returns (t, S) with S decreasing, ready for inverse-transform sampling.
     """
-    t = np.arange(0, max(20 / rate, rp + 20 * width), dt)
-    shape = 1.0 / (1 + np.exp(-(t - rp) / max(width, 1e-9)))
+    t = np.arange(0, max(20 / rate, rp + 20 * max(width, 1e-4)), dt)
+    shape = np.clip((t - rp) / width, 0.0, 1.0) if width > 0 else (t >= rp).astype(float)
     lam = 1.0
     for _ in range(60):
         S = np.exp(-np.cumsum(lam * shape) * dt)
@@ -86,12 +89,12 @@ def _graded_survival(rate, rp, width, dt=2e-5):
 
 
 def gen_graded_rp(rate, duration, rp=0.002, width=0.001, rng=None):
-    """Renewal process with a *graded* recovery: the hazard after each spike
-    rises as a logistic from 0 to the asymptotic rate, centred at `rp` with
-    scale `width`. `width -> 0` recovers the hard-RP process.
+    """Renewal process with an absolute refractory period then a graded recovery.
 
-    Sampled by inverse transform on the ISI survival function, which for a
-    renewal process with hazard h(t) is S(t) = exp(-integral_0^t h).
+    Spiking is impossible for `rp` after each spike; the hazard then rises
+    linearly to its asymptote over the next `width` seconds. This is the
+    "hard to 2 ms, then graded to 3 ms" shape, not a soft suppression that
+    still permits spikes at zero lag.
     """
     rng = rng or np.random.default_rng()
     if rate <= 0:
