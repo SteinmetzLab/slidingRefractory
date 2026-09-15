@@ -182,7 +182,7 @@ def make_figure(df, stats, path):
         c = plotstyle.REGION_COLORS[reg]
         plotstyle.box_row(ax, v, y, c, height=0.44)
         labels.append(f"{plotstyle.DATASET_NAMES.get(ds, ds)} {reg}  "
-                      f"n={len(v):,} / {g.session_key.nunique()} sess.")
+                      f"n={len(v):,} / {g.insertion_key.nunique()} ins.")
     ax.axvline(2, color="0.7", lw=1, ls=":", zorder=0)
     ax.set_yticks(ypos)
     ax.set_yticklabels(labels, fontsize=7)

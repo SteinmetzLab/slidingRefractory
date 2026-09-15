@@ -38,7 +38,7 @@ from load_enriched import RP_COLUMNS, load_all, rule_common  # noqa: E402
 OUTDIR = Path(r"D:/Dropbox/papers/2026_SlidingRP/jNeurophysResubmission/"
               r"01_fig1_rp_durations")
 MIN_UNITS = 150
-MIN_SESSIONS = 5
+MIN_INSERTIONS = 5
 MAIN_COL = "rp_ms_10"
 
 
@@ -48,7 +48,7 @@ def region_table(inc, df, weights):
     for reg, g in inc.groupby("beryl"):
         if not reg or reg in ("root", "void") or len(g) < MIN_UNITS:
             continue
-        if g.session_key.nunique() < MIN_SESSIONS:
+        if g.insertion_key.nunique() < MIN_INSERTIONS:
             continue
         v = g[MAIN_COL].astype(float)
         lo, hi = plotstyle.bootstrap_ci(v)
@@ -78,7 +78,7 @@ def region_table(inc, df, weights):
 
 
 def row_labels(t):
-    return [f"{r.beryl}  ({r.cosmos}, n={r.n:,}, {r.n_sess} sess.)"
+    return [f"{r.beryl}  ({r.cosmos}, n={r.n:,}, {r.n_ins} ins.)"
             for r in t.itertuples()]
 
 
@@ -192,7 +192,9 @@ def fig_firing_rate(t):
 def write_numbers(t, weights):
     L = ["Beryl-level recovery times and acceptance rates", "=" * 52, "",
          f"Regions with at least {MIN_UNITS} units passing the common inclusion",
-         f"rule and at least {MIN_SESSIONS} sessions. {len(t)} regions qualify.",
+         f"rule and at least {MIN_INSERTIONS} insertions. {len(t)} regions",
+         "qualify (the same 80 either way: no region has 5 insertions but",
+         "fewer than 5 sessions, or the reverse).",
          "",
          "Columns: n units / n sessions / n insertions / n animals; median",
          "estimated ACG recovery time with bootstrapped 95% CI; the fraction",
