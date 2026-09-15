@@ -15,6 +15,7 @@ no sorter label (NaN).
 """
 from __future__ import annotations
 
+from collections import namedtuple
 from pathlib import Path
 
 import numpy as np
@@ -96,10 +97,46 @@ def load_all(datasets=("ibl", "allen", "steinmetz", "macaque"), verbose=True):
     # a single animal key that is unique across datasets
     df["animal_key"] = df["dataset"].astype(str) + ":" + df["animal"].astype(str)
     df["insertion_key"] = df["dataset"].astype(str) + ":" + df["insertion"].astype(str)
+    # ``session`` holds a mixture of uuids, paths and (for one dataset) raw
+    # bytes, so map it through repr rather than astype(str), which chokes on
+    # the non-utf8 entries.
+    df["session_key"] = (df["dataset"].astype(str) + ":"
+                         + df["session"].map(lambda v: f"{v!r}"))
+    # The three candidate timepoints, all in ms, so a figure can switch between
+    # them with one column name. See RP_COLUMNS below for what each one means.
+    df["rp_Cmin_ms"] = df["tau_Cmin"].astype(float) * 1000
+    if "tau_last_pass" in df:
+        df["rp_last_ms"] = df["tau_last_pass"].astype(float) * 1000
     if verbose:
         print(f"TOTAL {len(df):,} units, {df.insertion_key.nunique()} insertions, "
               f"{df.animal_key.nunique()} animals", flush=True)
     return df
+
+
+# --- the three candidate timepoints ----------------------------------------
+
+#: Three operational answers to "how long is this unit quiet for". None of them
+#: is a refractory period; the point of carrying all three is to see how much
+#: the Fig 1 result depends on which one is used.
+#:
+#: ``text`` is for plain-text output, ``math`` for a figure title (mathtext) and
+#: ``axis`` for an axis label with units.
+RPCol = namedtuple("RPCol", "text math axis")
+
+RP_COLUMNS = {
+    "rp_ms_10": RPCol(
+        "ACG recovery (sigmoid, 10%)",
+        "ACG recovery (sigmoid, 10%)",
+        "Estimated ACG recovery time (ms)"),
+    "rp_Cmin_ms": RPCol(
+        "tau_r at C_min",
+        r"$\tau_r$ at $C_{min}$",
+        r"$\tau_r$ at minimum confirmable contamination (ms)"),
+    "rp_last_ms": RPCol(
+        "Last accepted tau_r",
+        r"Last accepted $\tau_r$",
+        r"Longest accepted $\tau_r$ (ms)"),
+}
 
 
 # --- inclusion rules (work package 01) -------------------------------------

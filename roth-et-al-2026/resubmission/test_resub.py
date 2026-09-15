@@ -215,3 +215,107 @@ def test_rp_reject_argument_is_honoured():
     # and it must still agree with the package at the package's default
     assert slidingRP_from_acg(nACG, st.size, dur)["max_conf"] == pytest.approx(
         metrics.slidingRP(st, params={"recDur": dur})[0], rel=1e-10)
+
+
+# --- the two candidate timepoints added for the revision --------------------
+
+def test_tau_last_pass_matches_the_package_sweep():
+    """The vectorised last-accepted-tau must agree with a per-unit reference.
+
+    ``add_tau_last`` recomputes the whole confidence sweep in one matrix
+    operation over many units at once. This checks that against the package's
+    own single-unit path, both for the acceptance flag and for the first and
+    last accepted windows.
+    """
+    from add_tau_last import tau_last_pass
+
+    dur = 3600.0
+    acgs, ns = [], []
+    for rate, cont, rp in [(5.0, 0.0, 0.002), (5.0, 0.10, 0.002),
+                           (1.0, 0.05, 0.003), (20.0, 0.15, 0.0015),
+                           (12.0, 0.0, 0.0025)]:
+        st, _ = make_train("standard", rate, cont, dur, rp, rng=RNG)
+        acgs.append(metrics.computeACG(st, BIN_SIZE, N_BINS))
+        ns.append(st.size)
+    acgs = np.vstack(acgs)
+    ns = np.array(ns, float)
+    durs = np.full(ns.shape, dur)
+
+    last, first, acc, nbins = tau_last_pass(acgs, ns, durs)
+    for i in range(acgs.shape[0]):
+        ref = slidingRP_from_acg(acgs[i], ns[i], dur)
+        assert acc[i] == ref["passes"]
+        if ref["passes"]:
+            assert first[i] == pytest.approx(ref["tau_first_pass"], abs=1e-12)
+            assert last[i] >= first[i]
+            assert 1 <= nbins[i] <= RP_CENTERS.size
+        else:
+            assert np.isnan(first[i]) and np.isnan(last[i])
+            assert nbins[i] == 0
+
+
+def test_tau_last_pass_is_the_last_not_the_end_of_the_first_run():
+    """Constructed case: an accepted window, a gap, then another accepted one.
+
+    The accepted set of tau_r need not be contiguous. This pins the documented
+    behaviour -- the last element, not the end of the first run -- so a future
+    change to that has to be deliberate.
+    """
+    from add_tau_last import tau_last_pass
+
+    dur, n = 3600.0, 40000.0
+    # Clean out to 2 ms, then one bin holding 300 violations. Just after that
+    # bin the expectation is far below 300 so the unit is rejected; by 10 ms the
+    # expectation has grown past 800 and it is accepted again. The accepted set
+    # is therefore two runs, and the answer must come from the second.
+    acg = np.zeros((1, N_BINS))
+    acg[0, RP_CENTERS.searchsorted(0.002)] = 300
+    last, first, acc, nbins = tau_last_pass(acg, np.array([n]), np.array([dur]))
+    assert acc[0]
+    assert first[0] == pytest.approx(RP_CENTERS[RP_CENTERS > 0.0005][0])
+    # the first run ends at the burst, well before the answer
+    assert last[0] > 0.009
+    # and the accepted set really is broken in two, not one long run
+    assert nbins[0] < np.sum(RP_CENTERS > 0.0005)
+
+
+def test_standardization_is_identity_without_a_firing_rate_effect():
+    """If the value does not depend on firing rate, standardizing changes nothing."""
+    from fr_standardize import reference_weights, standardized_median
+
+    rng = np.random.default_rng(0)
+    fr = np.exp(rng.normal(np.log(8), 0.7, 40000))
+    v = rng.gamma(4, 0.6, fr.size)               # independent of fr
+    w = reference_weights(fr)
+    std, cov = standardized_median(fr, v, w)
+    assert cov == pytest.approx(1.0)
+    assert std == pytest.approx(np.median(v), abs=0.02)
+
+
+def test_standardization_removes_a_known_firing_rate_effect():
+    """Two groups with the same conditional means but different rate mixes.
+
+    Raw medians differ only because the groups sample firing rate differently;
+    standardization must bring them back together. It does not close the gap
+    completely, and that residual is a real property of the method rather than a
+    bug: within a bin the low-rate group still sits at the low edge and the
+    high-rate group at the high edge, so a coarse grid leaves some of the effect
+    behind. Here it removes 88% of a 0.69 ms gap.
+    """
+    from fr_standardize import reference_weights, standardized_median
+
+    rng = np.random.default_rng(1)
+
+    def group(n, log_mu):
+        fr = np.exp(rng.normal(log_mu, 0.5, n))
+        v = 4.0 - 0.5 * np.log(fr) + rng.normal(0, 0.3, n)   # same law in both
+        return fr, v
+
+    fr_a, v_a = group(30000, np.log(4))
+    fr_b, v_b = group(30000, np.log(16))
+    w = reference_weights(np.concatenate([fr_a, fr_b]))
+    raw_gap = abs(np.median(v_a) - np.median(v_b))
+    std_a = standardized_median(fr_a, v_a, w)[0]
+    std_b = standardized_median(fr_b, v_b, w)[0]
+    assert raw_gap > 0.4, raw_gap
+    assert abs(std_a - std_b) < 0.2 * raw_gap

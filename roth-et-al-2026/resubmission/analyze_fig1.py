@@ -24,7 +24,10 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 import plotstyle  # noqa: E402
-from load_enriched import load_all, rule_common, rule_mouse  # noqa: E402
+from fr_standardize import (FR_EDGES, by_bin_table, reference_weights,  # noqa: E402
+                            standardized_ci, standardized_median)
+from load_enriched import (RP_COLUMNS, load_all, rule_common,  # noqa: E402
+                           rule_mouse)
 
 OUTDIR = Path(r"D:/Dropbox/papers/2026_SlidingRP/jNeurophysResubmission/"
               r"01_fig1_rp_durations")
@@ -47,7 +50,8 @@ def group_stats(df, by=("dataset", "cosmos")):
     for key, g in df.groupby(list(by)):
         lo, hi = bootstrap_ci(g.rp_ms_10)
         rows.append(dict(zip(by, key if isinstance(key, tuple) else (key,))) | dict(
-            n_units=len(g), n_insertions=g.insertion_key.nunique(),
+            n_units=len(g), n_sessions=g.session_key.nunique(),
+            n_insertions=g.insertion_key.nunique(),
             n_animals=g.animal_key.nunique(),
             median=float(np.nanmedian(g.rp_ms_10)), ci_lo=lo, ci_hi=hi,
             q25=float(np.nanpercentile(g.rp_ms_10, 25)),
@@ -173,18 +177,12 @@ def make_figure(df, stats, path):
     ypos = np.arange(len(groups))[::-1]
     labels = []
     for y, (ds, reg) in zip(ypos, groups):
-        v = df[(df.dataset == ds) & (df.cosmos == reg)].rp_ms_10.dropna().values
+        g = df[(df.dataset == ds) & (df.cosmos == reg)]
+        v = g.rp_ms_10.dropna().values
         c = plotstyle.REGION_COLORS[reg]
-        # distribution: box from the quartiles with 5-95% whiskers
-        q1, med, q3 = np.percentile(v, [25, 50, 75])
-        p5, p95 = np.percentile(v, [5, 95])
-        ax.plot([p5, p95], [y, y], color=c, lw=0.8, alpha=0.6, zorder=1)
-        ax.add_patch(plt.Rectangle((q1, y - 0.22), q3 - q1, 0.44, facecolor=c,
-                                   alpha=0.25, edgecolor="none", zorder=2))
-        lo, hi = bootstrap_ci(v)
-        ax.plot([lo, hi], [y, y], color=c, lw=2.6, zorder=3, solid_capstyle="butt")
-        ax.plot(med, y, "o", color="w", mec=c, mew=1.4, ms=5.5, zorder=4)
-        labels.append(f"{ds} {reg}  n={len(v):,} / {df[(df.dataset==ds)&(df.cosmos==reg)].insertion_key.nunique()} ins")
+        plotstyle.box_row(ax, v, y, c, height=0.44)
+        labels.append(f"{plotstyle.DATASET_NAMES.get(ds, ds)} {reg}  "
+                      f"n={len(v):,} / {g.session_key.nunique()} sess.")
     ax.axvline(2, color="0.7", lw=1, ls=":", zorder=0)
     ax.set_yticks(ypos)
     ax.set_yticklabels(labels, fontsize=7)
@@ -193,6 +191,180 @@ def make_figure(df, stats, path):
     ax.set_title("b  Median (95% CI), interquartile box, 5-95% whiskers", loc="left")
     fig.tight_layout()
     plotstyle.save(fig, path)
+
+
+def fig_definitions(df, path):
+    """The Fig 1 comparison under all three candidate timepoints."""
+    plotstyle.apply()
+    groups = [(ds, reg) for ds in ["steinmetz", "ibl", "allen", "macaque"]
+              for reg in REGIONS
+              if len(df[(df.dataset == ds) & (df.cosmos == reg)]) >= 20]
+    cols = list(RP_COLUMNS)
+    fig, axs = plt.subplots(1, len(cols), figsize=(12, max(4, 0.36 * len(groups))),
+                            sharey=True)
+    ypos = np.arange(len(groups))[::-1]
+    for k, (ax, col) in enumerate(zip(axs, cols)):
+        for y, (ds, reg) in zip(ypos, groups):
+            v = df[(df.dataset == ds) & (df.cosmos == reg)][col].astype(float)
+            plotstyle.box_row(ax, v, y, plotstyle.REGION_COLORS[reg])
+        ax.axvline(2, color="0.7", lw=1, ls=":", zorder=0)
+        ax.set_xlabel(RP_COLUMNS[col].axis)
+        ax.set_title(f"{'abc'[k]}  {RP_COLUMNS[col].math}", loc="left")
+        allv = df[col].astype(float)
+        ax.set_xlim(max(0.3, np.nanpercentile(allv, 0.5)),
+                    min(10.2, np.nanpercentile(allv, 99.5)))
+    axs[0].set_yticks(ypos)
+    axs[0].set_yticklabels(
+        [f"{plotstyle.DATASET_NAMES.get(ds, ds)} {reg}" for ds, reg in groups],
+        fontsize=8)
+    fig.tight_layout()
+    plotstyle.save(fig, path)
+
+
+def fig_firing_rate(df, path):
+    """Is the region difference a firing-rate difference? Two ways to look."""
+    plotstyle.apply()
+    w = reference_weights(df.firing_rate)
+    fig, axs = plt.subplots(1, 3, figsize=(13, 4.2),
+                            gridspec_kw={"width_ratios": [1, 1, 1.1]})
+
+    # a: the firing-rate distributions themselves. If these coincide, no
+    # amount of firing-rate dependence can confound the region comparison.
+    ax = axs[0]
+    bins = np.logspace(np.log10(2), np.log10(200), 40)
+    for reg in REGIONS:
+        v = df[df.cosmos == reg].firing_rate.dropna()
+        n, e = np.histogram(v, bins=bins)
+        ax.stairs(n / n.sum(), e, color=plotstyle.REGION_COLORS[reg], lw=1.6,
+                  label=f"{reg} (median {np.median(v):.1f})")
+    ax.set_xscale("log")
+    ax.set_xlabel("Firing rate (spikes/s)")
+    ax.set_ylabel("Proportion of neurons")
+    ax.set_title("a  Firing-rate distributions by region", loc="left")
+    plotstyle.plain_log_ticks(ax)
+    ax.legend(fontsize=7)
+
+    # b: the interaction. Median recovery time inside each firing-rate bin.
+    ax = axs[1]
+    centers = np.sqrt(FR_EDGES[:-1] * np.minimum(FR_EDGES[1:], 60))
+    for reg in REGIONS:
+        g = df[df.cosmos == reg]
+        idx = np.digitize(g.firing_rate, FR_EDGES) - 1
+        med = [np.nanmedian(g.rp_ms_10[idx == b]) if (idx == b).sum() >= 30
+               else np.nan for b in range(len(FR_EDGES) - 1)]
+        ax.plot(centers, med, "o-", color=plotstyle.REGION_COLORS[reg], ms=4,
+                label=reg)
+    ax.set_xscale("log")
+    ax.set_xlabel("Firing rate (spikes/s)")
+    ax.set_ylabel("Median estimated ACG recovery time (ms)")
+    ax.set_title("b  Recovery time within firing-rate bins", loc="left")
+    plotstyle.plain_log_ticks(ax)
+    ax.legend(fontsize=7)
+
+    # c: observed against standardized median, per dataset and region
+    ax = axs[2]
+    groups = [(ds, reg) for ds in ["steinmetz", "ibl", "allen", "macaque"]
+              for reg in REGIONS
+              if len(df[(df.dataset == ds) & (df.cosmos == reg)]) >= 20]
+    ypos = np.arange(len(groups))[::-1]
+    for y, (ds, reg) in zip(ypos, groups):
+        g = df[(df.dataset == ds) & (df.cosmos == reg)]
+        c = plotstyle.REGION_COLORS[reg]
+        raw = float(np.nanmedian(g.rp_ms_10))
+        std, cov = standardized_median(g.firing_rate, g.rp_ms_10.astype(float), w)
+        lo, hi = plotstyle.bootstrap_ci(g.rp_ms_10)
+        ax.plot([lo, hi], [y, y], color=c, lw=2.2, alpha=0.5,
+                solid_capstyle="butt")
+        ax.plot(raw, y, "o", color="w", mec=c, mew=1.3, ms=5.5)
+        if np.isfinite(std):
+            ax.plot(std, y, "|", color=c, ms=10, mew=2)
+    ax.axvline(2, color="0.7", lw=1, ls=":", zorder=0)
+    ax.set_yticks(ypos)
+    ax.set_yticklabels([f"{plotstyle.DATASET_NAMES.get(ds, ds)} {reg}"
+                        for ds, reg in groups], fontsize=7)
+    ax.set_xlabel("Estimated ACG recovery time (ms)")
+    ax.set_title("c  Circle, observed median; tick, standardized", loc="left")
+    fig.tight_layout()
+    plotstyle.save(fig, path)
+
+
+def firing_rate_section(df, lines):
+    """Everything needed to answer 'is this just a firing-rate difference?'."""
+    w = reference_weights(df.firing_rate)
+    lines += ["", "=" * 60,
+              "Firing rate: is the region difference a firing-rate difference?",
+              "",
+              "Reference firing-rate distribution used for standardization "
+              "(all included units):",
+              "  " + "  ".join(f"{a:g}-{b:g}:{x:.3f}" for a, b, x in
+                               zip(FR_EDGES[:-1], FR_EDGES[1:], w)),
+              "",
+              "Firing rate by region (spikes/s):"]
+    for reg in REGIONS:
+        g = df[df.cosmos == reg]
+        lines.append(f"  {reg:10s} median {g.firing_rate.median():6.2f}  "
+                     f"q25 {g.firing_rate.quantile(.25):5.2f}  "
+                     f"q75 {g.firing_rate.quantile(.75):6.2f}")
+    lines += ["", "Observed and firing-rate-standardized medians (ms):"]
+    for col in RP_COLUMNS:
+        lines.append(f"  {RP_COLUMNS[col].text}:")
+        for reg in REGIONS:
+            g = df[df.cosmos == reg]
+            raw = float(np.nanmedian(g[col].astype(float)))
+            std, cov = standardized_median(g.firing_rate, g[col].astype(float), w)
+            lo, hi = standardized_ci(g.firing_rate, g[col].astype(float), w,
+                                     n_boot=300)
+            lines.append(f"    {reg:10s} observed {raw:6.3f}  standardized "
+                         f"{std:6.3f} [{lo:.3f}, {hi:.3f}]  "
+                         f"change {std - raw:+.3f}  coverage {cov:.2f}")
+    lines += ["",
+              "Median recovery time inside each firing-rate bin (the check for",
+              "an interaction; a region difference that survives inside every",
+              "bin is not a firing-rate artifact):"]
+    t = by_bin_table(df[df.cosmos.isin(REGIONS)], "cosmos", "rp_ms_10")
+    piv = t.pivot(index="fr_bin", columns="cosmos", values="median")
+    lines.append("  " + piv.round(3).to_string().replace("\n", "\n  "))
+
+
+def definitions_section(df, lines):
+    """The three candidate timepoints side by side."""
+    from scipy import stats as sps
+    lines += ["", "=" * 60,
+              "Three candidate timepoints",
+              "",
+              "None of these is a refractory period. Each is a different",
+              "operational answer to 'how long is this unit quiet for', and the",
+              "point of listing all three is to show how much of Fig 1 depends",
+              "on which one is used. All are computed on the same units.",
+              ""]
+    for col, spec in RP_COLUMNS.items():
+        v = df[col].astype(float)
+        lines.append(f"  {spec.text:28s} median {v.median():6.3f}  "
+                     f"q05 {v.quantile(.05):6.3f}  q95 {v.quantile(.95):6.3f}  "
+                     f"at the 0.5 ms floor {np.mean(v < 0.55):5.1%}  "
+                     f"at the 10 ms ceiling {np.mean(v > 9.9):5.1%}")
+    lines += ["", "Median by region (ms):"]
+    for reg in REGIONS:
+        g = df[df.cosmos == reg]
+        lines.append(f"  {reg:10s} " + "  ".join(
+            f"{RP_COLUMNS[c].text} {g[c].astype(float).median():6.3f}"
+            for c in RP_COLUMNS))
+    lines += ["", "Unit-level Spearman correlation between definitions:"]
+    cols = list(RP_COLUMNS)
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            a, b = df[cols[i]].astype(float), df[cols[j]].astype(float)
+            m = a.notna() & b.notna()
+            r = sps.spearmanr(a[m], b[m])
+            lines.append(f"  {RP_COLUMNS[cols[i]].text:28s} vs "
+                         f"{RP_COLUMNS[cols[j]].text:28s} rho = "
+                         f"{r.statistic:+.3f}")
+    lines += ["",
+              "Caveats specific to each: tau_r at C_min piles up at the tau_min",
+              "boundary (0.5 ms) for the fraction shown above, because for many",
+              "units the tightest contamination bound comes from the shortest",
+              "window; the last accepted tau_r is right-censored at the 10 ms",
+              "edge of the tested range for the fraction shown above."]
 
 
 def main():
@@ -275,6 +447,10 @@ def main():
     lines += ["", "=" * 60, "Hierarchical statistics"]
     hierarchical(inc, lines)
 
+    # --- the two additions Nick asked for ---------------------------------
+    definitions_section(inc[inc.cosmos.isin(REGIONS)], lines)
+    firing_rate_section(inc[inc.cosmos.isin(REGIONS)], lines)
+
     OUTDIR.mkdir(parents=True, exist_ok=True)
     (OUTDIR / "fig1_numbers.txt").write_text("\n".join(lines))
     print("\n".join(lines[:60]))
@@ -282,6 +458,10 @@ def main():
 
     (OUTDIR / "figures").mkdir(exist_ok=True)
     make_figure(inc, st, OUTDIR / "figures" / "fig1")
+    fig_definitions(inc[inc.cosmos.isin(REGIONS)],
+                    OUTDIR / "figures" / "fig1_definitions")
+    fig_firing_rate(inc[inc.cosmos.isin(REGIONS)],
+                    OUTDIR / "figures" / "fig1_firing_rate")
 
 
 if __name__ == "__main__":
