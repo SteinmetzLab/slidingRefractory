@@ -114,12 +114,24 @@ def test_gen_hard_rp_rate_and_refractoriness():
     assert np.min(np.diff(st)) >= 0.003 - 1e-12
 
 
-def test_gen_graded_rp_has_no_hard_edge():
-    """A graded process puts some mass below the nominal RP, a hard one none."""
-    hard = gen_hard_rp(10.0, 900.0, 0.003, RNG)
-    graded = gen_graded_rp(10.0, 900.0, 0.003, 0.001, RNG)
-    assert np.sum(np.diff(hard) < 0.003) == 0
-    assert np.sum(np.diff(graded) < 0.003) > 0
+def test_gen_graded_rp_is_absolute_then_graded():
+    """Hard below `rp`, then suppressed but non-zero over the ramp.
+
+    This is the shape Nick described: a unit hard to 2 ms and then graded to
+    3 ms. An earlier version of this generator centred a logistic hazard *on*
+    `rp`, which left 27% of baseline firing at zero lag and so had no absolute
+    refractory period at all; that made graded recovery look catastrophic for
+    the metric when it is in fact a non-issue. The assertions below are what
+    distinguishes the two.
+    """
+    hard = gen_hard_rp(10.0, 900.0, 0.002, RNG)
+    graded = gen_graded_rp(10.0, 900.0, 0.002, 0.001, RNG)
+    assert np.sum(np.diff(hard) < 0.002) == 0
+    assert np.sum(np.diff(graded) < 0.002) == 0           # absolute part
+    isi = np.diff(graded)
+    ramp = np.mean((isi >= 0.002) & (isi < 0.003))        # suppressed ramp
+    after = np.mean((isi >= 0.003) & (isi < 0.004))       # full hazard
+    assert 0 < ramp < after, (ramp, after)
     assert graded.size / 900.0 == pytest.approx(10.0, rel=0.15)
 
 
