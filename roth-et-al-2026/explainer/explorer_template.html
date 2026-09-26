@@ -1,0 +1,834 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sliding RP explorer</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f8; --panel: #ffffff; --ink: #1b2129; --ink-2: #4b5563;
+    --muted: #7a8494; --rule: #dfe3e8; --grid: #edf0f3; --bar: #2a2f36;
+    --srp: #d42a2a; --srp-fill: rgba(212, 42, 42, 0.13); --srp-shade: rgba(212, 42, 42, 0.30);
+    --hl: #6c63b5; --band: #e8ebef; --veil: rgba(255, 255, 255, 0.5);
+    --good: #177245; --bad: #b3261e; --btn: #1b2129; --btn-ink: #ffffff;
+    --halo: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f1216; --panel: #171b21; --ink: #e7eaee; --ink-2: #b4bcc7;
+      --muted: #8791a0; --rule: #2a3039; --grid: #1f242b; --bar: #cfd4db;
+      --srp: #e8443f; --srp-fill: rgba(232, 68, 63, 0.16); --srp-shade: rgba(232, 68, 63, 0.38);
+      --hl: #8a80e6; --band: #242a32; --veil: rgba(0, 0, 0, 0.5);
+      --good: #4cc38a; --bad: #ff7b72; --btn: #e7eaee; --btn-ink: #0f1216;
+      --halo: #0f1216;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1216; --panel: #171b21; --ink: #e7eaee; --ink-2: #b4bcc7;
+    --muted: #8791a0; --rule: #2a3039; --grid: #1f242b; --bar: #cfd4db;
+    --srp: #e8443f; --srp-fill: rgba(232, 68, 63, 0.16); --srp-shade: rgba(232, 68, 63, 0.38);
+    --hl: #8a80e6; --band: #242a32; --veil: rgba(0, 0, 0, 0.5);
+    --good: #4cc38a; --bad: #ff7b72; --btn: #e7eaee; --btn-ink: #0f1216;
+    --halo: #0f1216;
+  }
+
+  html, body { background: var(--bg); color: var(--ink); }
+  body { margin: 0; font: 14px/1.45 Arial, "Helvetica Neue", Helvetica, sans-serif; }
+  .m { font-family: "Times New Roman", Times, serif; font-style: italic; font-size: 1.08em; }
+  .wrap { max-width: 1340px; margin: 0 auto; padding-inline: 20px; padding-block: 22px 44px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 16px; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--ink-2); max-width: 78ch; }
+
+  .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+  .controls { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 14px 16px 16px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  @media (max-width: 960px) { .controls { position: static; } }
+  .controls h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--muted); margin: 6px 0 4px; font-weight: bold; }
+  .controls h2 + .ctl { margin-top: 4px; }
+  .group + .group { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--rule); }
+  .ctl { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; margin-block: 9px; }
+  .ctl label { font-size: 13px; color: var(--ink-2); }
+  .ctl output { font-size: 13px; font-weight: bold; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .ctl input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 3px 0 0; accent-color: var(--ink); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { font: inherit; font-size: 13px; font-weight: bold; border-radius: 7px; padding: 7px 12px;
+    cursor: pointer; border: 1px solid var(--btn); background: var(--btn); color: var(--btn-ink); }
+  button.secondary { background: transparent; color: var(--ink); border-color: var(--rule); }
+  button:disabled { opacity: 0.55; cursor: progress; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--srp); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink-2); font-weight: normal; padding: 5px 10px; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); font-weight: bold; }
+  .fact { font-size: 12.5px; color: var(--ink-2); margin-top: 12px; font-variant-numeric: tabular-nums; }
+
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1180px) { .panels { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 12px 14px 10px; min-width: 0; position: relative; }
+  .panel h3 { font-size: 14.5px; margin: 0 0 2px; }
+  .sub { margin: 0 0 6px; color: var(--ink-2); font-size: 12.5px; min-height: 1.45em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12.5px; margin-bottom: 4px; }
+  canvas { display: block; width: 100%; touch-action: pan-y; }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--panel);
+    font-size: 12px; padding: 5px 8px; border-radius: 6px; white-space: nowrap;
+    font-variant-numeric: tabular-nums; z-index: 5; }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  .verdicts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+  @media (max-width: 720px) { .verdicts { grid-template-columns: minmax(0, 1fr); } }
+  .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .card-head h3 { margin: 0; }
+  .swatch-srp { color: var(--srp); } .swatch-hl { color: var(--hl); }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px;
+    font-weight: bold; font-size: 12.5px; }
+  .pill.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+  .pill.no { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--ink-2); } dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  .batch { margin-top: 16px; }
+  .batch-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .batch-head h3 { margin: 0; }
+  .progress { width: 160px; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--ink); }
+  .batch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 10px; }
+  @media (max-width: 720px) { .batch-grid { grid-template-columns: minmax(0, 1fr); } }
+  .big { font-size: 30px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stale .big, .stale canvas { opacity: 0.35; }
+  .status { font-size: 12.5px; color: var(--ink-2); }
+  .context { margin: 8px 0 0; font-size: 13px; color: var(--ink); max-width: 90ch; }
+
+  details { margin-top: 16px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 16px; }
+  details summary { cursor: pointer; font-weight: bold; }
+  details p, details li { color: var(--ink-2); max-width: 88ch; }
+  code { font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Sliding RP explorer</h1>
+    <p>Simulate one unit, watch the Sliding RP metric test every candidate refractory period, and compare it with a
+      fixed-window Hill&ndash;Llobet estimate. Then simulate 100 units with the same settings to see how often each
+      method accepts them.</p>
+  </header>
+
+  <div class="layout">
+    <aside class="controls" aria-label="Settings">
+      <div class="group">
+        <h2>Simulated unit</h2>
+        <div class="ctl"><label for="rate">Total firing rate</label><output id="rateOut" for="rate"></output>
+          <input id="rate" type="range" min="0" max="1000" step="1" value="668"></div>
+        <div class="ctl"><label for="rp">True refractory period</label><output id="rpOut" for="rp"></output>
+          <input id="rp" type="range" min="0.5" max="5" step="0.1" value="1.5"></div>
+        <div class="ctl"><label for="cont">True contamination</label><output id="contOut" for="cont"></output>
+          <input id="cont" type="range" min="0" max="50" step="0.5" value="5"></div>
+        <div class="ctl"><label for="dur">Recording duration</label><output id="durOut" for="dur"></output>
+          <input id="dur" type="range" min="10" max="240" step="5" value="60"></div>
+      </div>
+      <div class="group">
+        <h2>Metric settings</h2>
+        <div class="ctl"><label for="cth">Contamination threshold</label><output id="cthOut" for="cth"></output>
+          <input id="cth" type="range" min="1" max="35" step="0.5" value="10"></div>
+        <div class="ctl"><label for="gam">Confidence threshold</label><output id="gamOut" for="gam"></output>
+          <input id="gam" type="range" min="50" max="99.5" step="0.5" value="90"></div>
+        <div class="ctl"><label for="tmin">Shortest window tested (<span class="m">&tau;</span><sub>min</sub>)</label><output id="tminOut" for="tmin"></output>
+          <input id="tmin" type="range" min="0" max="2" step="0.05" value="0.5"></div>
+        <div class="ctl"><label for="hl">Hill&ndash;Llobet assumed refractory period</label><output id="hlOut" for="hl"></output>
+          <input id="hl" type="range" min="0.5" max="5" step="0.1" value="2"></div>
+      </div>
+      <div class="btns">
+        <button id="newTrain" type="button">New spike train</button>
+        <button id="reset" type="button" class="secondary">Reset settings</button>
+      </div>
+      <div class="btns" style="margin-top:12px; align-items:center; gap:8px">
+        <span class="hint">Time axis</span>
+        <span class="seg" role="group" aria-label="Time axis range">
+          <button id="x5" type="button" aria-pressed="true">0&ndash;5 ms</button>
+          <button id="x10" type="button" aria-pressed="false">0&ndash;10 ms</button>
+        </span>
+      </div>
+      <p class="fact" id="trainFact"></p>
+    </aside>
+
+    <main>
+      <div class="panels">
+        <section class="panel" aria-labelledby="hACG">
+          <h3 id="hACG">Autocorrelogram</h3>
+          <div class="legend" id="legACG"></div>
+          <canvas id="cvACG" role="img" aria-label="Autocorrelogram of the simulated unit with the tested windows"></canvas>
+        </section>
+
+        <section class="panel" aria-labelledby="hCurve">
+          <h3 id="hCurve">Confidence across candidate refractory periods</h3>
+          <p class="sub" id="curveSub"></p>
+          <canvas id="cvCurve" role="img" aria-label="Confidence against tested refractory period"></canvas>
+          <div class="tip" id="tipCurve" hidden></div>
+        </section>
+
+        <section class="panel" aria-labelledby="hPois">
+          <h3 id="hPois">The test at one window</h3>
+          <p class="sub" id="poisSub"></p>
+          <canvas id="cvPois" role="img" aria-label="Poisson distribution of violations expected at the contamination threshold"></canvas>
+        </section>
+
+        <section class="panel" aria-labelledby="hMat">
+          <h3 id="hMat">Confidence matrix</h3>
+          <p class="sub" id="matSub"></p>
+          <canvas id="cvMat" role="img" aria-label="Confidence for every contamination threshold and window"></canvas>
+          <div class="tip" id="tipMat" hidden></div>
+        </section>
+      </div>
+      <p class="hint" style="margin:8px 2px 0">Hover over the confidence curve or the matrix to test a different
+        window; click to keep it there. The autocorrelogram and the single-window test follow.</p>
+
+      <div class="verdicts">
+        <section class="panel" aria-labelledby="hSrp">
+          <div class="card-head"><h3 id="hSrp" class="swatch-srp">Sliding RP</h3><span id="srpPill" class="pill"></span></div>
+          <dl class="kv" id="srpKV"></dl>
+        </section>
+        <section class="panel" aria-labelledby="hHl">
+          <div class="card-head"><h3 id="hHl" class="swatch-hl">Hill&ndash;Llobet</h3><span id="hlPill" class="pill"></span></div>
+          <dl class="kv" id="hlKV"></dl>
+        </section>
+      </div>
+
+      <section class="panel batch" id="batch" aria-labelledby="hBatch">
+        <div class="batch-head">
+          <h3 id="hBatch">100 units with these settings</h3>
+          <button id="runBatch" type="button">Simulate 100 trains</button>
+          <div class="progress" id="prog" hidden><div id="progBar"></div></div>
+          <span class="status" id="batchStatus"></span>
+        </div>
+        <p class="context" id="batchContext"></p>
+        <div class="batch-grid">
+          <div>
+            <div class="card-head" style="margin:6px 0 2px"><strong class="swatch-srp">Sliding RP</strong></div>
+            <div class="big" id="srpBig">&ndash;</div>
+            <div class="status" id="srpBigSub"></div>
+            <canvas id="cvStripSrp" role="img" aria-label="Maximum confidence of each simulated train"></canvas>
+          </div>
+          <div>
+            <div class="card-head" style="margin:6px 0 2px"><strong class="swatch-hl">Hill&ndash;Llobet</strong></div>
+            <div class="big" id="hlBig">&ndash;</div>
+            <div class="status" id="hlBigSub"></div>
+            <canvas id="cvStripHl" role="img" aria-label="Estimated contamination of each simulated train"></canvas>
+          </div>
+        </div>
+        <p class="hint" style="margin:10px 0 0">Changing a metric setting updates these results at once, on the same
+          100 trains. Changing the simulated unit needs a re-run.</p>
+      </section>
+
+      <details>
+        <summary>How the calculation works</summary>
+        <p><strong>The unit.</strong> A base neuron fires with a hard refractory period (inter-spike intervals are the
+          refractory period plus an exponential, rate-corrected so the firing rate comes out as set). A contaminating
+          source fires as a Poisson process with no refractory period. Contamination is the fraction of all spikes that
+          come from the contaminating source. This is the model used throughout the manuscript.</p>
+        <p><strong>Sliding RP.</strong> For each candidate window <span class="m">&tau;</span><sub>r</sub> (every
+          autocorrelogram bin, 1/30,000 s, up to 10 ms), count the observed violations <span class="m">V</span><sub>o</sub>:
+          spike pairs closer than <span class="m">&tau;</span><sub>r</sub>. If the unit were contaminated at exactly the
+          threshold <span class="m">C</span>, the expected count is
+          <span class="m">V</span><sub>e</sub> = 2<span class="m">&tau;</span><sub>r</sub><span class="m">N</span><sub>c</sub>(<span class="m">N</span><sub>b</sub> + (<span class="m">N</span><sub>c</sub> &minus; 1)/2)/<span class="m">D</span>
+          (Llobet et al.), with <span class="m">N</span><sub>c</sub> contaminating and <span class="m">N</span><sub>b</sub>
+          base spikes in a recording of duration <span class="m">D</span>. The confidence is the probability of seeing
+          more than <span class="m">V</span><sub>o</sub> violations from a Poisson count with mean
+          <span class="m">V</span><sub>e</sub>. The unit is accepted if the confidence reaches the confidence threshold
+          at any window longer than <span class="m">&tau;</span><sub>min</sub>. No refractory period has to be assumed.
+          <span class="m">C</span><sub>min</sub> is the lowest contamination threshold that would be accepted.</p>
+        <p><strong>Hill&ndash;Llobet.</strong> Count violations inside one fixed, assumed refractory period and convert the
+          count to a point estimate of contamination,
+          1 &minus; &radic;(1 &minus; <span class="m">V</span><sub>o</sub><span class="m">D</span> / (<span class="m">&tau;</span><span class="m">N</span><sup>2</sup>)).
+          The unit is accepted if the estimate is at or below the threshold (equivalently, if
+          <span class="m">V</span><sub>o</sub> &le; <span class="m">V</span><sub>e</sub>). There is no statistical test, so
+          a low-rate unit with no violations is always accepted, and a clean unit whose true refractory period is
+          shorter than the assumed one is rejected.</p>
+        <p><strong>What this page leaves out.</strong> Sliding RP takes the best of many windows without a
+          multiple-comparisons correction, so for a unit sitting exactly at the threshold it accepts noticeably more
+          often than the confidence threshold implies; try it with the 100-train button. The simulation has no
+          bursting, drift, or correlation between the neuron and its contamination.</p>
+        <p><strong>Where the numbers come from.</strong> The calculations reproduce the <code>slidingRP</code> Python
+          package: autocorrelograms exactly, confidences to within 10<sup>&minus;9</sup>, and acceptance rates of the
+          simulator within sampling error of the package's own simulator.</p>
+      </details>
+    </main>
+  </div>
+</div>
+
+<script>
+/*__SRP_CORE__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const S = window.SRP;
+  const NB = S.N_BINS, BIN = S.BIN;
+  const TAU_MS = Array.from(S.REF_DUR, (v) => v * 1000);
+  const CENT_MS = Array.from(S.RP_CENTERS, (v) => v * 1000);
+  const GRID = S.CONT_GRID;
+  const $ = (id) => document.getElementById(id);
+  const DEFAULTS = { rate: 668, rp: 1.5, cont: 5, dur: 60, cth: 10, gam: 90, tmin: 0.5, hl: 2 };
+
+  const state = { seed: 20260926, xmax: 5, unitKey: null, st: null, acg: null, n: 0, nCont: 0,
+    dur: 3600, res: null, hl: null, M: null, selK: null, hoverK: null, pinned: false, p: null,
+    batch: null, batchToken: 0, matHover: null };
+
+  // ------------------------------------------------------------ helpers --
+  const fmt = (x, d) => Number.isFinite(x) ? x.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '–';
+  const pct = (x, d = 1) => Number.isFinite(x) ? fmt(x, d) + '%' : '–';
+  const tok = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rateOf = (v) => 0.2 * Math.pow(250, v / 1000);
+  const fmtRate = (r) => (r < 1 ? r.toFixed(2) : r < 10 ? r.toFixed(1) : r.toFixed(0));
+  const TAU_HTML = '<span class="m">&tau;</span><sub>r</sub>';
+
+  function readParams() {
+    return { rate: rateOf(+$('rate').value), rpMs: +$('rp').value, contPct: +$('cont').value,
+      durMin: +$('dur').value, cth: +$('cth').value, gam: +$('gam').value,
+      tminMs: +$('tmin').value, hlMs: +$('hl').value };
+  }
+  const unitKey = (p) => [p.rate.toFixed(5), p.rpMs, p.contPct, p.durMin].join('|');
+
+  function showOutputs(p) {
+    $('rateOut').textContent = fmtRate(p.rate) + ' spikes/s';
+    $('rpOut').textContent = p.rpMs.toFixed(1) + ' ms';
+    $('contOut').textContent = p.contPct.toFixed(1) + '%';
+    $('durOut').textContent = p.durMin >= 120 ? (p.durMin / 60).toFixed(p.durMin % 60 ? 2 : 0) + ' h' : p.durMin + ' min';
+    $('cthOut').textContent = p.cth.toFixed(1) + '%';
+    $('gamOut').textContent = p.gam.toFixed(1) + '%';
+    $('tminOut').textContent = p.tminMs.toFixed(2) + ' ms';
+    $('hlOut').textContent = p.hlMs.toFixed(1) + ' ms';
+  }
+
+  function kOfTau(ms) { return clamp(Math.round(ms / 1000 / BIN) - 1, 0, NB - 1); }
+  function nCols() { return Math.round(state.xmax / 1000 / BIN); }
+  function dispK() { return state.hoverK !== null ? state.hoverK : state.selK; }
+
+  // ------------------------------------------------------------ compute --
+  function compute() {
+    const p = readParams();
+    showOutputs(p);
+    const uk = unitKey(p) + '|' + state.seed;
+    if (uk !== state.unitKey) {
+      const rng = S.makeRng(state.seed);
+      const tr = S.makeTrain(p.rate, p.contPct / 100, p.durMin * 60, p.rpMs / 1000, rng);
+      state.st = tr.st; state.n = tr.st.length; state.nCont = tr.nCont;
+      state.dur = p.durMin * 60; state.acg = S.computeACG(tr.st); state.unitKey = uk;
+      state.M = null;
+    }
+    const tmin = p.tminMs / 1000;
+    state.res = S.slidingRP(state.acg, state.n, state.dur,
+      { contThresh: p.cth, confThresh: p.gam, tauMin: tmin });
+    if (!state.M) state.M = S.confidenceMatrix(state.res.obs, state.n, state.dur);
+    state.hl = S.hillLlobet(state.acg, state.n, state.dur, p.hlMs / 1000, p.cth);
+    state.p = p;
+    if (!state.pinned || state.selK === null) {
+      let k = state.res.kMax;
+      if (k < 0) { k = 0; while (k < NB - 1 && !(S.RP_CENTERS[k] > tmin)) k++; }
+      state.selK = k;
+    }
+    render();
+    summarizeBatch();
+  }
+
+  // ------------------------------------------------------------- canvas --
+  function prep(cv, ratio, minH, maxH) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(200, cv.clientWidth);
+    const h = Math.round(clamp(w * ratio, minH, maxH));
+    const W = Math.round(w * dpr), H = Math.round(h * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv.style.height = h + 'px'; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function lin(d0, d1, r0, r1) {
+    const f = (v) => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+    f.inv = (px) => d0 + (px - r0) / (r1 - r0) * (d1 - d0);
+    return f;
+  }
+  function niceTicks(lo, hi, count) {
+    const raw = (hi - lo) / Math.max(1, count);
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const e = raw / mag;
+    const step = (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + step * 1e-9; v += step) out.push(+v.toPrecision(12));
+    return out;
+  }
+  const tickLabel = (v) => (Math.abs(v) >= 1000 ? v.toLocaleString('en-US') : String(+v.toPrecision(6)));
+
+  const FONT = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
+  const MATH = '"Times New Roman", Times, serif';
+  /** Draw text made of plain, math-italic and subscript runs. */
+  function rich(ctx, parts, x, y, align, size, color) {
+    const fonts = { '': size + 'px ' + FONT, m: 'italic ' + (size + 1) + 'px ' + MATH,
+      s: 'italic ' + Math.round(size * 0.78) + 'px ' + MATH };
+    const widths = parts.map(([t, s]) => { ctx.font = fonts[s]; return ctx.measureText(t).width; });
+    const total = widths.reduce((a, b) => a + b, 0);
+    let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+    ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    parts.forEach(([t, s], i) => { ctx.font = fonts[s]; ctx.fillText(t, cx, s === 's' ? y + size * 0.3 : y); cx += widths[i]; });
+    return total;
+  }
+  function text(ctx, t, x, y, align, size, color, base) {
+    ctx.font = size + 'px ' + FONT; ctx.fillStyle = color; ctx.textAlign = align;
+    ctx.textBaseline = base || 'alphabetic'; ctx.fillText(t, x, y);
+  }
+  function axes(ctx, b, sx, sy, xt, yt, xlab, ylab, opt) {
+    const o = opt || {};
+    ctx.lineWidth = 1;
+    if (!o.noGrid) {
+      ctx.strokeStyle = tok('--grid');
+      yt.forEach((v) => { const y = Math.round(sy(v)) + 0.5; ctx.beginPath(); ctx.moveTo(b.x0, y); ctx.lineTo(b.x1, y); ctx.stroke(); });
+    }
+    const ink2 = tok('--ink-2'), ink = tok('--ink');
+    ctx.strokeStyle = ink2;
+    ctx.beginPath(); ctx.moveTo(b.x0 + 0.5, b.y0); ctx.lineTo(b.x0 + 0.5, b.y1 + 0.5); ctx.lineTo(b.x1, b.y1 + 0.5); ctx.stroke();
+    xt.forEach((v) => {
+      const x = Math.round(sx(v)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, b.y1); ctx.lineTo(x, b.y1 + 4); ctx.stroke();
+      text(ctx, tickLabel(v), x, b.y1 + 16, 'center', 11.5, ink2);
+    });
+    yt.forEach((v) => {
+      const y = Math.round(sy(v)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(b.x0 - 4, y); ctx.lineTo(b.x0, y); ctx.stroke();
+      text(ctx, (o.yfmt || tickLabel)(v), b.x0 - 7, y, 'right', 11.5, ink2, 'middle');
+    });
+    rich(ctx, xlab, (b.x0 + b.x1) / 2, b.y1 + 34, 'center', 12.5, ink);
+    ctx.save(); ctx.translate(14, (b.y0 + b.y1) / 2); ctx.rotate(-Math.PI / 2);
+    rich(ctx, ylab, 0, 0, 'center', 12.5, ink); ctx.restore();
+  }
+  const X_TAU = [['Tested refractory period ', ''], ['τ', 'm'], ['r', 's'], [' (ms)', '']];
+
+  // --------------------------------------------------------- panel: ACG --
+  function drawACG() {
+    const { ctx, w, h } = prep($('cvACG'), 0.56, 230, 380);
+    const b = { x0: 56, x1: w - 12, y0: 10, y1: h - 44 };
+    const nc = nCols(), acg = state.acg;
+    let ymax = 1;
+    for (let k = 0; k < nc; k++) ymax = Math.max(ymax, acg[k]);
+    ymax *= 1.1;
+    const sx = lin(0, state.xmax, b.x0, b.x1), sy = lin(0, ymax, b.y1, b.y0);
+    axes(ctx, b, sx, sy, niceTicks(0, state.xmax, 5), niceTicks(0, ymax, 4),
+      [['Time from spike (ms)', '']], [['Spike pairs per bin', '']]);
+    const k = dispK(), tau = TAU_MS[k];
+    ctx.fillStyle = tok('--srp-fill');
+    ctx.fillRect(b.x0 + 1, b.y0, Math.max(0, sx(Math.min(tau, state.xmax)) - b.x0 - 1), b.y1 - b.y0);
+    ctx.fillStyle = tok('--bar');
+    const bw = sx(BIN * 1000) - sx(0);
+    for (let i = 0; i < nc; i++) {
+      if (!acg[i]) continue;
+      const y = sy(acg[i]);
+      ctx.fillRect(sx(i * BIN * 1000), y, Math.max(1, bw), b.y1 - y);
+    }
+    const vline = (ms, color, dash, width) => {
+      if (ms > state.xmax) return;
+      const x = Math.round(sx(ms)) + 0.5;
+      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash);
+      ctx.beginPath(); ctx.moveTo(x, b.y0); ctx.lineTo(x, b.y1); ctx.stroke(); ctx.restore();
+    };
+    vline(state.p.rpMs, tok('--muted'), [2, 3], 1.5);
+    vline(state.hl.window * 1000, tok('--hl'), [6, 4], 2);
+    vline(tau, tok('--srp'), [], 2);
+    const n = state.res.obs[k];
+    text(ctx, n.toLocaleString('en-US') + (n === 1 ? ' violation' : ' violations'), b.x0 + 8, b.y0 + 16, 'left', 13, tok('--srp'));
+    $('legACG').innerHTML =
+      `<span class="swatch-srp">Sliding RP window, ${TAU_HTML} = ${tau.toFixed(2)} ms</span>` +
+      `<span class="swatch-hl">Hill&ndash;Llobet window, ${(state.hl.window * 1000).toFixed(2)} ms</span>` +
+      `<span style="color:var(--muted)">True refractory period, ${state.p.rpMs.toFixed(1)} ms</span>`;
+  }
+
+  // ------------------------------------------------ panel: confidence ----
+  let curveGeom = null;
+  function drawCurve() {
+    const { ctx, w, h } = prep($('cvCurve'), 0.56, 230, 380);
+    const b = { x0: 56, x1: w - 12, y0: 12, y1: h - 44 };
+    const sx = lin(0, state.xmax, b.x0, b.x1), sy = lin(0, 100, b.y1, b.y0);
+    curveGeom = { b, sx, sy };
+    const p = state.p, res = state.res;
+    const tmin = Math.min(p.tminMs, state.xmax);
+    if (tmin > 0) {
+      ctx.fillStyle = tok('--band');
+      ctx.fillRect(b.x0 + 1, b.y0, sx(tmin) - b.x0 - 1, b.y1 - b.y0);
+      if (sx(tmin) - b.x0 > 16) {
+        ctx.save(); ctx.translate((b.x0 + sx(tmin)) / 2 + 4, b.y1 - 8); ctx.rotate(-Math.PI / 2);
+        text(ctx, 'Not tested', 0, 0, 'left', 11, tok('--muted')); ctx.restore();
+      }
+    }
+    axes(ctx, b, sx, sy, niceTicks(0, state.xmax, 5), [0, 20, 40, 60, 80, 100], X_TAU,
+      [['Confidence (%)', '']]);
+    ctx.strokeStyle = tok('--ink'); ctx.lineWidth = 1.5;
+    const yg = Math.round(sy(p.gam)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(b.x0, yg); ctx.lineTo(b.x1, yg); ctx.stroke();
+    text(ctx, `Acceptance threshold (${fmt(p.gam, 1)}%)`, b.x1 - 2, yg - 5, 'right', 11.5, tok('--ink'));
+    const nc = nCols();
+    ctx.strokeStyle = tok('--srp'); ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < nc; k++) {
+      const x = sx(TAU_MS[k]), y = sy(res.row[k]);
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const k = dispK();
+    if (TAU_MS[k] <= state.xmax) {
+      const x = Math.round(sx(TAU_MS[k])) + 0.5;
+      ctx.save(); ctx.strokeStyle = tok('--muted'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, b.y0); ctx.lineTo(x, b.y1); ctx.stroke(); ctx.restore();
+      dot(ctx, x, sy(res.row[k]), 4.5, tok('--srp'), tok('--panel'));
+    }
+    if (res.kMax >= 0 && TAU_MS[res.kMax] <= state.xmax) {
+      star(ctx, sx(TAU_MS[res.kMax]), sy(res.maxConf), 8, tok('--srp'), tok('--panel'));
+    }
+    $('hCurve').innerHTML = `Confidence that contamination is below ${fmt(p.cth, 1)}%`;
+    const where = res.kMax >= 0 ? ` at ${TAU_HTML} = ${TAU_MS[res.kMax].toFixed(2)} ms` : '';
+    $('curveSub').innerHTML = `Maximum ${pct(res.maxConf)}${where} (star). Accepted if it reaches ${fmt(p.gam, 1)}% anywhere outside the gray band.`;
+  }
+  function dot(ctx, x, y, r, fill, ring) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = ring; ctx.stroke();
+  }
+  function star(ctx, x, y, r, fill, ring) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+    }
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = ring; ctx.stroke();
+  }
+
+  // ------------------------------------------------- panel: one window ---
+  function drawPois() {
+    const { ctx, w, h } = prep($('cvPois'), 0.56, 230, 380);
+    const b = { x0: 60, x1: w - 14, y0: 12, y1: h - 44 };
+    const p = state.p, k = dispK();
+    const lamArr = S.expectedViolations(state.n, state.dur, p.cth);
+    const lam = lamArr[k], o = state.res.obs[k];
+    if (!(lam > 1e-9)) { text(ctx, 'Too few spikes to expect any violations.', w / 2, h / 2, 'center', 13, tok('--ink-2')); return; }
+    const sd = Math.sqrt(lam);
+    let lo = Math.max(0, Math.floor(lam - 5 * sd - 3)), hi = Math.ceil(lam + 5 * sd + 3);
+    if (o >= lam - 12 * sd - 10 && o <= lam + 12 * sd + 10) { lo = Math.max(0, Math.min(lo, o - 2)); hi = Math.max(hi, o + 2); }
+    const step = Math.max(1, Math.ceil((hi - lo) / 700));
+    const xs = [], ys = [];
+    let ymax = 0;
+    for (let x = lo; x <= hi; x += step) { const y = S.poissonPMF(x, lam); xs.push(x); ys.push(y); ymax = Math.max(ymax, y); }
+    ymax *= 1.18;
+    const sx = lin(lo, hi, b.x0, b.x1), sy = lin(0, ymax, b.y1, b.y0);
+    axes(ctx, b, sx, sy, niceTicks(lo, hi, 5), niceTicks(0, ymax, 4),
+      [['Number of violations', '']], [['Probability', '']], { yfmt: (v) => String(+v.toPrecision(3)) });
+    ctx.fillStyle = tok('--srp-shade');
+    ctx.beginPath(); ctx.moveTo(sx(xs[0]), b.y1);
+    let any = false;
+    for (let i = 0; i < xs.length && xs[i] <= o; i++) { ctx.lineTo(sx(xs[i]), sy(ys[i])); any = true; }
+    if (any) { ctx.lineTo(sx(Math.min(o, hi)), b.y1); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = tok('--srp'); ctx.lineWidth = 2; ctx.beginPath();
+    xs.forEach((x, i) => (i ? ctx.lineTo(sx(x), sy(ys[i])) : ctx.moveTo(sx(x), sy(ys[i]))));
+    ctx.stroke();
+    const ink = tok('--ink');
+    if (o >= lo && o <= hi) {
+      const x = Math.round(sx(o)) + 0.5;
+      ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(x, b.y1); ctx.lineTo(x, b.y0 + 18); ctx.stroke(); ctx.restore();
+      const right = x < (b.x0 + b.x1) / 2;
+      text(ctx, 'Observed ' + o.toLocaleString('en-US'), x + (right ? 6 : -6), b.y0 + 14, right ? 'left' : 'right', 12.5, ink);
+    } else {
+      const right = o > hi;
+      text(ctx, right ? `Observed ${o.toLocaleString('en-US')} →` : `← Observed ${o.toLocaleString('en-US')}`,
+        right ? b.x1 - 2 : b.x0 + 6, b.y0 + 14, right ? 'right' : 'left', 12.5, ink);
+    }
+    const peakX = sx(lam), gap = sx(lam + 1.6 * sd) - peakX + 6;
+    const l1 = `Expected if ${fmt(p.cth, 1)}% contaminated`, l2 = `mean ${fmt(lam, 1)}`;
+    ctx.font = '12px ' + FONT;
+    const lw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width);
+    const lblRight = peakX + gap + lw <= b.x1 - 2 || peakX - gap - lw < b.x0 + 4;
+    const lx = lblRight ? Math.min(peakX + gap, b.x1 - 2 - lw) : peakX - gap;
+    const ly = sy(ymax / 1.18 * 0.8);
+    text(ctx, l1, lx, ly, lblRight ? 'left' : 'right', 12, tok('--srp'));
+    text(ctx, l2, lx, ly + 15, lblRight ? 'left' : 'right', 12, tok('--srp'));
+    const pLe = 100 * S.poissonCDF(o, lam);
+    $('poisSub').innerHTML = `At ${TAU_HTML} = ${TAU_MS[k].toFixed(2)} ms: ${o.toLocaleString('en-US')} observed, ` +
+      `${fmt(lam, 1)} expected at ${fmt(p.cth, 1)}% contamination. P(&le; ${o.toLocaleString('en-US')}) = ${pct(pLe)}, ` +
+      `so confidence = ${pct(100 - pLe)}.`;
+  }
+
+  // ---------------------------------------------------- panel: matrix ----
+  const VIRIDIS = ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6ece58', '#fde725']
+    .map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  function viridis(t) {
+    const x = clamp(t, 0, 1) * (VIRIDIS.length - 1), i = Math.min(VIRIDIS.length - 2, Math.floor(x)), f = x - i;
+    const a = VIRIDIS[i], c = VIRIDIS[i + 1];
+    return [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f, a[2] + (c[2] - a[2]) * f];
+  }
+  let matGeom = null;
+  function drawMat() {
+    const { ctx, w, h } = prep($('cvMat'), 0.56, 230, 380);
+    const b = { x0: 56, x1: w - 64, y0: 12, y1: h - 44 };
+    const nc = nCols(), M = state.M, p = state.p, res = state.res;
+    const sx = lin(0, nc * BIN * 1000, b.x0, b.x1), sy = lin(0.25, GRID[GRID.length - 1] + 0.25, b.y0, b.y1);
+    matGeom = { b, sx, sy };
+    const off = document.createElement('canvas');
+    off.width = nc; off.height = GRID.length;
+    const octx = off.getContext('2d'), img = octx.createImageData(nc, GRID.length);
+    for (let i = 0; i < GRID.length; i++) for (let k = 0; k < nc; k++) {
+      const c = viridis(M[i][k] / 100), j = 4 * (i * nc + k);
+      img.data[j] = c[0]; img.data[j + 1] = c[1]; img.data[j + 2] = c[2]; img.data[j + 3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, b.x0 + 1, b.y0, b.x1 - b.x0 - 1, b.y1 - b.y0);
+    const tmin = Math.min(p.tminMs, state.xmax);
+    if (tmin > 0) { ctx.fillStyle = tok('--veil'); ctx.fillRect(b.x0 + 1, b.y0, sx(tmin) - b.x0 - 1, b.y1 - b.y0); }
+    axes(ctx, b, sx, sy, niceTicks(0, state.xmax, 5), [5, 10, 15, 20, 25, 30, 35], X_TAU,
+      [['Contamination threshold (%)', '']], { noGrid: true });
+    const halo = (draw, color, width) => {
+      ctx.save(); ctx.lineJoin = 'round';
+      ctx.strokeStyle = tok('--halo'); ctx.lineWidth = width + 2.5; draw(); ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = width; draw(); ctx.stroke(); ctx.restore();
+    };
+    halo(() => {
+      ctx.beginPath();
+      let pen = false;
+      for (let k = 0; k < nc; k++) {
+        let i = 0;
+        while (i < GRID.length && M[i][k] < p.gam) i++;
+        if (i >= GRID.length) { pen = false; continue; }
+        const y = sy(GRID[i] - 0.25), xa = sx(k * BIN * 1000), xb = sx((k + 1) * BIN * 1000);
+        if (pen) ctx.lineTo(xa, y); else ctx.moveTo(xa, y);
+        ctx.lineTo(xb, y); pen = true;
+      }
+    }, '#000000', 1.8);
+    halo(() => { ctx.beginPath(); ctx.moveTo(b.x0, sy(p.cth)); ctx.lineTo(b.x1, sy(p.cth)); }, tok('--srp'), 2);
+    const k = dispK();
+    if (TAU_MS[k] <= state.xmax) {
+      const x = Math.round(sx(CENT_MS[k])) + 0.5;
+      ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.85; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, b.y0); ctx.lineTo(x, b.y1); ctx.stroke(); ctx.restore();
+    }
+    if (res.kCmin >= 0 && TAU_MS[res.kCmin] <= state.xmax) {
+      dot(ctx, sx(CENT_MS[res.kCmin]), sy(res.cMin), 5.5, '#ffffff', '#000000');
+    }
+    const cx0 = b.x1 + 14, cw = 11;
+    for (let y = b.y0; y < b.y1; y++) {
+      const c = viridis(1 - (y - b.y0) / (b.y1 - b.y0));
+      ctx.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+      ctx.fillRect(cx0, y, cw, 1.5);
+    }
+    const scb = lin(0, 100, b.y1, b.y0), ink2 = tok('--ink-2');
+    [0, 50, 100].forEach((v) => text(ctx, String(v), cx0 + cw + 4, scb(v), 'left', 11, ink2, 'middle'));
+    ctx.save(); ctx.translate(w - 6, (b.y0 + b.y1) / 2); ctx.rotate(-Math.PI / 2);
+    text(ctx, 'Confidence (%)', 0, 0, 'center', 12, tok('--ink')); ctx.restore();
+    const cm = Number.isFinite(res.cMin)
+      ? `<span class="m">C</span><sub>min</sub> = ${pct(res.cMin)} at ${TAU_HTML} = ${TAU_MS[res.kCmin].toFixed(2)} ms (white dot)`
+      : `<span class="m">C</span><sub>min</sub> is above 35%`;
+    $('matSub').innerHTML = `Black line: ${fmt(p.gam, 1)}% confidence boundary. Red line: the ${fmt(p.cth, 1)}% threshold. ${cm}.`;
+  }
+
+  // ------------------------------------------------------------ cards ----
+  function pill(el, ok) {
+    el.className = 'pill ' + (ok ? 'ok' : 'no');
+    el.textContent = ok ? '✓ Accepted' : '✗ Rejected';
+  }
+  function drawCards() {
+    const p = state.p, res = state.res, hl = state.hl;
+    pill($('srpPill'), res.passes);
+    const range = res.kFirst >= 0 ? `${TAU_MS[res.kFirst].toFixed(2)}&ndash;${TAU_MS[res.kLast].toFixed(2)} ms` : 'none';
+    $('srpKV').innerHTML =
+      `<dt>Maximum confidence</dt><dd>${pct(res.maxConf)}${res.kMax >= 0 ? ` at ${TAU_HTML} = ${TAU_MS[res.kMax].toFixed(2)} ms` : ''} (needs ${fmt(p.gam, 1)}%)</dd>` +
+      `<dt>Accepted windows</dt><dd>${range}</dd>` +
+      `<dt>Lowest confirmable</dt><dd>${Number.isFinite(res.cMin) ? `<span class="m">C</span><sub>min</sub> = ${pct(res.cMin)}` : 'above 35%'}</dd>`;
+    pill($('hlPill'), hl.passes);
+    const est = Number.isFinite(hl.est) ? pct(100 * hl.est) : 'undefined (too many violations)';
+    $('hlKV').innerHTML =
+      `<dt>Window</dt><dd>0&ndash;${(hl.window * 1000).toFixed(2)} ms (the assumed ${p.hlMs.toFixed(1)} ms, ` +
+      `rounded up to a whole bin as the original code does)</dd>` +
+      `<dt>Violations</dt><dd>${hl.obs.toLocaleString('en-US')} observed; ${fmt(hl.expected, 1)} at ${fmt(p.cth, 1)}% contamination</dd>` +
+      `<dt>Estimated contamination</dt><dd>${est} (threshold ${fmt(p.cth, 1)}%)</dd>`;
+    const realized = state.n ? 100 * state.nCont / state.n : NaN;
+    $('trainFact').textContent = `This train: ${state.n.toLocaleString('en-US')} spikes ` +
+      `(${fmtRate(state.n / state.dur)} spikes/s), ${pct(realized)} from the contaminating source.`;
+  }
+
+  function renderPanels() {
+    if (!state.res) return;
+    drawACG(); drawCurve(); drawPois(); drawMat();
+  }
+  function render() {
+    if (!state.res) return;
+    renderPanels(); drawCards(); drawBatchStrips();
+  }
+  let hoverFrame = 0;
+  function renderSoon() {
+    cancelAnimationFrame(hoverFrame);
+    hoverFrame = requestAnimationFrame(renderPanels);
+  }
+
+  // ------------------------------------------------------- hover/pin -----
+  function hookHover(cv, geomFn, tipEl, tipFn) {
+    const move = (ev) => {
+      const g = geomFn(); if (!g) return;
+      const r = cv.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+      if (x < g.b.x0 || x > g.b.x1 || y < g.b.y0 || y > g.b.y1) { leave(); return; }
+      const k = kOfTau(g.sx.inv(x));
+      if (k !== state.hoverK) { state.hoverK = k; renderSoon(); }
+      tipEl.innerHTML = tipFn(k, g.sy.inv(y));
+      tipEl.hidden = false;
+      const panel = cv.parentNode.getBoundingClientRect();
+      const left = ev.clientX - panel.left + 12, top = ev.clientY - panel.top - 34;
+      tipEl.style.left = Math.min(left, panel.width - tipEl.offsetWidth - 6) + 'px';
+      tipEl.style.top = Math.max(4, top) + 'px';
+    };
+    const leave = () => { tipEl.hidden = true; if (state.hoverK !== null) { state.hoverK = null; renderSoon(); } };
+    cv.addEventListener('pointermove', move);
+    cv.addEventListener('pointerleave', leave);
+    cv.addEventListener('pointerdown', (ev) => {
+      move(ev);
+      if (state.hoverK !== null) { state.selK = state.hoverK; state.pinned = true; }
+      if (ev.pointerType !== 'mouse') { state.hoverK = null; tipEl.hidden = true; renderSoon(); }
+    });
+  }
+  hookHover($('cvCurve'), () => curveGeom, $('tipCurve'), (k) =>
+    `τ<sub>r</sub> = ${TAU_MS[k].toFixed(2)} ms &middot; confidence ${pct(state.res.row[k])}`);
+  hookHover($('cvMat'), () => matGeom, $('tipMat'), (k, c) => {
+    const i = clamp(Math.round(c / 0.5) - 1, 0, GRID.length - 1);
+    return `τ<sub>r</sub> = ${TAU_MS[k].toFixed(2)} ms &middot; ${fmt(GRID[i], 1)}% &middot; confidence ${pct(state.M[i][k])}`;
+  });
+
+  // ------------------------------------------------------------ batch ----
+  function wilson(k, n) {
+    const z = 1.96, ph = k / n, d = 1 + z * z / n;
+    const c = (ph + z * z / (2 * n)) / d, hw = z * Math.sqrt(ph * (1 - ph) / n + z * z / (4 * n * n)) / d;
+    return [Math.max(0, c - hw), Math.min(1, c + hw)];
+  }
+  async function runBatch() {
+    const p = readParams(), token = ++state.batchToken, N = 100;
+    const btn = $('runBatch');
+    btn.disabled = true; btn.textContent = 'Simulating…';
+    $('prog').hidden = false; $('progBar').style.width = '0%';
+    $('batchStatus').textContent = '';
+    const rng = S.makeRng((state.seed * 2654435761 + 97) >>> 0);
+    const acgs = [], ns = [], conts = [], dur = p.durMin * 60;
+    let t0 = performance.now();
+    for (let i = 0; i < N; i++) {
+      const tr = S.makeTrain(p.rate, p.contPct / 100, dur, p.rpMs / 1000, rng);
+      acgs.push(S.computeACG(tr.st)); ns.push(tr.st.length); conts.push(tr.st.length ? tr.nCont / tr.st.length : NaN);
+      if (performance.now() - t0 > 30) {
+        $('progBar').style.width = (100 * (i + 1) / N) + '%';
+        await new Promise((r) => setTimeout(r, 0));
+        if (token !== state.batchToken) return;
+        t0 = performance.now();
+      }
+    }
+    state.batch = { acgs, ns, conts, dur, uk: unitKey(p), p };
+    $('prog').hidden = true; btn.disabled = false; btn.textContent = 'Simulate 100 trains';
+    summarizeBatch();
+  }
+  function summarizeBatch() {
+    const B = state.batch;
+    if (!B) return;
+    const p = readParams(), stale = unitKey(p) !== B.uk;
+    $('batch').classList.toggle('stale', stale);
+    const N = B.acgs.length;
+    const srp = [], hl = [];
+    for (let i = 0; i < N; i++) {
+      srp.push(S.slidingRP(B.acgs[i], B.ns[i], B.dur,
+        { contThresh: p.cth, confThresh: p.gam, tauMin: p.tminMs / 1000, withCmin: false }));
+      hl.push(S.hillLlobet(B.acgs[i], B.ns[i], B.dur, p.hlMs / 1000, p.cth));
+    }
+    B.srp = srp; B.hl = hl; B.pNow = p;
+    const kS = srp.filter((r) => r.passes).length, kH = hl.filter((r) => r.passes).length;
+    const show = (big, sub, k) => {
+      const [lo, hi] = wilson(k, N);
+      $(big).textContent = Math.round(100 * k / N) + '% accepted';
+      $(sub).textContent = `${k} of ${N} trains; 95% CI ${Math.round(100 * lo)}–${Math.round(100 * hi)}%`;
+    };
+    show('srpBig', 'srpBigSub', kS);
+    show('hlBig', 'hlBigSub', kH);
+    const c = B.p.contPct, below = c < p.cth;
+    const rc = B.conts.filter(Number.isFinite), mean = rc.reduce((a, b) => a + b, 0) / rc.length;
+    $('batchContext').innerHTML = stale
+      ? 'The simulated unit has changed since these trains were made. Press <strong>Simulate 100 trains</strong> to re-run.'
+      : (below
+        ? `True contamination is ${fmt(c, 1)}%, below the ${fmt(p.cth, 1)}% threshold, so every acceptance is correct: higher is better (the true acceptance rate).`
+        : `True contamination is ${fmt(c, 1)}%, at or above the ${fmt(p.cth, 1)}% threshold, so every acceptance is a false acceptance: lower is better (the false acceptance rate).`) +
+        ` Realized contamination across the 100 trains averages ${pct(100 * mean)}.`;
+    $('batchStatus').textContent = stale ? 'Out of date' : `${fmtRate(B.p.rate)} spikes/s, ${B.p.rpMs.toFixed(1)} ms refractory period, ${fmt(B.p.contPct, 1)}% contamination, ${B.p.durMin} min`;
+    drawBatchStrips();
+  }
+  function strip(cv, vals, passes, domain, thresh, xlab, color, fmtThresh) {
+    const { ctx, w, h } = prep(cv, 0.2, 86, 96);
+    const b = { x0: 14, x1: w - 14, y0: 8, y1: h - 38 };
+    const sx = lin(domain[0], domain[1], b.x0, b.x1);
+    const ink2 = tok('--ink-2');
+    ctx.strokeStyle = ink2; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(b.x0, b.y1 + 0.5); ctx.lineTo(b.x1, b.y1 + 0.5); ctx.stroke();
+    niceTicks(domain[0], domain[1], 5).forEach((v) => {
+      const x = Math.round(sx(v)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, b.y1); ctx.lineTo(x, b.y1 + 4); ctx.stroke();
+      text(ctx, tickLabel(v), x, b.y1 + 15, 'center', 11, ink2);
+    });
+    text(ctx, xlab, (b.x0 + b.x1) / 2, b.y1 + 31, 'center', 12, tok('--ink'));
+    const xt = Math.round(sx(thresh)) + 0.5;
+    ctx.strokeStyle = tok('--ink'); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(xt, b.y0 - 2); ctx.lineTo(xt, b.y1); ctx.stroke();
+    let beyond = 0;
+    vals.forEach((v, i) => {
+      let x;
+      if (!Number.isFinite(v) || v > domain[1]) { beyond++; x = b.x1; } else x = sx(Math.max(domain[0], v));
+      const y = b.y0 + 4 + ((i * 0.6180339887) % 1) * (b.y1 - b.y0 - 8);
+      ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 2 * Math.PI);
+      if (passes[i]) { ctx.fillStyle = color; ctx.fill(); }
+      else { ctx.lineWidth = 1.3; ctx.strokeStyle = color; ctx.stroke(); }
+    });
+    return beyond;
+  }
+  function drawBatchStrips() {
+    const B = state.batch;
+    if (!B || !B.srp) return;
+    const p = B.pNow;
+    strip($('cvStripSrp'), B.srp.map((r) => r.maxConf), B.srp.map((r) => r.passes), [0, 100], p.gam,
+      'Maximum confidence per train (%); filled = accepted', tok('--srp'));
+    const est = B.hl.map((r) => 100 * r.est);
+    const fin = est.filter(Number.isFinite);
+    const top = Math.min(100, Math.max(2 * p.cth, fin.length ? Math.max(...fin) * 1.05 : 0, 5));
+    strip($('cvStripHl'), est, B.hl.map((r) => r.passes), [0, top], p.cth,
+      'Estimated contamination per train (%); filled = accepted', tok('--hl'));
+  }
+
+  // ------------------------------------------------------------- wiring --
+  let pending = 0;
+  function schedule() {
+    showOutputs(readParams());
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => { state.pinned = false; compute(); });
+  }
+  ['rate', 'rp', 'cont', 'dur', 'cth', 'gam', 'tmin', 'hl'].forEach((id) => $(id).addEventListener('input', schedule));
+  $('newTrain').addEventListener('click', () => { state.seed = (state.seed + 1) >>> 0; state.pinned = false; compute(); });
+  $('reset').addEventListener('click', () => {
+    Object.entries(DEFAULTS).forEach(([id, v]) => { $(id).value = v; });
+    state.pinned = false; compute();
+  });
+  $('runBatch').addEventListener('click', runBatch);
+  const setX = (v) => {
+    state.xmax = v;
+    $('x5').setAttribute('aria-pressed', String(v === 5));
+    $('x10').setAttribute('aria-pressed', String(v === 10));
+    render();
+  };
+  $('x5').addEventListener('click', () => setX(5));
+  $('x10').addEventListener('click', () => setX(10));
+
+  let rz = 0;
+  new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(render); }).observe(document.querySelector('main'));
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  compute();
+  runBatch();
+})();
+</script>
