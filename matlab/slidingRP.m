@@ -37,6 +37,17 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %                              Default: 0.5:0.5:35.
 %       .nViolShortThresh    - Threshold for nViolShort output (s).
 %                              Default: 0.002 (2 ms).
+%       .censor              - The spike sorter's censor (duplicate-removal)
+%                              window, in seconds. If the sorter deleted every
+%                              spike within this window of an earlier spike of
+%                              the same unit, violations at shorter lags can
+%                              never be observed, and ignoring that makes the
+%                              metric strongly anti-conservative. Each tested
+%                              window tau_r then contributes an expected count
+%                              over max(tau_r - censor, 0). Set it to your
+%                              sorter's window (e.g. Kilosort 4's
+%                              duplicate_spike_ms). Default: 0, the published
+%                              method exactly.
 %       .correction          - Logical. If true, apply the family-wise
 %                              multiple-comparisons correction across tau_r
 %                              (exact Poisson first-passage; Fig. S3). Slow and
@@ -99,6 +110,11 @@ if isfield(params, 'rpReject')
 else
     rpReject = 0.0005;
 end
+if isfield(params, 'censor')
+    censor = params.censor;
+else
+    censor = 0;
+end
 
 useCorrection = isfield(params, 'correction') && params.correction;
 
@@ -124,7 +140,7 @@ if useCorrection
     nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
     passTest = confidence >= confThresh;
     if isfield(params, 'recDur'); recDurC = params.recDur; else; recDurC = max(spikeTimes); end
-    tauPass0Val = tauPass0(numel(spikeTimes), recDurC, contThresh, confThresh);
+    tauPass0Val = tauPass0(numel(spikeTimes), recDurC, contThresh, confThresh, censor);
     return;
 end
 
@@ -138,6 +154,7 @@ rpEdges    = 0:acgBinSize:testWindow;
 [nACG, rp] = histdiff(spikeTimes, spikeTimes, rpEdges);
 obsViol    = cumsum(nACG);          % cumulative observed violations up to each tau_r
 refDur     = rp + acgBinSize/2;     % right bin edge = tested tau_r
+refDurObs  = max(refDur - censor, 0);   % observable part of each window
 
 % Exclude tau_r bins below rpReject from pass/fail decisions
 testTimes = rp > rpReject;
@@ -145,13 +162,13 @@ testTimes = rp > rpReject;
 % Maximum confidence at the user-defined contamination threshold. This is the
 % same quantity computeMatrix would give at the contThresh row, but computed as
 % a single vector over tau_r (no full contamination grid needed).
-confAtThresh = 100 * computeViol(obsViol, [], spikeCount, refDur, contThresh/100, recDur);
+confAtThresh = 100 * computeViol(obsViol, [], spikeCount, refDurObs, contThresh/100, recDur);
 confidence = max(confAtThresh(testTimes));
 
 % Minimum contamination confirmable at confThresh, computed analytically
 % (continuous; equivalent to the grid search to within grid resolution).
 [contamination, timeOfLowestCont] = computeMinContamination(...
-    obsViol, spikeCount, refDur, rp, recDur, confThresh, rpReject);
+    obsViol, spikeCount, refDurObs, rp, recDur, confThresh, rpReject);
 
 % Count short-ISI spikes (diagnostic for low-rate units)
 nViolShort = sum(nACG(1:find(rp > nViolShortThresh, 1)));
@@ -161,7 +178,7 @@ passTest = confidence >= confThresh;
 % Diagnostic: shortest violation-free window that would have let this unit
 % pass, given only its spike count and duration (see tauPass0). Does not
 % affect passTest.
-tauPass0Val = tauPass0(spikeCount, recDur, contThresh, confThresh);
+tauPass0Val = tauPass0(spikeCount, recDur, contThresh, confThresh, censor);
 
 % Full confidence matrix is only built when the caller requests it (outputs
 % 6-7). The scalar metrics above never need it.

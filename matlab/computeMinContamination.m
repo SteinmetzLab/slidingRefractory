@@ -54,7 +54,7 @@ lambda = chi2inv(gamma, 2 * (obsViol + 1)) / 2;
 
 disc = (N - 0.5)^2 - lambda .* recDur ./ refDur;
 Cmin = nan(size(refDur));
-ok = disc >= 0;
+ok = disc >= 0 & refDur > 0;   % a window inside the censor has no information
 Cmin(ok) = ((N - 0.5) - sqrt(disc(ok))) / N * 100;   % percentage
 
 testTimes = rp > rpReject;

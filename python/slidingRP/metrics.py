@@ -222,9 +222,18 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     For the full confidence matrix, call computeMatrix() directly.
 
     params options include: recDur, sampleRate, binSizeCorr, cont, correction
-    (FWER multiple-comparisons; default off), and forcePass (IBL-specific; default
-    off) — when True, units with zero <2 ms violations and firing_rate > 0.5 are
-    flagged via pass_forced.
+    (FWER multiple-comparisons; default off), censor, and forcePass
+    (IBL-specific; default off) — when True, units with zero <2 ms violations and
+    firing_rate > 0.5 are flagged via pass_forced.
+
+    censor (seconds, default 0): the sorter's censor (duplicate-removal)
+    window. If the sorter deleted every spike within ``censor`` of an earlier
+    spike of the same unit, violations at shorter lags can never be observed,
+    and ignoring that makes the metric strongly anti-conservative. With
+    ``censor = w`` each tested window tau_r contributes an expected count over
+    its observable length max(tau_r - w, 0). Set it to your sorter's window
+    (e.g. Kilosort 4's ``duplicate_spike_ms``); 0 reproduces the published
+    method exactly.
 
     Returns
     -------
@@ -237,7 +246,9 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     pass_cont_thresh : bool   max_conf >= conf_thresh
     pass_forced : bool    IBL force-pass flag (False unless params['forcePass'])
     tau_pass0 : float     shortest violation-free window (s) that would pass;
-                          > tau_max means the unit cannot pass for lack of data
+                          > tau_max means the unit cannot pass for lack of data.
+                          With a censor window this includes it (censor + the
+                          observable length needed).
 
     Mapping to MATLAB slidingRP.m outputs (which differ in order):
         MATLAB [passTest, confidence, contamination, timeOfLowestCont, nViolShort, ...]
@@ -248,6 +259,7 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     params = dict(params) if params else {}
     sampleRate = params.setdefault('sampleRate', 30000)
     rpBinSize = params.setdefault('binSizeCorr', 1 / sampleRate)
+    censor = float(params.get('censor', 0.0))
 
     spikeTimes = np.asarray(spikeTimes, dtype=np.float64)
 
@@ -267,7 +279,7 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
             recDur_corr = float(np.max(spikeTimes)) if spikeTimes.size else 0.0
         return max_conf, min_cont, rp_min_val, n_spikes_below2, firing_rate, \
             pass_cont_thresh, pass_forced, \
-            tau_pass0(spikeTimes.size, recDur_corr, cont_thresh, conf_thresh)
+            tau_pass0(spikeTimes.size, recDur_corr, cont_thresh, conf_thresh, censor=censor)
 
     n_spikes = spikeTimes.size
     recDur = params.get('recDur', None)
@@ -277,6 +289,8 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
     rp = rpEdges + rpBinSize / 2                   # bin centres (s)
     refDur = rp + rpBinSize / 2                    # right bin edge = tested tau_r
+    # observable part of each window: violations below the censor are never seen
+    refDurObs = np.clip(refDur - censor, 0.0, None)
     nACG = computeACG(spikeTimes, rpBinSize, rp.size)
     obsViol = np.cumsum(nACG)
     firing_rate = n_spikes / recDur if recDur > 0 else 0.0
@@ -284,13 +298,13 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     testTimes = rp > rp_reject  # exclude tau_r below rp_reject from pass/fail
 
     # Max confidence at the contamination threshold (identical to the matrix path)
-    conf_at_thresh = 100 * computeViol(obsViol, firing_rate, n_spikes, refDur,
+    conf_at_thresh = 100 * computeViol(obsViol, firing_rate, n_spikes, refDurObs,
                                        cont_thresh / 100, recDur)
     max_conf = float(np.max(conf_at_thresh[testTimes])) if np.any(testTimes) else 0.0
 
     # Minimum confirmable contamination, computed analytically (continuous)
     min_cont, rp_min_val = compute_min_contamination(
-        obsViol, n_spikes, refDur, rp, recDur, conf_thresh, rp_reject)
+        obsViol, n_spikes, refDurObs, rp, recDur, conf_thresh, rp_reject)
 
     pass_cont_thresh = bool(max_conf >= conf_thresh)
 
@@ -305,7 +319,7 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     return max_conf, min_cont, rp_min_val, \
         n_spikes_below2, firing_rate, \
         pass_cont_thresh, pass_forced, \
-        tau_pass0(n_spikes, recDur, cont_thresh, conf_thresh)
+        tau_pass0(n_spikes, recDur, cont_thresh, conf_thresh, censor=censor)
 
 
 def _slidingRP_worker(args):
@@ -322,7 +336,8 @@ def slidingRP_all(spikeTimes, spikeClusters, params=None,
 
     :param spikeTimes:  array of spike times (s)
     :param spikeClusters:  array of spike cluster ids that corresponds to spikeTimes
-    :param params:  dict of options passed to slidingRP (e.g. {'recDur': ...})
+    :param params:  dict of options passed to slidingRP (e.g. {'recDur': ...,
+                    'censor': 0.00025} for a sorter with a 0.25 ms censor window)
     :param n_jobs:  number of parallel processes over clusters. 1 (default) runs
                     serially; >1 uses that many processes; <0 uses all cores.
                     (Process-based, like the MATLAB parfor; on Windows the caller
@@ -430,6 +445,7 @@ def computeMatrix(spikeTimes, params):
           first-passage; Fig. S3). Slow and over-conservative for short-RP
           units; intended for Fig. S3 only.
         - rpReject : min tau_r (s) included in the correction, default 0.0005.
+        - censor : sorter censor window (s), default 0; see slidingRP.
 
     Returns
     -------
@@ -449,6 +465,7 @@ def computeMatrix(spikeTimes, params):
     cont = params.get('cont', np.arange(0.5, 35.5, 0.5))
     correction = params.get('correction', False)
     rp_reject = params.get('rpReject', 0.0005)
+    censor = float(params.get('censor', 0.0))
 
     rpEdges = np.arange(0, 10 / 1000, rpBinSize)  # in s
     rp = rpEdges + rpBinSize / 2  # refractory period durations to test (bin centres)
@@ -459,11 +476,12 @@ def computeMatrix(spikeTimes, params):
     nACG = computeACG(spikeTimes, rpBinSize, rp.size)
     obsViol = np.cumsum(nACG[0:rp.size])
     refDur = rp + rpBinSize / 2
+    refDurObs = np.clip(refDur - censor, 0.0, None)   # observable window length
 
     # Pointwise (nominal) confidence matrix
     Nc = n_spikes * (cont[:, np.newaxis] / 100)
     Nb = n_spikes * (1 - cont[:, np.newaxis] / 100)
-    expectedViolMatrix = 2 * refDur[np.newaxis, :] / recDur * Nc * (Nb + (Nc - 1) / 2)
+    expectedViolMatrix = 2 * refDurObs[np.newaxis, :] / recDur * Nc * (Nb + (Nc - 1) / 2)
     nominalConfMatrix = 100 * (1 - stats.poisson.cdf(obsViol[np.newaxis, :], expectedViolMatrix))
 
     if not correction:
@@ -614,9 +632,10 @@ def compute_min_contamination(obsViol, spikeCount, refDur, rp, recDur,
         return np.nan, np.nan
     gamma = conf_thresh / 100
     lam = stats.chi2.ppf(gamma, 2 * (obsViol + 1)) / 2
-    disc = (N - 0.5) ** 2 - lam * recDur / refDur
+    with np.errstate(divide='ignore', invalid='ignore'):
+        disc = (N - 0.5) ** 2 - lam * recDur / refDur
     Cmin = np.full(refDur.shape, np.nan)
-    ok = disc >= 0
+    ok = (disc >= 0) & (refDur > 0)   # a window inside the censor has no information
     Cmin[ok] = ((N - 0.5) - np.sqrt(disc[ok])) / N * 100  # as a percentage
 
     testTimes = rp > rp_reject

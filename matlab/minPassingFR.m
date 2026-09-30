@@ -3,6 +3,7 @@ function fr = minPassingFR(recDur, tau, varargin)
 %
 %   fr = minPassingFR(recDur, tau)
 %   fr = minPassingFR(recDur, tau, contThresh, confThresh)
+%   fr = minPassingFR(recDur, tau, contThresh, confThresh, censor)
 %
 %   Exact inverse of Ve(tau) = -log(1 - gamma), which is a quadratic in the
 %   spike count N:
@@ -17,6 +18,8 @@ function fr = minPassingFR(recDur, tau, varargin)
 %     tau        - refractory period duration assumed clean, in seconds.
 %     contThresh - (optional) maximum acceptable contamination (%). Default 10.
 %     confThresh - (optional) required confidence (%). Default 90.
+%     censor     - (optional) sorter censor window (s). Default 0. The
+%                  observable length tau - censor replaces tau (Inf if <= 0).
 %
 %   OUTPUT
 %     fr - minimum firing rate in spikes/s.
@@ -29,9 +32,12 @@ function fr = minPassingFR(recDur, tau, varargin)
 
 if nargin > 2 && ~isempty(varargin{1}); contThresh = varargin{1}; else; contThresh = 10; end
 if nargin > 3 && ~isempty(varargin{2}); confThresh = varargin{2}; else; confThresh = 90; end
+if nargin > 4 && ~isempty(varargin{3}); censor = varargin{3}; else; censor = 0; end
 
 C = contThresh / 100;
-k = -log(1 - confThresh / 100) .* recDur ./ (2 * tau);
+tauObs = tau - censor;
+k = -log(1 - confThresh / 100) .* recDur ./ (2 * tauObs);
+k(tauObs <= 0) = Inf;
 a = C * (1 - C) + C^2 / 2;
 b = -C / 2;
 N = (-b + sqrt(b.^2 + 4 * a * k)) / (2 * a);

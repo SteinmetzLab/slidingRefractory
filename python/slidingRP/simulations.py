@@ -72,8 +72,9 @@ def RPmetric_Classic(spikeTimes, params):
 
     params keys: metricType ('Llobet' default | 'Hill'), contaminationThresh
     (%, default 10), recDur, RPdur (s, default 0.002), acgBinSize (default
-    1/30000). For speed, a precomputed ACG may be passed via nACG + rp +
-    spikeCount (as the MATLAB simulation does).
+    1/30000), censor (s, default 0: the sorter's censor window; the expected
+    count and the estimate then use RPdur - censor). For speed, a precomputed
+    ACG may be passed via nACG + rp + spikeCount (as the MATLAB simulation does).
 
     Returns (passTest, estContam): passTest is obsViol <= expectedViol at RPdur;
     estContam is the inverted point estimate (proportion).
@@ -82,6 +83,7 @@ def RPmetric_Classic(spikeTimes, params):
     contThresh = params.get('contaminationThresh', 10)
     RPdur = params.get('RPdur', 0.002)
     acgBinSize = params.get('acgBinSize', 1 / 30000)
+    censor = float(params.get('censor', 0.0))
 
     if 'nACG' in params:
         nACG = params['nACG']
@@ -103,17 +105,18 @@ def RPmetric_Classic(spikeTimes, params):
 
     Nc = spikeCount * contThresh / 100
     Nb = spikeCount * (1 - contThresh / 100)
+    RPobs = max(RPdur - censor, 0.0)   # observable part of the window
 
     # estContam is undefined (NaN) when observed violations exceed the formula's
     # valid range (very high contamination); passTest is unaffected.
-    with np.errstate(invalid='ignore'):
+    with np.errstate(invalid='ignore', divide='ignore'):
         if metricType == 'Llobet':
             # contaminating spikes also violate with each other
-            expectedViol = 2 * RPdur / recDur * Nc * (Nb + (Nc - 1) / 2)
-            estContam = 1 - np.sqrt(1 - obsViol * recDur / (spikeCount ** 2 * RPdur))
+            expectedViol = 2 * RPobs / recDur * Nc * (Nb + (Nc - 1) / 2)
+            estContam = 1 - np.sqrt(1 - obsViol * recDur / (spikeCount ** 2 * RPobs))
         else:  # 'Hill': single other neuron, violations only with the base neuron
-            expectedViol = 2 * RPdur / recDur * Nc * Nb
-            estContam = 0.5 * (1 - np.sqrt(1 - 2 * obsViol * recDur / spikeCount ** 2 / RPdur))
+            expectedViol = 2 * RPobs / recDur * Nc * Nb
+            estContam = 0.5 * (1 - np.sqrt(1 - 2 * obsViol * recDur / spikeCount ** 2 / RPobs))
 
     passTest = bool(obsViol <= expectedViol)
     return passTest, estContam

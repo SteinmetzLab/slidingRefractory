@@ -384,3 +384,20 @@ def test_gen_modulated_pair_stats_do_not_change_the_spikes():
                                    rng=np.random.default_rng(9), return_stats=True)
     assert np.array_equal(b1, b2) and np.array_equal(c1, c2)
     assert s["kappa"] == pytest.approx(0.27, abs=0.06)
+
+
+@pytest.mark.parametrize("w", [0.0, 0.00025, 0.0005])
+def test_analysis_censor_matches_package(w):
+    """acg_table's censor must equal the package's params['censor']."""
+    dur = 3600.0
+    st, _ = make_train("standard", 5.0, 0.12, dur, 0.003, rng=RNG, censor=w)
+    ref = metrics.slidingRP(st, params={"recDur": dur, "censor": w})
+    got = slidingRP_from_acg(metrics.computeACG(st, BIN_SIZE, N_BINS), st.size, dur,
+                             censor=w)
+    assert got["max_conf"] == pytest.approx(ref[0], abs=1e-10)
+    assert got["passes"] == ref[5]
+    if np.isnan(ref[1]):
+        assert np.isnan(got["min_cont"])
+    else:
+        assert got["min_cont"] == pytest.approx(ref[1], rel=1e-9)
+        assert got["rp_min_val"] == pytest.approx(ref[2], rel=1e-12)

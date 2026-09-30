@@ -27,7 +27,7 @@ from __future__ import annotations
 import numpy as np
 
 
-def tau_pass0(n_spikes, rec_dur, cont_thresh=10.0, conf_thresh=90.0):
+def tau_pass0(n_spikes, rec_dur, cont_thresh=10.0, conf_thresh=90.0, censor=0.0):
     """Shortest violation-free window (s) that would let a unit pass.
 
     ``tau_pass0 = -ln(1 - gamma) * D / (2 * Nc * (Nb + (Nc - 1)/2))``
@@ -47,6 +47,10 @@ def tau_pass0(n_spikes, rec_dur, cont_thresh=10.0, conf_thresh=90.0):
         Maximum acceptable contamination (%), the C_thresh of the metric.
     conf_thresh : float
         Required confidence (%), the gamma_thresh of the metric.
+    censor : float
+        Sorter censor window (s), default 0. Violations below it are never
+        observed, so the window must be ``censor`` longer to hold the same
+        observable length: the result is shifted by ``censor``.
 
     Returns
     -------
@@ -66,11 +70,11 @@ def tau_pass0(n_spikes, rec_dur, cont_thresh=10.0, conf_thresh=90.0):
     denom = 2 * nc * (nb + (nc - 1) / 2)
     with np.errstate(divide="ignore", invalid="ignore"):
         out = -np.log(1 - conf_thresh / 100.0) * d / denom
-    out = np.where(denom > 0, out, np.inf)
+    out = np.where(denom > 0, out + censor, np.inf)
     return float(out) if np.ndim(out) == 0 else out
 
 
-def min_passing_fr(rec_dur, tau, cont_thresh=10.0, conf_thresh=90.0):
+def min_passing_fr(rec_dur, tau, cont_thresh=10.0, conf_thresh=90.0, censor=0.0):
     """Minimum firing rate (spikes/s) for a violation-free unit to pass at tau.
 
     Exact inverse of ``Ve(tau) = -ln(1 - gamma)``, which is a quadratic in the
@@ -79,12 +83,15 @@ def min_passing_fr(rec_dur, tau, cont_thresh=10.0, conf_thresh=90.0):
         [C(1-C) + C^2/2] N^2 - (C/2) N - ln(1/(1-gamma)) D / (2 tau) = 0
 
     Returns ``N / D``. This is the analytical form of manuscript Fig 4g, which
-    was previously obtained by simulation.
+    was previously obtained by simulation. With a sorter censor window the
+    observable length ``tau - censor`` replaces ``tau`` (``inf`` if not positive).
     """
     d = np.asarray(rec_dur, dtype=np.float64)
-    t = np.asarray(tau, dtype=np.float64)
+    t = np.asarray(tau, dtype=np.float64) - censor
     c = cont_thresh / 100.0
-    k = -np.log(1 - conf_thresh / 100.0) * d / (2 * t)
+    with np.errstate(divide="ignore"):
+        k = np.where(t > 0, -np.log(1 - conf_thresh / 100.0) * d / (2 * np.where(t > 0, t, 1.0)),
+                     np.inf)
     a = c * (1 - c) + c * c / 2
     b = -c / 2
     n = (-b + np.sqrt(b * b + 4 * a * k)) / (2 * a)

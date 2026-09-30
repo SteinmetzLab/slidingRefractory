@@ -36,6 +36,9 @@ function [confMatrix, cont, rp, nACG, nominalConfMatrix] = computeMatrix(spikeTi
 %       .testWindow  - Maximum tau_r to test (seconds). Default: 0.01 (10 ms).
 %       .correction  - Logical. Apply the multiple-comparisons correction.
 %                      Default: false.
+%       .censor      - Sorter censor window (s); each window contributes an
+%                      expected count over max(tau_r - censor, 0). Default 0.
+%                      See slidingRP.
 %       .rpReject    - Min tau_r (s) included in the correction. Default
 %                      0.0005. (Only used when correction is true.)
 %
@@ -88,6 +91,11 @@ if nargin > 1 && isfield(params, 'rpReject')
 else
     rpReject = 0.0005;
 end
+if nargin > 1 && isfield(params, 'censor')
+    censor = params.censor;
+else
+    censor = 0;
+end
 
 rpEdges = 0:acgBinSize:testWindow;
 
@@ -99,13 +107,14 @@ spikeCount = numel(spikeTimes);
 
 obsViol = cumsum(nACG);             % cumulative observed violations up to tau_r
 refDur  = rp + acgBinSize/2;        % right edge of bin = tested tau_r
+refDurObs = max(refDur - censor, 0); % observable part of each window
 
 % ---- Pointwise (nominal) confidence matrix, computed for every case --------
 nominalConfMatrix    = nan(numel(cont), numel(rp));
 expectedViolMatrix   = nan(numel(cont), numel(rp));
 for cidx = 1:numel(cont)
     [nomScore, eViol] = computeViol(...
-        obsViol, [], spikeCount, refDur, cont(cidx)/100, recDur);
+        obsViol, [], spikeCount, refDurObs, cont(cidx)/100, recDur);
     nominalConfMatrix(cidx, :)  = nomScore * 100;
     expectedViolMatrix(cidx, :) = eViol;
 end

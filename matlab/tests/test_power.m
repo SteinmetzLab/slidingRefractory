@@ -11,6 +11,14 @@ function tests = test_power
 tests = functiontests(localfunctions);
 end
 
+function setupOnce(~)
+% Add the package and its simulations folder (genST) so this file runs on its
+% own, not only after another test file has put them on the path.
+repo = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+addpath(fullfile(repo, 'matlab'));
+addpath(fullfile(repo, 'matlab', 'simulations'));
+end
+
 % =====================================================================
 %  tauPass0
 % =====================================================================

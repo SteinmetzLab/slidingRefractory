@@ -20,12 +20,15 @@ function rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params)
 %     params        - (optional) scalar struct of parameters. Any fields
 %                     not specified will use their default values. Fields:
 %
-%       .contaminationThresh - Maximum acceptable contamination proportion.
-%                              Passed to slidingRP(). Default: 0.1 (10%).
+%       .contaminationThresh - Maximum acceptable contamination, in percent.
+%                              Passed to slidingRP(). Default: 10.
 %       .confidenceThresh    - Minimum confidence required to accept a
 %                              unit. Passed to slidingRP(). Default: 90.
-%       .tauMin              - Minimum RP duration to consider (seconds).
-%                              Passed to slidingRP(). Default: 0.0005.
+%       .rpReject            - Minimum RP duration to consider (seconds),
+%                              tau_min in the manuscript. Passed to
+%                              slidingRP(). Default: 0.0005.
+%       .censor              - The sorter's censor (duplicate-removal) window
+%                              in seconds; see slidingRP(). Default: 0.
 %       .returnMatrix        - Logical. If true, the full confidence matrix
 %                              from slidingRP() is stored in each element
 %                              of rpMetrics. Default: false.
@@ -55,7 +58,7 @@ function rpMetrics = slidingRP_all(spikeTimes, spikeClusters, params)
 %     rpMetrics = slidingRP_all(spikeTimes, spikeClusters);
 %
 %     % Custom thresholds, serial execution, with confidence matrices
-%     params.contaminationThresh = 0.05;
+%     params.contaminationThresh = 5;      % percent
 %     params.confidenceThresh    = 95;
 %     params.returnMatrix        = true;
 %     params.useParallel         = false;

@@ -3,6 +3,7 @@ function tau = tauPass0(spikeCount, recDur, varargin)
 %
 %   tau = tauPass0(spikeCount, recDur)
 %   tau = tauPass0(spikeCount, recDur, contThresh, confThresh)
+%   tau = tauPass0(spikeCount, recDur, contThresh, confThresh, censor)
 %
 %   A unit can fail the Sliding RP test for two different reasons: refractory
 %   period violations incompatible with acceptable contamination, or too few
@@ -28,6 +29,8 @@ function tau = tauPass0(spikeCount, recDur, varargin)
 %     recDur     - recording duration in seconds (scalar or array).
 %     contThresh - (optional) maximum acceptable contamination (%). Default 10.
 %     confThresh - (optional) required confidence (%). Default 90.
+%     censor     - (optional) sorter censor window (s). Default 0. The window
+%                  must be this much longer to hold the same observable length.
 %
 %   OUTPUT
 %     tau - shortest violation-free window in seconds; Inf if spikeCount is 0.
@@ -41,12 +44,13 @@ function tau = tauPass0(spikeCount, recDur, varargin)
 
 if nargin > 2 && ~isempty(varargin{1}); contThresh = varargin{1}; else; contThresh = 10; end
 if nargin > 3 && ~isempty(varargin{2}); confThresh = varargin{2}; else; confThresh = 90; end
+if nargin > 4 && ~isempty(varargin{3}); censor = varargin{3}; else; censor = 0; end
 
 C  = contThresh / 100;
 Nc = spikeCount .* C;
 Nb = spikeCount .* (1 - C);
 denom = 2 * Nc .* (Nb + (Nc - 1) / 2);
 
-tau = -log(1 - confThresh / 100) .* recDur ./ denom;
+tau = -log(1 - confThresh / 100) .* recDur ./ denom + censor;
 tau(denom <= 0) = Inf;
 end

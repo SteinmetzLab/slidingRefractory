@@ -30,6 +30,9 @@ function [passTest, estContam, rp, nACG] = RPmetric_Classic(spikeTimes, params)
 %       .recDur             - Recording duration (seconds). Defaults to
 %                             max(spikeTimes) if not specified.
 %       .acgBinSize         - ACG bin width (seconds). Default: 1/30000.
+%       .censor             - Sorter censor window (seconds). The expected
+%                             count and the estimate use RPdur - censor.
+%                             Default: 0.
 %       .nACG               - Pre-computed ACG counts (skips histdiff).
 %                             Must also provide .rp and .spikeCount.
 %       .rp                 - Bin labels for pre-computed nACG (seconds).
@@ -73,6 +76,11 @@ if nargin > 1 && isfield(params, 'acgBinSize')
 else
     acgBinSize = 1/30000;
 end
+if nargin > 1 && isfield(params, 'censor')
+    censor = params.censor;
+else
+    censor = 0;
+end
 
 if nargin > 1 && isfield(params, 'nACG')
     % Use pre-computed ACG (avoids histdiff dependency)
@@ -90,6 +98,7 @@ end
 
 expectedNc = spikeCount * contaminationThresh / 100;
 expectedNb = spikeCount * (1 - contaminationThresh / 100);
+RPobs = max(RPdur - censor, 0);   % observable part of the window
 
 switch metricType
 
@@ -98,8 +107,8 @@ switch metricType
         % produce violations with each other.
         %   Ve = 2P/D * Nc * (Nb + (Nc-1)/2)
         %   C  = 1 - sqrt(1 - Nv*D / (Nt^2 * P))
-        expectedViol = 2 * RPdur / recDur * expectedNc .* (expectedNb + (expectedNc - 1) / 2);
-        estContam    = 1 - sqrt(1 - obsViol * recDur / (spikeCount^2 * RPdur));
+        expectedViol = 2 * RPobs / recDur * expectedNc .* (expectedNb + (expectedNc - 1) / 2);
+        estContam    = 1 - sqrt(1 - obsViol * recDur / (spikeCount^2 * RPobs));
 
     case 'Hill'
         % Hill, Mehta & Kleinfeld (2011): contamination from a single other
@@ -107,8 +116,8 @@ switch metricType
         % itself), so Ve uses Nb (not Nb + Nc). Matches the manuscript Methods.
         %   Ve = 2P/D * Nc * Nb
         %   C  = 1/2 * (1 - sqrt(1 - 2*Nv*D / (Nt^2 * P)))
-        expectedViol = 2 * RPdur / recDur * expectedNc .* expectedNb;
-        estContam    = 1/2 * (1 - sqrt(1 - 2 * obsViol * recDur / spikeCount^2 / RPdur));
+        expectedViol = 2 * RPobs / recDur * expectedNc .* expectedNb;
+        estContam    = 1/2 * (1 - sqrt(1 - 2 * obsViol * recDur / spikeCount^2 / RPobs));
 
 end
 
