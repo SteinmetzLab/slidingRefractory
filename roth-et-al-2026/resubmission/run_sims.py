@@ -25,7 +25,7 @@ from joblib import Parallel, delayed
 from scipy import stats
 
 sys.path.insert(0, str(Path(__file__).parent))
-from resub_simulations import evaluate_arms, make_train  # noqa: E402
+from resub_simulations import evaluate_arms, evaluate_censor, make_train  # noqa: E402
 
 OUT = Path(r"D:/temp/slidingRP_resub/sims")
 sweep = None  # bound in __main__ to _sweep_impl with the chosen n_jobs
@@ -48,9 +48,12 @@ def _one_condition(cond, n_sim, seed, arms_kw):
                             with_correction=arms_kw.get("correction", False),
                             gammas=GAMMAS)
         out.update({k: v for k, v in info.items() if k.startswith("realised")})
+        if arms_kw.get("censor_eval"):
+            out.update(evaluate_censor(st, cond["rec_dur"],
+                                       cond.get("model_kw", {}).get("censor", 0.0)))
         rows.append(out)
     df = pd.DataFrame(rows)
-    agg = {k: v for k, v in cond.items() if k != "model_kw"}
+    agg = {k: v for k, v in cond.items() if k not in ("model_kw", "seed")}
     agg.update({f"{k}": str(v) for k, v in cond.get("model_kw", {}).items()})
     agg["n_sim"] = n_sim
     for c in df.columns:
@@ -73,8 +76,10 @@ def _sweep_impl(name, conditions, n_sim, arms_kw, n_jobs=11, seed0=20260913):
     t0 = time.time()
     print(f"[{name}] {len(conditions)} conditions x {n_sim} sims "
           f"= {len(conditions)*n_sim:,} spike trains", flush=True)
+    # a condition may carry its own seed, so that conditions differing only in
+    # a model parameter share spike trains (common random numbers)
     res = Parallel(n_jobs=n_jobs, verbose=5)(
-        delayed(_one_condition)(c, n_sim, seed0 + i, arms_kw)
+        delayed(_one_condition)(c, n_sim, c.get("seed", seed0 + i), arms_kw)
         for i, c in enumerate(conditions))
     df = pd.DataFrame(res)
     df.to_parquet(OUT / f"{name}.pqt")
@@ -191,6 +196,59 @@ def run_mismatch(n_sim=1000):
     return sweep("mismatch", conds, n_sim, dict(oracle=False))
 
 
+FIG4 = dict(total_rate=[5.0], rp_dur=[0.003], rec_dur=[3600.0])
+RHOS = (-1.0, -0.5, -0.2, -0.15, -0.1, -0.05, 0.0, 0.05, 0.1, 0.15, 0.2, 0.5, 1.0)
+
+
+def _crn(conds, base):
+    """Give conditions that share a contamination level the same seed."""
+    idx = {round(c, 6): i for i, c in enumerate(CONT_GRID)}
+    for c in conds:
+        c["seed"] = base + 1000 * int(round(c["rp_dur"] * 1e5)) + idx[round(c["cont_prop"], 6)]
+    return conds
+
+
+def run_fig4_reference(n_sim=4000):
+    """The manuscript's model at the manuscript's Fig 4 setting: 5 spikes/s,
+    3 ms refractory period, 1 h. The reference curve for the mismatch figure."""
+    conds = grid(model=["standard"], cont_prop=list(CONT_GRID), **FIG4)
+    return sweep("fig4_reference", conds, n_sim, dict(oracle=False))
+
+
+def run_fig4_mismatch(n_sim=1000):
+    """05 redone at the Fig 4 setting, one curve per condition (the first
+    version pooled 1 and 5 spikes/s and 2 and 3 ms into each curve), with a
+    true-correlation model on a fine rho grid."""
+    cg = list(CONT_GRID)
+    conds = []
+    conds += grid(model=["single_neuron_contaminant"], cont_prop=cg,
+                  model_kw=[{"cont_rp": 0.0015}, {"cont_rp": 0.0025}], **FIG4)
+    conds += grid(model=["bursting"], cont_prop=cg,
+                  model_kw=[{"p_burst": 0.1}, {"p_burst": 0.3}], **FIG4)
+    conds += grid(model=["graded"], cont_prop=cg,
+                  model_kw=[{"width": w} for w in (0.0005, 0.001, 0.002)], **FIG4)
+    conds += grid(model=["nonoverlapping"], cont_prop=cg,
+                  model_kw=[{"overlap": o} for o in (0.0, 0.25, 0.5, 0.75, 1.0)], **FIG4)
+    corr = grid(model=["correlated"], cont_prop=cg,
+                model_kw=[{"rho": r, "tau_s": 2.0} for r in RHOS], **FIG4)
+    mod = grid(model=["modulated"], cont_prop=cg,
+               model_kw=[{"rho": r, "tau_s": 2.0} for r in (-1.0, -0.5, 0.5, 1.0)], **FIG4)
+    conds += _crn(corr, 7_000_000) + _crn(mod, 8_000_000)
+    return sweep("fig4_mismatch", conds, n_sim, dict(oracle=False))
+
+
+def run_censoring(n_sim=1000):
+    """08: a sorter censor window in the data, and the method ignoring it or
+    accounting for it. Censor levels share trains (common random numbers), so
+    the uncensored condition is the same trains before censoring."""
+    ws = (0.0, 1 / 6000, 0.00025, 0.0005, 0.001)
+    conds = grid(model=["standard"], total_rate=[5.0], rp_dur=[0.0015, 0.003],
+                 rec_dur=[3600.0], cont_prop=list(CONT_GRID),
+                 model_kw=[{"censor": w} for w in ws])
+    conds = _crn(conds, 9_000_000)
+    return sweep("censoring", conds, n_sim, dict(oracle=False, censor_eval=True))
+
+
 def run_fig4g_validation(n_sim=600):
     """Simulation to overlay on the analytical Fig 4g (work package 06).
 
@@ -220,6 +278,9 @@ JOBS = {
     "decomposition": run_decomposition,
     "decomposition_realistic": run_decomposition_realistic,
     "mismatch": run_mismatch,
+    "fig4_reference": run_fig4_reference,
+    "fig4_mismatch": run_fig4_mismatch,
+    "censoring": run_censoring,
     "fig4g_validation": run_fig4g_validation,
 }
 

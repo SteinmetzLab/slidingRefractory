@@ -73,7 +73,7 @@ def computeViol(obs_viol, spike_count, ref_dur, contamination_prop, rec_dur):
 
 
 def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
-                       conf_thresh=90.0, rp_reject=RP_REJECT):
+                       conf_thresh=90.0, rp_reject=RP_REJECT, censor=0.0):
     """Sliding RP metric from a precomputed ACG (fast analytical path).
 
     Mirrors ``slidingRP.metrics.slidingRP`` step for step, but takes the ACG
@@ -82,6 +82,13 @@ def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
 
     Returns a dict with max_conf, min_cont, rp_min_val, n_viol_short, passes,
     tau_first_pass and tau_pass0.
+
+    ``censor`` (seconds) is a sorter exclusion window: if the sorter removed
+    every spike within ``censor`` of an earlier spike of the same unit, no
+    violation can be observed at lags below it, so the window over which
+    violations can accrue is ``tau_r - censor`` rather than ``tau_r``. The
+    expected count and C_min use that shortened window. ``censor = 0`` is the
+    published method exactly. See 08_censoring_window/censoring_math.md.
     """
     from scipy import stats
 
@@ -97,7 +104,8 @@ def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
                     passes=False, tau_first_pass=np.nan,
                     tau_pass0=tau_pass0(spike_count, rec_dur, cont_thresh, conf_thresh))
 
-    conf_at_thresh = 100 * computeViol(obs_viol, spike_count, REF_DUR,
+    ref_eff = np.clip(REF_DUR - censor, 0.0, None)
+    conf_at_thresh = 100 * computeViol(obs_viol, spike_count, ref_eff,
                                        cont_thresh / 100, rec_dur)[0]
     max_conf = float(np.max(conf_at_thresh[test_times]))
     passes = bool(max_conf >= conf_thresh)
@@ -109,9 +117,10 @@ def slidingRP_from_acg(nACG, spike_count, rec_dur, cont_thresh=10.0,
     # Minimum confirmable contamination, analytical (matches
     # compute_min_contamination / computeMinContamination.m).
     lam = stats.chi2.ppf(conf_thresh / 100, 2 * (obs_viol + 1)) / 2
-    disc = (spike_count - 0.5) ** 2 - lam * rec_dur / REF_DUR
+    with np.errstate(divide="ignore", invalid="ignore"):
+        disc = (spike_count - 0.5) ** 2 - lam * rec_dur / ref_eff
     cmin = np.full(REF_DUR.shape, np.nan)
-    good = disc >= 0
+    good = (disc >= 0) & (ref_eff > 0)
     cmin[good] = ((spike_count - 0.5) - np.sqrt(disc[good])) / spike_count * 100
     cmin_test = cmin[test_times]
     if np.all(np.isnan(cmin_test)):
@@ -166,19 +175,24 @@ def min_passing_fr(rec_dur, tau, cont_thresh=10.0, conf_thresh=90.0):
     return N / rec_dur
 
 
-def hill_llobet_from_acg(nACG, spike_count, rec_dur, rp_dur, cont_thresh=10.0):
+def hill_llobet_from_acg(nACG, spike_count, rec_dur, rp_dur, cont_thresh=10.0,
+                         censor=0.0):
     """Hill-Llobet fixed-RP point estimate from a precomputed ACG.
 
     Mirrors ``matlab/RPmetric_Classic.m`` (metricType 'Llobet'), including its
     inclusive bin selection ``sum(nACG(1:find(rp > RPdur, 1)))``.
+
+    ``censor`` shortens the window used for the expectation and the estimate
+    to ``rp_dur - censor``, as in slidingRP_from_acg; 0 is the published method.
     """
     idx = int(np.argmax(RP_CENTERS > rp_dur))
     obs_viol = float(np.sum(np.asarray(nACG)[:idx + 1]))
     Nc = spike_count * cont_thresh / 100
     Nb = spike_count * (1 - cont_thresh / 100)
-    expected = 2 * rp_dur / rec_dur * Nc * (Nb + (Nc - 1) / 2)
-    with np.errstate(invalid="ignore"):
-        est = 1 - np.sqrt(1 - obs_viol * rec_dur / (spike_count ** 2 * rp_dur))
+    eff = max(rp_dur - censor, 0.0)
+    expected = 2 * eff / rec_dur * Nc * (Nb + (Nc - 1) / 2)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        est = 1 - np.sqrt(1 - obs_viol * rec_dur / (spike_count ** 2 * eff))
     return bool(obs_viol <= expected), float(est), obs_viol
 
 

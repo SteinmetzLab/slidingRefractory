@@ -176,8 +176,78 @@ def _modulation(duration, tau_s, rng, dt=0.05):
     return y, dt
 
 
+def _pair_stats(prof_b, prof_c, base, cont, duration):
+    """What a correlated pair looks like, three ways.
+
+    kappa    excess coincidence of the two rate processes,
+             E[r_b r_c] / (E[r_b] E[r_c]) - 1. This is what the metric feels: it
+             scales the number of neuron-contaminant pairs at short lags, and so
+             the observed violations, by (1 + kappa).
+    kappa_cc the contaminant's own excess self-coincidence, Var(r_c)/E[r_c]^2,
+             which scales the contaminant-contaminant violations.
+    r_0p1, r_1  the spike-count correlations at 100 ms and 1 s bins, which is
+             what a correlation measured in data usually is. Counting noise makes
+             these much smaller than the rate correlation, and they depend on
+             firing rate, so they are a poor proxy for kappa.
+    """
+    out = {"kappa": float(np.mean(prof_b * prof_c) - 1.0),
+           "kappa_cc": float(np.mean(prof_c * prof_c) - 1.0)}
+    for tag, w in (("r_0p1", 0.1), ("r_1", 1.0)):
+        edges = np.arange(0, duration + w, w)
+        cb = np.histogram(base, edges)[0].astype(float)
+        cc = np.histogram(cont, edges)[0].astype(float)
+        out[tag] = (float(np.corrcoef(cb, cc)[0, 1])
+                    if cb.std() > 0 and cc.std() > 0 else np.nan)
+    return out
+
+
+def gen_correlated_pair(base_rate, cont_rate, duration, rp, rho=0.0, amp=0.8,
+                        tau_s=2.0, rng=None):
+    """Base neuron and contaminant whose rate modulations have correlation rho.
+
+    Unlike gen_modulated_pair, where both units follow ONE shared signal and
+    rho only scales the contaminant's modulation depth (so the two rate
+    processes are perfectly correlated for any rho != 0), here each unit has its
+    own unit-variance modulation of the same depth ``amp``:
+
+        s_b = s1,   s_c = rho * s1 + sqrt(1 - rho^2) * s2,
+
+    with s1, s2 independent AR(1) signals of correlation time tau_s. rho is then
+    the correlation coefficient of the two modulations, and rho = 0 means
+    independently modulated (not unmodulated) units. Rates are
+    ``R (1 + amp * s)`` clipped at zero and renormalised to the target mean.
+
+    Returns (base_spikes, contaminant_spikes, stats) with stats from
+    _pair_stats.
+    """
+    rng = rng or np.random.default_rng()
+    s1, dt = _modulation(duration, tau_s, rng)
+    s2, _ = _modulation(duration, tau_s, rng)
+    sb = s1
+    sc = rho * s1 + np.sqrt(max(0.0, 1.0 - rho * rho)) * s2
+
+    def profile(s):
+        prof = np.clip(1 + amp * s, 0, None)
+        return prof / prof.mean()
+
+    def thin(rate, rp_, prof):
+        if rate <= 0:
+            return np.empty(0)
+        rmax = prof.max()
+        st = gen_hard_rp(rate * rmax, duration, rp_, rng)
+        if st.size == 0:
+            return st
+        p = prof[np.minimum((st / dt).astype(int), prof.size - 1)] / rmax
+        return st[rng.random(st.size) < p]
+
+    pb, pc = profile(sb), profile(sc)
+    base = thin(base_rate, rp, pb)
+    cont = thin(cont_rate, 0.0, pc)
+    return base, cont, _pair_stats(pb, pc, base, cont, duration)
+
+
 def gen_modulated_pair(base_rate, cont_rate, duration, rp, rho=0.0, amp=0.8,
-                       tau_s=2.0, rng=None):
+                       tau_s=2.0, rng=None, return_stats=False):
     """Base neuron and contaminant driven by a shared slow rate modulation.
 
     ``r_b(t) = R_b (1 + amp*s(t))`` and ``r_c(t) = R_c (1 + rho*amp*s(t))``.
@@ -190,7 +260,13 @@ def gen_modulated_pair(base_rate, cont_rate, duration, rp, rho=0.0, amp=0.8,
     thinning, which slightly lengthens the effective dead time; that is the
     intended behaviour (a modulated neuron still cannot fire within its RP).
 
-    Returns (base_spikes, contaminant_spikes, realised_rate_correlation).
+    Returns (base_spikes, contaminant_spikes, realised_rate_correlation), or
+    with ``return_stats=True`` (base, contaminant, stats) where stats comes from
+    _pair_stats. The random-number stream is identical either way.
+
+    Note the name: rho here is the contaminant's modulation depth relative to
+    the base neuron's, on a shared signal, NOT a correlation coefficient. For a
+    true rate correlation use gen_correlated_pair.
     """
     rng = rng or np.random.default_rng()
     s, dt = _modulation(duration, tau_s, rng)
@@ -209,6 +285,11 @@ def gen_modulated_pair(base_rate, cont_rate, duration, rp, rho=0.0, amp=0.8,
 
     base = thin(base_rate, rp, 1.0)
     cont = thin(cont_rate, 0.0, rho)
+    if return_stats:
+        def profile(weight):
+            prof = np.clip(1 + weight * amp * s, 0, None)
+            return prof / prof.mean()
+        return base, cont, _pair_stats(profile(1.0), profile(rho), base, cont, duration)
     # realised correlation of the two rate profiles in 100 ms bins
     edges = np.arange(0, duration + 0.1, 0.1)
     cb = np.histogram(base, edges)[0].astype(float)
@@ -272,11 +353,19 @@ def make_train(model, total_rate, cont_prop, duration, rp, rng=None, **kw):
         b = gen_hard_rp(base_rate, duration, rp, rng)
         c = gen_hard_rp(cont_rate, duration, kw.get("cont_rp", 0.0015), rng)
     elif model == "modulated":                    # 05-B1
-        b, c, r = gen_modulated_pair(base_rate, cont_rate, duration, rp,
-                                     rho=kw.get("rho", 0.0),
-                                     amp=kw.get("amp", 0.8),
-                                     tau_s=kw.get("tau_s", 2.0), rng=rng)
-        info["realised_rate_corr"] = r
+        b, c, st_ = gen_modulated_pair(base_rate, cont_rate, duration, rp,
+                                       rho=kw.get("rho", 0.0),
+                                       amp=kw.get("amp", 0.8),
+                                       tau_s=kw.get("tau_s", 2.0), rng=rng,
+                                       return_stats=True)
+        info["realised_rate_corr"] = st_["r_0p1"]
+        info.update({f"realised_{k}": v for k, v in st_.items()})
+    elif model == "correlated":                   # 05-B1, true correlation
+        b, c, st_ = gen_correlated_pair(base_rate, cont_rate, duration, rp,
+                                        rho=kw.get("rho", 0.0),
+                                        amp=kw.get("amp", 0.8),
+                                        tau_s=kw.get("tau_s", 2.0), rng=rng)
+        info.update({f"realised_{k}": v for k, v in st_.items()})
     elif model == "nonoverlapping":               # 05-B2
         b, c = gen_nonoverlapping(base_rate, cont_rate, duration, rp,
                                   overlap=kw.get("overlap", 0.0),
@@ -292,6 +381,13 @@ def make_train(model, total_rate, cont_prop, duration, rp, rng=None, **kw):
 
     st = np.sort(np.concatenate([b, c]))
     info["n_base"], info["n_cont"] = b.size, c.size
+    w = kw.get("censor", 0.0)
+    if w and w > 0:
+        # sorter-style exclusion window on the merged unit: no two spikes
+        # closer than w survive (08_censoring_window)
+        n_before = st.size
+        st = _enforce_dead_time(st, w)
+        info["realised_censored_frac"] = 1 - st.size / max(n_before, 1)
     info["realised_cont"] = c.size / max(st.size, 1)
     return st, info
 
@@ -330,6 +426,35 @@ def poisson_test_fixed_tau(nACG, n_spikes, rec_dur, tau, cont_thresh=10.0):
     obs = float(np.sum(np.asarray(nACG)[:idx + 1]))
     conf, _ = computeViol(obs, n_spikes, REF_DUR[idx], cont_thresh / 100, rec_dur)
     return 100 * float(conf)
+
+
+def evaluate_censor(st, rec_dur, censor, cont_thresh=10.0, conf_thresh=90.0,
+                    hl_rps=(0.002, 0.003)):
+    """Sliding RP and Hill-Llobet on one train, ignoring and accounting for a
+    sorter censor window.
+
+    Keys without a suffix use the published method (censor = 0); keys ending
+    in ``_cc`` shorten every window by the known censor. On the same train, so
+    the difference is the bias of ignoring the censor, not simulation noise.
+    """
+    n = st.size
+    out = {}
+    if n < 2:
+        return out
+    nACG = computeACG(st, BIN_SIZE, N_BINS)
+    for tag, c in (("", 0.0), ("_cc", censor)):
+        r = slidingRP_from_acg(nACG, n, rec_dur, cont_thresh=cont_thresh,
+                               conf_thresh=conf_thresh, censor=c)
+        out[f"srp_pass{tag}"] = r["passes"]
+        out[f"srp_maxconf{tag}"] = r["max_conf"]
+        out[f"srp_cmin{tag}"] = r["min_cont"]
+        for rp_dur in hl_rps:
+            p, est, _ = hill_llobet_from_acg(nACG, n, rec_dur, rp_dur, cont_thresh,
+                                             censor=c)
+            k = f"{rp_dur*1000:g}".replace(".", "p")
+            out[f"hl{k}_pass{tag}"] = p
+            out[f"hl{k}_est{tag}"] = est
+    return out
 
 
 def evaluate_arms(st, rec_dur, true_rp=None, cont_thresh=10.0,

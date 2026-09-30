@@ -319,3 +319,68 @@ def test_standardization_removes_a_known_firing_rate_effect():
     std_b = standardized_median(fr_b, v_b, w)[0]
     assert raw_gap > 0.4, raw_gap
     assert abs(std_a - std_b) < 0.2 * raw_gap
+
+
+# --- censor window and true-correlation model (05 revision, 08) ---------------
+
+def test_censor_zero_is_the_published_method():
+    dur = 3600.0
+    st, _ = make_train("standard", 5.0, 0.10, dur, 0.003, rng=RNG)
+    acg = metrics.computeACG(st, BIN_SIZE, N_BINS)
+    a = slidingRP_from_acg(acg, st.size, dur)
+    b = slidingRP_from_acg(acg, st.size, dur, censor=0.0)
+    assert a == b
+    h1 = hill_llobet_from_acg(acg, st.size, dur, 0.002)
+    h2 = hill_llobet_from_acg(acg, st.size, dur, 0.002, censor=0.0)
+    assert h1[0] == h2[0] and h1[2] == h2[2]
+
+
+def test_censor_shortens_every_window_by_w():
+    """With censor w the expectation at tau equals the uncensored one at tau - w,
+    and windows no longer than w carry no information (confidence 0)."""
+    from acg_table import REF_DUR as RD
+    from acg_table import computeViol
+    dur, n, w = 3600.0, 18000, 0.0005
+    acg = np.zeros(N_BINS)
+    r = slidingRP_from_acg(acg, n, dur, censor=w, rp_reject=0.0)
+    assert r["max_conf"] > 0
+    k = int(np.searchsorted(RD, 0.002))
+    _, e_cens = computeViol(0, n, RD[k] - w, 0.10, dur)
+    _, e_plain = computeViol(0, n, RD[k], 0.10, dur)
+    assert e_cens == pytest.approx(e_plain * (RD[k] - w) / RD[k])
+    # a fully empty ACG, uncensored, is more confident than when censored:
+    assert slidingRP_from_acg(acg, n, dur)["max_conf"] >= r["max_conf"]
+
+
+def test_make_train_censor_removes_every_short_isi():
+    st, info = make_train("standard", 20.0, 0.3, 600.0, 0.002, rng=RNG,
+                          censor=0.0005)
+    assert np.min(np.diff(st)) >= 0.0005 - 1e-12
+    assert 0 < info["realised_censored_frac"] < 0.05
+
+
+def test_gen_correlated_pair_rho_is_a_correlation():
+    from resub_simulations import gen_correlated_pair
+    kap = {}
+    for rho in (-0.5, 0.0, 0.5, 1.0):
+        b, c, s = gen_correlated_pair(4.5, 0.5, 3600.0, 0.002, rho=rho,
+                                      rng=np.random.default_rng(3))
+        kap[rho] = s["kappa"]
+        # Excess coincidence is rho times the rate variance. With amp = 0.8
+        # the clipping at zero rate brings that variance from 0.64 to about
+        # 0.5, so kappa is about 0.47 rho (measured, not assumed).
+        assert s["kappa"] == pytest.approx(0.47 * rho, abs=0.05), (rho, s)
+        # an independently modulated contaminant still self-coincides more than
+        # a Poisson one, by about the rate variance, whatever rho is
+        assert 0.4 < s["kappa_cc"] < 0.6
+        assert b.size / 3600.0 == pytest.approx(4.5, rel=0.1)
+    assert kap[-0.5] < kap[0.0] < kap[0.5] < kap[1.0]
+
+
+def test_gen_modulated_pair_stats_do_not_change_the_spikes():
+    b1, c1, _ = gen_modulated_pair(4.5, 0.5, 600.0, 0.002, rho=0.5,
+                                   rng=np.random.default_rng(9))
+    b2, c2, s = gen_modulated_pair(4.5, 0.5, 600.0, 0.002, rho=0.5,
+                                   rng=np.random.default_rng(9), return_stats=True)
+    assert np.array_equal(b1, b2) and np.array_equal(c1, c2)
+    assert s["kappa"] == pytest.approx(0.27, abs=0.06)
