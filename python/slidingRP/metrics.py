@@ -231,9 +231,12 @@ def slidingRP(spikeTimes, params=None, conf_thresh=90, cont_thresh=10, rp_reject
     spike of the same unit, violations at shorter lags can never be observed,
     and ignoring that makes the metric strongly anti-conservative. With
     ``censor = w`` each tested window tau_r contributes an expected count over
-    its observable length max(tau_r - w, 0). Set it to your sorter's window
-    (e.g. Kilosort 4's ``duplicate_spike_ms``); 0 reproduces the published
-    method exactly.
+    its observable length max(tau_r - w, 0). Set it to your sorter's window;
+    0 reproduces the published method exactly. Kilosort 4 removes same-cluster
+    spikes closer than int(duplicate_spike_ms * fs / 1000) samples, so its
+    default (0.25 ms at 30 kHz) is 7 samples: use censor = 7 / 30000, not
+    0.00025. Measure it from your data if unsure: it is the smallest
+    inter-spike interval across all units of a recording.
 
     Returns
     -------

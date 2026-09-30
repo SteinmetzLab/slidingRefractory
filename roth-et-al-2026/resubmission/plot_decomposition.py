@@ -47,6 +47,8 @@ ARMS = [
 ]
 
 
+FAR_C, TAR_C = 0.12, 0.08     # false / true acceptance points (Fig 4 convention)
+
 def op(sub, col, cont):
     s = sub[np.isclose(sub.cont_prop, cont)]
     return s[col].mean() * 100 if len(s) and col in s else np.nan
@@ -87,9 +89,10 @@ def main():
             continue
         xs, ys = [], []
         for fr in sorted(d.total_rate.unique()):
-            sub = d[d.total_rate == fr]
-            xs.append(op(sub, col, 0.10))
-            ys.append(op(sub, col, 0.08))
+            # one true RP (the Fig 4 setting), not pooled across 1.5, 3 and 5 ms
+            sub = d[(d.total_rate == fr) & np.isclose(d.rp_dur, 0.003)]
+            xs.append(op(sub, col, FAR_C))
+            ys.append(op(sub, col, TAR_C))
         ax.plot(xs, ys, ls, color=c, marker="o", ms=5, alpha=0.85, label=lab)
         ax.annotate(f"{sorted(d.total_rate.unique())[0]:g}", (xs[0], ys[0]),
                     fontsize=5.5, color=c, xytext=(2, 2),
@@ -97,7 +100,7 @@ def main():
     ax.plot([0, 100], [0, 100], "k--", lw=1)
     ax.set_xlabel("False acceptance rate (%)")
     ax.set_ylabel("True acceptance rate (%)")
-    ax.set_title("c  Operating points (1, 2, 5 spikes/s)", loc="left")
+    ax.set_title("c  Operating points, true RP 3 ms (1, 2, 5 spikes/s)", loc="left")
 
     # --- d: estimator error -------------------------------------------------
     ax = axs[3]
@@ -122,7 +125,8 @@ def main():
     L = ["Decomposing the Hill-Llobet comparison", "=" * 45, "",
          f"Sliding RP and the Poisson-test arms at gamma = {G}; 600 trains per",
          "contamination level; all arms on the same trains. 'False' is the",
-         "acceptance rate at exactly 10% contamination, 'true' at 8%.", ""]
+         f"acceptance rate at {FAR_C*100:g}% contamination, 'true' at {TAR_C*100:g}% (the",
+         "manuscript's Fig 4 convention).", ""]
     for rp in sorted(d.rp_dur.unique()):
         L += [f"True refractory period {rp*1000:g} ms:", ""]
         L.append(f"  {'arm':28s} " + "".join(
@@ -133,7 +137,7 @@ def main():
             cells = []
             for fr in sorted(d.total_rate.unique()):
                 sub = d[(d.rp_dur == rp) & (d.total_rate == fr)]
-                cells.append(f"{op(sub, col, 0.10):8.1f} /{op(sub, col, 0.08):7.1f}")
+                cells.append(f"{op(sub, col, FAR_C):8.1f} /{op(sub, col, TAR_C):7.1f}")
             L.append(f"  {lab:28s} " + "".join(f"{c:>22}" for c in cells))
         L.append("")
     if "rp_est_ms_median" in d:

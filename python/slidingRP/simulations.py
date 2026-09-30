@@ -109,15 +109,18 @@ def RPmetric_Classic(spikeTimes, params):
 
     # estContam is undefined (NaN) when observed violations exceed the formula's
     # valid range (very high contamination); passTest is unaffected.
+    obsViol = float(obsViol)
     with np.errstate(invalid='ignore', divide='ignore'):
         if metricType == 'Llobet':
             # contaminating spikes also violate with each other
             expectedViol = 2 * RPobs / recDur * Nc * (Nb + (Nc - 1) / 2)
-            estContam = 1 - np.sqrt(1 - obsViol * recDur / (spikeCount ** 2 * RPobs))
+            estContam = 1 - np.sqrt(1 - np.divide(obsViol * recDur, spikeCount ** 2 * RPobs))
         else:  # 'Hill': single other neuron, violations only with the base neuron
             expectedViol = 2 * RPobs / recDur * Nc * Nb
-            estContam = 0.5 * (1 - np.sqrt(1 - 2 * obsViol * recDur / spikeCount ** 2 / RPobs))
+            estContam = 0.5 * (1 - np.sqrt(1 - np.divide(2 * obsViol * recDur, spikeCount ** 2 * RPobs)))
 
+    if RPobs <= 0:     # the whole window lies inside the censor: no information
+        estContam = np.nan
     passTest = bool(obsViol <= expectedViol)
     return passTest, estContam
 

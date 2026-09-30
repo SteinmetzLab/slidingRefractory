@@ -39,8 +39,11 @@ def main():
     (OUTDIR / "figures").mkdir(exist_ok=True)
     lines = ["Real-data analysis: what Sliding RP changes", "=" * 60, ""]
 
-    # sorter-accepted units are the main-text population
-    acc = df[(df.sorter_label.isna()) | (df.sorter_label > 0)].copy()
+    # sorter-good units are the main-text population, as in Fig 1: IBL label 1,
+    # Allen 'good', Steinmetz phy_annotation >= 2, all macaque units. (Before
+    # 2026-09-29 this was any positive label, which for IBL also admitted
+    # partial labels 0.33 and 0.67.)
+    acc = df[(df.sorter_label.isna()) | (df.sorter_label >= 1)].copy()
     lines.append(f"All units {len(df):,}; sorter-accepted {len(acc):,}")
 
     # --- 1. pass rates by dataset x region --------------------------------

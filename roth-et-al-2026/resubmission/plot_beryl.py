@@ -55,7 +55,7 @@ def region_table(inc, df, weights):
         std, cov = standardized_median(g.firing_rate, v, weights)
         slo, shi = standardized_ci(g.firing_rate, v, weights, n_boot=300)
         acc = df[(df.beryl == reg)
-                 & (df.sorter_label.isna() | (df.sorter_label > 0))]
+                 & (df.sorter_label.isna() | (df.sorter_label >= 1))]
         row = dict(beryl=reg, cosmos=g.cosmos.mode().iat[0], n=len(g),
                    n_sess=g.session_key.nunique(),
                    n_ins=g.insertion_key.nunique(),

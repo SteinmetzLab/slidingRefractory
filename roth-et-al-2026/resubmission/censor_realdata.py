@@ -103,7 +103,10 @@ def main():
             n = e.n_spikes.to_numpy(float)
             dur = e.rec_dur_s.to_numpy(float)
             a0 = accept(acg, n, dur, L_plain)
-            assert np.array_equal(a0, e.passes.to_numpy(bool)), "must reproduce stored decisions"
+            # after apply_censor.py the stored decision is the censored one and
+            # the published decision is kept as passes_nocensor
+            published = (e.passes_nocensor if "passes_nocensor" in e else e.passes)
+            assert np.array_equal(a0, published.to_numpy(bool)), "must reproduce published decisions"
             res.append(pd.DataFrame(dict(cosmos=e.cosmos.values, a0=a0,
                                          a_hard=accept(acg, n, dur, L_hard),
                                          a_prof=accept(acg, n, dur, L_prof))))

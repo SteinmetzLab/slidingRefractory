@@ -191,6 +191,8 @@ def hill_llobet_from_acg(nACG, spike_count, rec_dur, rp_dur, cont_thresh=10.0,
     Nb = spike_count * (1 - cont_thresh / 100)
     eff = max(rp_dur - censor, 0.0)
     expected = 2 * eff / rec_dur * Nc * (Nb + (Nc - 1) / 2)
+    if eff <= 0:       # the whole window lies inside the censor: no information
+        return bool(obs_viol <= expected), float("nan"), obs_viol
     with np.errstate(invalid="ignore", divide="ignore"):
         est = 1 - np.sqrt(1 - obs_viol * rec_dur / (spike_count ** 2 * eff))
     return bool(obs_viol <= expected), float(est), obs_viol

@@ -45,8 +45,13 @@ function [passTest, confidence, contamination, timeOfLowestCont, ...
 %                              metric strongly anti-conservative. Each tested
 %                              window tau_r then contributes an expected count
 %                              over max(tau_r - censor, 0). Set it to your
-%                              sorter's window (e.g. Kilosort 4's
-%                              duplicate_spike_ms). Default: 0, the published
+%                              sorter's window. Kilosort 4 removes same-cluster
+%                              spikes closer than
+%                              int(duplicate_spike_ms*fs/1000) samples, so its
+%                              default (0.25 ms at 30 kHz) is 7 samples: use
+%                              7/30000, not 0.00025. If unsure, it is the
+%                              smallest inter-spike interval across all units
+%                              of a recording. Default: 0, the published
 %                              method exactly.
 %       .correction          - Logical. If true, apply the family-wise
 %                              multiple-comparisons correction across tau_r

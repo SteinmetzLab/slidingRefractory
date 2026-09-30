@@ -121,4 +121,7 @@ switch metricType
 
 end
 
+if RPobs <= 0   % the whole window lies inside the censor: no information
+    estContam = NaN;
+end
 passTest = obsViol <= expectedViol;
