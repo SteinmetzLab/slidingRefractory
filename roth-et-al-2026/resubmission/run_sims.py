@@ -154,6 +154,17 @@ def run_decomposition(n_sim=600):
                  dict(oracle=True, estimator=True))
 
 
+def run_decomposition_0p5(n_sim=600):
+    """04, the same arms and grid as run_decomposition at 0.5 spikes/s, where the
+    point estimate's lack of a power check should be most visible."""
+    cont = [c for c in CONT_GRID if c in (0, 0.04, 0.06, 0.08, 0.09, 0.10,
+                                          0.11, 0.12, 0.14, 0.16, 0.20)]
+    conds = grid(model=["standard"], total_rate=[0.5],
+                 rp_dur=[0.0015, 0.003, 0.005],
+                 rec_dur=[7200.0], cont_prop=cont)
+    return sweep("decomposition_0p5", conds, n_sim, dict(oracle=True, estimator=True))
+
+
 def run_decomposition_realistic(n_sim=400):
     """04, second grid: the same arms on ACG shapes where RP estimation is hard."""
     conds = (grid(model=["graded"], total_rate=[1.0, 5.0], rp_dur=[0.002, 0.003],
@@ -281,6 +292,7 @@ JOBS = {
     "fig4_reference": run_fig4_reference,
     "fig4_mismatch": run_fig4_mismatch,
     "censoring": run_censoring,
+    "decomposition_0p5": run_decomposition_0p5,
     "fig4g_validation": run_fig4g_validation,
 }
 
